@@ -9,8 +9,8 @@ const seasons = [
     badge: "bg-green-100 text-green-700",
     icon: "🌱",
     description:
-      "Glädje, lek och grundläggande motorik. Lär barnen att älska basket utan krav på teknisk perfektion.",
-    highlights: ["Studsteknik", "Kasta mot korg", "Passningar", "Lagkänsla"],
+      "Glädje, lek och grundläggande motorik. 36 träningspass à 50–60 min med fokus på att introducera grunderna och ha riktigt kul.",
+    highlights: ["Bollbekantskap", "Dribbling", "Skott mot korg", "Roliga lekar"],
   },
   {
     year: 2,
@@ -20,8 +20,8 @@ const seasons = [
     badge: "bg-blue-100 text-blue-700",
     icon: "⚡",
     description:
-      "Bygg vidare på grunderna. Introducera specifika basket-tekniker och enkel speltaktik.",
-    highlights: ["Läggningar", "Försvarsgrunder", "Triple threat", "Minibasket"],
+      "Repetera grunderna och introducera matchspelet. 36 träningspass à 60 min med progression mot mer basketspecifika färdigheter.",
+    highlights: ["Passningar", "Dribbel", "Matchspel", "Lagövningar"],
   },
   {
     year: 3,
@@ -31,10 +31,11 @@ const seasons = [
     badge: "bg-orange-100 text-orange-700",
     icon: "🔥",
     description:
-      "Teknisk finslipning och taktiskt spelande. Offensiva och defensiva system, matchspel med fulla regler.",
-    highlights: ["Pick and roll", "Zonförsvar", "Motion offense", "Situationsspel"],
+      "Teknisk finslipning och taktisk förståelse. 36 träningspass à 60 min indelade i två cykler med helt nya moment.",
+    highlights: ["Stötpass", "Läggning", "Spelövningar", "Taktik"],
   },
 ];
+
 
 export default function Home() {
   return (
