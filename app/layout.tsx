@@ -15,9 +15,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="sv">
-      <body className="antialiased bg-gray-50 text-gray-900">
+      <body className="antialiased bg-slate-50 text-slate-900">
         <Navbar />
-        <main className="max-w-5xl mx-auto px-4 py-8">{children}</main>
+        <main className="max-w-5xl mx-auto px-4 py-10">{children}</main>
       </body>
     </html>
   );
