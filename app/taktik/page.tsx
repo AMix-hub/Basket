@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import { useCast } from "@/app/hooks/useCast";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Player {
@@ -189,6 +190,26 @@ export default function TaktikPage() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOnline = !!supabase && !!myTeam;
+
+  /* ─── Cast URL (computed client-side to avoid SSR mismatch) ─── */
+  /* Derive a stable cast URL from the team's id and name so the useCast hook
+   * only re-registers when those values actually change (not when the myTeam
+   * object reference changes, which can happen on every re-render because
+   * getMyTeam() reads from localStorage). */
+  const teamIdForCast = myTeam?.id ?? null;
+  const teamNameForCast = myTeam?.name ?? null;
+  const castUrl = useMemo(() => {
+    if (typeof window === "undefined" || !teamIdForCast || !teamNameForCast)
+      return null;
+    return (
+      `${window.location.origin}/cast` +
+      `?team=${teamIdForCast}` +
+      `&name=${encodeURIComponent(teamNameForCast)}`
+    );
+  }, [teamIdForCast, teamNameForCast]);
+
+  const { isAvailable: castAvailable, isPresenting, startCast, stopCast } =
+    useCast(castUrl);
 
   /* ─── Push live board state to Supabase (debounced 120 ms) ─── */
   const pushLiveState = useCallback(
@@ -642,6 +663,26 @@ export default function TaktikPage() {
               {myTeam.name}
             </span>
             <SyncBadge status={isOnline ? syncStatus : "offline"} />
+
+            {/* Cast button — visible when the Presentation API is supported */}
+            {castAvailable && (
+              <button
+                onClick={isPresenting ? stopCast : startCast}
+                title={
+                  isPresenting
+                    ? "Koppla från extern skärm"
+                    : "Visa taktiktavlan på TV / Chromecast / AirPlay"
+                }
+                className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg transition-colors ${
+                  isPresenting
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                <span>📺</span>
+                {isPresenting ? "Castar" : "Casta"}
+              </button>
+            )}
           </div>
         </div>
         <p className="text-slate-500 text-sm">
@@ -649,6 +690,21 @@ export default function TaktikPage() {
           Play-knappen.
           {isOnline && " Ändringar synkas i realtid med alla i laget."}
         </p>
+
+        {/* Casting-active banner */}
+        {isPresenting && (
+          <div className="mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 font-medium flex items-center justify-between gap-2">
+            <span>
+              📺 Castar till extern skärm — alla ändringar syns direkt på TV:n.
+            </span>
+            <button
+              onClick={stopCast}
+              className="shrink-0 font-semibold underline hover:no-underline"
+            >
+              Koppla från
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}

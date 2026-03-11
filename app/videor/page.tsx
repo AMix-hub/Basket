@@ -53,7 +53,9 @@ function YouTubeEmbed({ videoId }: { videoId: string }) {
         className="absolute inset-0 w-full h-full rounded-xl"
         src={`https://www.youtube.com/embed/${videoId}`}
         title="YouTube video"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        // x-webkit-airplay enables AirPlay controls in Safari/iOS for the embedded player
+        {...{ "x-webkit-airplay": "allow" }}
         allowFullScreen
       />
     </div>
@@ -124,6 +126,18 @@ export default function VideorPage() {
           </div>
           <p className="text-slate-500 text-sm">
             Bädda in YouTube-videor för övningar och taktiker.
+          </p>
+          {/* AirPlay / Chromecast hint */}
+          <p className="text-slate-400 text-xs mt-1">
+            📺 Visa video på TV via{" "}
+            <span className="font-medium text-slate-500">
+              AirPlay
+            </span>{" "}
+            (iOS/macOS: Kontrollcenter → Skärmspegling) eller{" "}
+            <span className="font-medium text-slate-500">
+              Chromecast
+            </span>{" "}
+            (Chrome: cast-ikonen i adressfältet).
           </p>
         </div>
         <button
