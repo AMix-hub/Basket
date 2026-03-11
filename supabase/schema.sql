@@ -234,9 +234,17 @@ BEGIN
     NULLIF(NEW.raw_user_meta_data->>'club_name',  ''),
     v_invite_code,
     NULLIF(NEW.raw_user_meta_data->>'child_name', '')
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;
 
   RETURN NEW;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Blockera inte skapandet av auth-användaren om profilinfogningen misslyckas.
+    -- Klientkoden skapar profilen som fallback direkt efter registreringen.
+    RAISE WARNING 'handle_new_user: profil kunde inte skapas för %. Fel: % (%)',
+      NEW.id, SQLERRM, SQLSTATE;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 

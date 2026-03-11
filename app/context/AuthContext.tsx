@@ -199,13 +199,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /* Load the profile + team for a given auth user */
   const loadProfile = useCallback(
     async (authId: string, email: string): Promise<User | null> => {
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", authId)
-        .single<DbProfile>();
+      let dbProfile: DbProfile | null = null;
 
-      if (error || !profile) return null;
+      {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", authId)
+          .single<DbProfile>();
+        dbProfile = data ?? null;
+      }
+
+      /* Fallback: profilen saknas (triggern misslyckades) – skapa från auth-metadata */
+      if (!dbProfile) {
+        const { data: authData } = await supabase.auth.getUser();
+        const meta = authData?.user?.user_metadata ?? {};
+        const role = (meta.role as string) || "player";
+        if (meta.name || meta.role) {
+          const { error: insertErr } = await supabase.from("profiles").insert({
+            id: authId,
+            name: (meta.name as string) || "Okänd",
+            role,
+            club_name: (meta.club_name as string) || null,
+            child_name: (meta.child_name as string) || null,
+            coach_invite_code: role === "admin" ? generateCode() : null,
+          });
+          if (!insertErr) {
+            const { data } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", authId)
+              .single<DbProfile>();
+            dbProfile = data ?? null;
+          }
+        }
+      }
+
+      if (!dbProfile) return null;
 
       /* Find team membership */
       const { data: membership } = await supabase
@@ -216,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       const u: User = {
-        ...toUser(profile, email),
+        ...toUser(dbProfile, email),
         teamId: membership?.team_id ?? null,
       };
 
@@ -383,6 +413,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     /* 3 ─ Email confirmation required? ─────────────────────── */
     if (!authData.session) {
       return "CONFIRM_EMAIL";
+    }
+
+    /* 3.5 ─ Ensure profile exists (fallback if trigger failed) ─
+         The handle_new_user trigger creates the profile automatically,
+         but if it failed for any reason we create it here from the
+         client side (user is now authenticated so RLS passes).      */
+    {
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (!existingProfile) {
+        const fallbackCode = role === "admin" ? generateCode() : null;
+        const { error: profileErr } = await supabase.from("profiles").insert({
+          id: userId,
+          name: name || "Okänd",
+          role,
+          club_name: role === "admin" ? (clubName ?? null) : null,
+          child_name: role === "parent" ? (childName ?? null) : null,
+          coach_invite_code: fallbackCode,
+        });
+        if (profileErr) return translateSupabaseError(profileErr.message);
+      }
     }
 
     /* 4 ─ For coaches: create a new team ────────────────────── */
