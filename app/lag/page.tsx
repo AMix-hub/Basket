@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useAuth, User } from "../context/AuthContext";
+import { roleLabel } from "../../lib/roleLabels";
 
 const USERS_KEY = "basketball_users";
 
@@ -72,14 +73,6 @@ export default function LagPage() {
   const members = team
     ? allUsers.filter((u) => team.memberIds.includes(u.id))
     : [];
-
-  const roleLabel: Record<string, string> = {
-    admin: "🏛 Admin",
-    coach: "🎽 Coach",
-    assistant: "👋 Assistent",
-    parent: "👪 Förälder",
-    player: "🏃 Spelare",
-  };
 
   return (
     <div>

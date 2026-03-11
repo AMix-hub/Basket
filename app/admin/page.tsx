@@ -2,17 +2,27 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuth, Team } from "../context/AuthContext";
+import { useAuth, Team, User } from "../context/AuthContext";
+import { roleLabel } from "../../lib/roleLabels";
 
 const TEAMS_KEY = "basketball_teams";
+const USERS_KEY = "basketball_users";
 
 export default function AdminPage() {
   const { user } = useAuth();
   const [copied, setCopied] = useState(false);
 
-  const allTeams: Team[] =
+  // Only load teams that belong to this admin
+  const myTeams: Team[] =
     typeof window !== "undefined"
-      ? (JSON.parse(localStorage.getItem(TEAMS_KEY) || "[]") as Team[])
+      ? (JSON.parse(localStorage.getItem(TEAMS_KEY) || "[]") as Team[]).filter(
+          (t) => t.adminId === user?.id
+        )
+      : [];
+
+  const allUsers: User[] =
+    typeof window !== "undefined"
+      ? (JSON.parse(localStorage.getItem(USERS_KEY) || "[]") as User[])
       : [];
 
   const copyToClipboard = async (text: string) => {
@@ -61,14 +71,14 @@ export default function AdminPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-3 mb-1">
           <span className="text-3xl">🏛</span>
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Föreningsadmin
+            {user.clubName ?? "Föreningsadmin"}
           </h1>
         </div>
         <p className="text-slate-500 text-sm">
-          Bjud in coacher och se alla lag i föreningen.
+          Bjud in coacher och följ alla lag i din förening.
         </p>
       </div>
 
@@ -78,7 +88,8 @@ export default function AdminPage() {
           Inbjudningskod för coacher
         </h2>
         <p className="text-slate-500 text-sm mb-4">
-          Dela denna kod med coacher så de kan registrera sig och skapa sitt lag.
+          Dela denna kod med coacher så de kan registrera sig och skapa sitt lag
+          i <strong>{user.clubName ?? "din förening"}</strong>.
         </p>
 
         {user.coachInviteCode ? (
@@ -109,36 +120,79 @@ export default function AdminPage() {
         )}
       </div>
 
-      {/* All teams */}
+      {/* All teams in this club */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
         <h2 className="font-bold text-slate-900 mb-4">
-          Alla lag ({allTeams.length})
+          Lag i {user.clubName ?? "föreningen"} ({myTeams.length})
         </h2>
-        {allTeams.length === 0 ? (
+        {myTeams.length === 0 ? (
           <p className="text-slate-400 text-sm">
-            Inga lag registrerade ännu. Bjud in en coach för att komma igång.
+            Inga lag registrerade ännu. Bjud in en coach med koden ovan för att
+            komma igång.
           </p>
         ) : (
-          <ul className="space-y-3">
-            {allTeams.map((team) => (
-              <li
-                key={team.id}
-                className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm text-slate-800">
-                    {team.name}
-                  </p>
-                  {team.ageGroup && (
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {team.ageGroup} · {team.memberIds.length}{" "}
-                      {team.memberIds.length === 1 ? "medlem" : "medlemmar"}
-                    </p>
+          <ul className="space-y-4">
+            {myTeams.map((team) => {
+              const members = allUsers.filter((u) =>
+                team.memberIds.includes(u.id)
+              );
+              const coach = members.find((u) => u.id === team.coachId);
+              const nonCoach = members.filter((u) => u.id !== team.coachId);
+
+              return (
+                <li
+                  key={team.id}
+                  className="border border-slate-100 rounded-xl p-4"
+                >
+                  {/* Team header */}
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <p className="font-bold text-slate-900">{team.name}</p>
+                      {team.ageGroup && (
+                        <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                          {team.ageGroup}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-2xl shrink-0">🏀</span>
+                  </div>
+
+                  {/* Members */}
+                  {members.length === 0 ? (
+                    <p className="text-xs text-slate-400">Inga medlemmar ännu.</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {coach && (
+                        <li className="flex items-center gap-2 text-sm">
+                          <span className="text-xs font-semibold text-slate-500 w-24 shrink-0">
+                            🎽 Coach
+                          </span>
+                          <span className="text-slate-800">{coach.name}</span>
+                        </li>
+                      )}
+                      {nonCoach.map((m) => (
+                        <li key={m.id} className="flex items-center gap-2 text-sm">
+                          <span className="text-xs font-semibold text-slate-500 w-24 shrink-0">
+                            {roleLabel[m.role] ?? m.role}
+                          </span>
+                          <span className="text-slate-700">{m.name}</span>
+                          {m.role === "parent" && m.childName && (
+                            <span className="text-xs text-slate-400 ml-1">
+                              (förälder till {m.childName})
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </div>
-                <span className="text-2xl shrink-0">🏀</span>
-              </li>
-            ))}
+
+                  <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100">
+                    {members.length}{" "}
+                    {members.length === 1 ? "medlem" : "medlemmar"} totalt
+                  </p>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

@@ -12,7 +12,10 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // "admin" is the only role that can self-register without an invite code,
+  // so it is the natural default for the registration form.
   const [role, setRole] = useState<UserRole>("admin");
+  const [clubName, setClubName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("≤7 år");
   const [inviteCode, setInviteCode] = useState("");
@@ -50,6 +53,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (role === "admin" && !clubName.trim()) {
+      setError("Ange föreningens namn.");
+      return;
+    }
+
     const err = register(
       name.trim(),
       email.trim().toLowerCase(),
@@ -58,7 +66,8 @@ export default function RegisterPage() {
       role === "coach" ? teamName.trim() : undefined,
       role === "coach" ? ageGroup : undefined,
       needsInviteCode ? inviteCode.trim() : undefined,
-      role === "parent" ? childName.trim() : undefined
+      role === "parent" ? childName.trim() : undefined,
+      role === "admin" ? clubName.trim() : undefined
     );
 
     if (err === null) {
@@ -146,7 +155,14 @@ export default function RegisterPage() {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => { setRole(value); setInviteCode(""); setError(""); }}
+                    onClick={() => {
+                      setRole(value);
+                      setError("");
+                      // Only clear fields that don't apply to the new role
+                      if (value !== "admin") setClubName("");
+                      if (value === "admin") setInviteCode("");
+                      if (value !== "parent") setChildName("");
+                    }}
                     className={`py-2.5 px-3 text-left rounded-xl transition-all border ${
                       role === value
                         ? "bg-orange-500 text-white border-orange-500"
@@ -165,6 +181,23 @@ export default function RegisterPage() {
                 ))}
               </div>
             </div>
+
+            {/* Admin-specific: club name */}
+            {role === "admin" && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  Föreningens namn
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={clubName}
+                  onChange={(e) => setClubName(e.target.value)}
+                  placeholder="T.ex. Kungsholmen Basket"
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+            )}
 
             {/* Coach-specific: team name + age group */}
             {role === "coach" && (
@@ -280,6 +313,7 @@ export default function RegisterPage() {
                   setEmail("");
                   setPassword("");
                   setRole("admin");
+                  setClubName("");
                   setTeamName("");
                   setAgeGroup("≤7 år");
                   setInviteCode("");

@@ -16,8 +16,9 @@ export interface User {
   passwordHash: string;
   role: UserRole;
   teamId: string | null;
-  childName?: string;      // for parents – the name of their child on the team
+  childName?: string;       // for parents – the name of their child on the team
   coachInviteCode?: string; // for admins – coaches use this to register
+  clubName?: string;        // for admins – the name of their club/association
   createdAt: string;
 }
 
@@ -26,6 +27,8 @@ export interface Team {
   name: string;
   ageGroup: string;
   coachId: string;
+  adminId: string;           // which admin's association this team belongs to
+  clubName: string;          // the club/association name (inherited from admin)
   memberIds: string[];
   inviteCode: string;        // staff code (coach shares with assistants)
   parentInviteCode: string;  // parent code (coach shares with parents)
@@ -45,7 +48,8 @@ interface AuthContextType {
     teamName?: string,
     ageGroup?: string,
     inviteCode?: string,
-    childName?: string
+    childName?: string,
+    clubName?: string
   ) => string | null;
   joinTeam: (inviteCode: string, childName?: string) => boolean;
   getMyTeam: () => Team | null;
@@ -113,7 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     teamName?: string,
     ageGroup?: string,
     inviteCode?: string,
-    childName?: string
+    childName?: string,
+    clubName?: string
   ): string | null => {
     const allUsers: User[] = JSON.parse(
       localStorage.getItem(USERS_KEY) || "[]"
@@ -125,16 +130,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.getItem(TEAMS_KEY) || "[]"
     );
 
-    // --- Invite-code gates ---
+    // --- Invite-code gates; for coaches, keep a ref to the admin to inherit club info ---
+    let invitingAdmin: User | null = null;
     if (role === "coach") {
       if (!inviteCode)
         return "Ange admin-inbjudningskoden för att registrera dig som coach.";
       const code = inviteCode.toUpperCase();
-      const adminUser = allUsers.find(
+      const found = allUsers.find(
         (u) => u.role === "admin" && u.coachInviteCode === code
       );
-      if (!adminUser)
+      if (!found)
         return "Ogiltig admin-inbjudningskod. Kontakta din föreningsadmin.";
+      invitingAdmin = found;
     }
 
     if (role === "assistant") {
@@ -167,22 +174,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       teamId: null,
       ...(childName ? { childName } : {}),
-      // Admins get a coach invite code so they can invite coaches
+      // Admins get a coach invite code + store their club name
       ...(role === "admin"
         ? {
             coachInviteCode: generateCode(),
+            ...(clubName ? { clubName } : {}),
           }
         : {}),
       createdAt: new Date().toISOString(),
     };
 
-    // Coaches create a new team
-    if (role === "coach" && teamName) {
+    // Coaches create a new team, inheriting the club from the inviting admin
+    if (role === "coach" && teamName && invitingAdmin) {
       const newTeam: Team = {
         id: crypto.randomUUID(),
         name: teamName,
         ageGroup: ageGroup || "",
         coachId: newUser.id,
+        adminId: invitingAdmin.id,
+        clubName: invitingAdmin.clubName ?? "",
         memberIds: [newUser.id],
         inviteCode: generateCode(),
         parentInviteCode: generateCode(),
