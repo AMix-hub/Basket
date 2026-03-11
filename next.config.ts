@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   env: {
-    // Supabase public credentials (anon/publishable keys – safe for the browser).
+    // Supabase public credentials (anon / publishable keys – safe for the browser).
+    // Supabase supports both classic JWT keys (eyJ...) and the newer
+    // Publishable Key format (sb_publishable_...). Both are valid here.
     //
     // These values are baked into the client bundle at build time by Next.js.
     // When the environment variables are already set in the deployment platform
