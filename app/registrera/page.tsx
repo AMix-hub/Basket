@@ -12,14 +12,29 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("coach");
+  const [role, setRole] = useState<UserRole>("admin");
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("≤7 år");
   const [inviteCode, setInviteCode] = useState("");
   const [childName, setChildName] = useState("");
   const [error, setError] = useState("");
 
-  const needsInviteCode = role === "assistant" || role === "parent";
+  // Roles that require an invite code to register
+  const needsInviteCode = role !== "admin";
+
+  const inviteCodeLabel: Partial<Record<UserRole, string>> = {
+    coach: "Admin-inbjudningskod",
+    assistant: "Inbjudningskod från coach",
+    parent: "Inbjudningskod från coach",
+    player: "Inbjudningskod från coach",
+  };
+
+  const inviteCodeHint: Partial<Record<UserRole, string>> = {
+    coach: "Fråga din föreningsadmin om koden.",
+    assistant: "Fråga din coach om assistentkoden.",
+    parent: "Fråga din coach om föräldrainbjudningskoden.",
+    player: "Fråga din coach om spelarkoden.",
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +50,7 @@ export default function RegisterPage() {
       return;
     }
 
-    const ok = register(
+    const err = register(
       name.trim(),
       email.trim().toLowerCase(),
       password,
@@ -46,18 +61,19 @@ export default function RegisterPage() {
       role === "parent" ? childName.trim() : undefined
     );
 
-    if (ok) {
+    if (err === null) {
       router.push("/");
     } else {
-      setError("E-postadressen används redan. Prova en annan.");
+      setError(err);
     }
   };
 
   const roles: { value: UserRole; label: string; desc: string }[] = [
-    { value: "admin", label: "🏛 Föreningsadmin", desc: "Ser alla lag" },
-    { value: "coach", label: "🎽 Coach", desc: "Skapar och leder ett lag" },
+    { value: "admin", label: "🏛 Föreningsadmin", desc: "Administrerar föreningen" },
+    { value: "coach", label: "🎽 Coach", desc: "Leder ett lag" },
     { value: "assistant", label: "👋 Assistent", desc: "Hjälper coachen" },
     { value: "parent", label: "👪 Förälder", desc: "Följer sitt barns lag" },
+    { value: "player", label: "🏃 Spelare", desc: "Spelar i laget" },
   ];
 
   return (
@@ -130,7 +146,7 @@ export default function RegisterPage() {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setRole(value)}
+                    onClick={() => { setRole(value); setInviteCode(""); setError(""); }}
                     className={`py-2.5 px-3 text-left rounded-xl transition-all border ${
                       role === value
                         ? "bg-orange-500 text-white border-orange-500"
@@ -203,15 +219,15 @@ export default function RegisterPage() {
               </div>
             )}
 
-            {/* Invite code for assistant and parent */}
+            {/* Invite code – required for all roles except admin */}
             {needsInviteCode && (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  {role === "parent" ? "Föräldrainbjudningskod" : "Inbjudningskod"}{" "}
-                  <span className="text-slate-400 font-normal">(valfri)</span>
+                  {inviteCodeLabel[role]}
                 </label>
                 <input
                   type="text"
+                  required
                   value={inviteCode}
                   onChange={(e) =>
                     setInviteCode(e.target.value.toUpperCase())
@@ -221,9 +237,7 @@ export default function RegisterPage() {
                   className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
                 />
                 <p className="text-xs text-slate-400 mt-1">
-                  {role === "parent"
-                    ? "Fråga coachen om föräldrainbjudningskoden för att gå med i laget direkt."
-                    : "Fråga din coach om koden för att gå med i laget."}
+                  {inviteCodeHint[role]}
                 </p>
               </div>
             )}
@@ -265,7 +279,7 @@ export default function RegisterPage() {
                   setName("");
                   setEmail("");
                   setPassword("");
-                  setRole("coach");
+                  setRole("admin");
                   setTeamName("");
                   setAgeGroup("≤7 år");
                   setInviteCode("");

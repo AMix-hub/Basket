@@ -78,6 +78,7 @@ export default function LagPage() {
     coach: "🎽 Coach",
     assistant: "👋 Assistent",
     parent: "👪 Förälder",
+    player: "🏃 Spelare",
   };
 
   return (
@@ -231,13 +232,35 @@ export default function LagPage() {
                     {copied === "parent" ? "✓ Kopierad!" : "📋 Kopiera"}
                   </button>
                 </div>
+
+                {/* Player code */}
+                <div className="flex items-center gap-3 bg-emerald-50 rounded-xl px-4 py-3">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-emerald-600 mb-0.5">
+                      🏃 Spelare
+                    </p>
+                    <p className="font-mono text-xl font-bold text-emerald-800 tracking-widest">
+                      {team.playerInviteCode}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      copyToClipboard(team.playerInviteCode, "player")
+                    }
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
+                      copied === "player"
+                        ? "bg-emerald-500 text-white"
+                        : "bg-emerald-200 text-emerald-700 hover:bg-emerald-300"
+                    }`}
+                  >
+                    {copied === "player" ? "✓ Kopierad!" : "📋 Kopiera"}
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700">
-                💡 <strong>Tips:</strong> Dela föräldrainbjudningskoden (orange) med föräldrar
-                när du bjuder in dem. De kan sedan logga in på{" "}
-                <strong>Föräldrasidan</strong> för att se sitt barns schema och
-                närvaro.
+                💡 <strong>Tips:</strong> Dela rätt kod med rätt person — assistentkod (grå) till assistenter,
+                föräldrainbjudningskod (orange) till föräldrar och spelarkod (grön) till spelare.
               </div>
             </div>
           )}

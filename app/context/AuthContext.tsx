@@ -7,7 +7,7 @@ import {
   ReactNode,
 } from "react";
 
-export type UserRole = "admin" | "coach" | "assistant" | "parent";
+export type UserRole = "admin" | "coach" | "assistant" | "parent" | "player";
 
 export interface User {
   id: string;
@@ -16,7 +16,8 @@ export interface User {
   passwordHash: string;
   role: UserRole;
   teamId: string | null;
-  childName?: string; // for parents – the name of their child on the team
+  childName?: string;      // for parents – the name of their child on the team
+  coachInviteCode?: string; // for admins – coaches use this to register
   createdAt: string;
 }
 
@@ -26,8 +27,9 @@ export interface Team {
   ageGroup: string;
   coachId: string;
   memberIds: string[];
-  inviteCode: string;       // staff code (coach shares with assistants)
-  parentInviteCode: string; // parent code (coach shares with parents)
+  inviteCode: string;        // staff code (coach shares with assistants)
+  parentInviteCode: string;  // parent code (coach shares with parents)
+  playerInviteCode: string;  // player code (coach shares with players)
 }
 
 interface AuthContextType {
@@ -44,7 +46,7 @@ interface AuthContextType {
     ageGroup?: string,
     inviteCode?: string,
     childName?: string
-  ) => boolean;
+  ) => string | null;
   joinTeam: (inviteCode: string, childName?: string) => boolean;
   getMyTeam: () => Team | null;
   getAllTeams: () => Team[];
@@ -60,6 +62,15 @@ const CURRENT_USER_KEY = "basketball_current_user";
 /* Simple deterministic hash – client-side only, not a security measure */
 function simpleHash(str: string): string {
   return btoa(encodeURIComponent(str));
+}
+
+/* Cryptographically random 6-character uppercase alphanumeric code */
+function generateCode(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from(
+    crypto.getRandomValues(new Uint8Array(6)),
+    (b) => chars[b % chars.length]
+  ).join("");
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -103,12 +114,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ageGroup?: string,
     inviteCode?: string,
     childName?: string
-  ): boolean => {
+  ): string | null => {
     const allUsers: User[] = JSON.parse(
       localStorage.getItem(USERS_KEY) || "[]"
     );
-    if (allUsers.find((u) => u.email === email)) return false;
+    if (allUsers.find((u) => u.email === email))
+      return "E-postadressen används redan. Prova en annan.";
 
+    let allTeams: Team[] = JSON.parse(
+      localStorage.getItem(TEAMS_KEY) || "[]"
+    );
+
+    // --- Invite-code gates ---
+    if (role === "coach") {
+      if (!inviteCode)
+        return "Ange admin-inbjudningskoden för att registrera dig som coach.";
+      const code = inviteCode.toUpperCase();
+      const adminUser = allUsers.find(
+        (u) => u.role === "admin" && u.coachInviteCode === code
+      );
+      if (!adminUser)
+        return "Ogiltig admin-inbjudningskod. Kontakta din föreningsadmin.";
+    }
+
+    if (role === "assistant") {
+      if (!inviteCode) return "Ange inbjudningskoden från din coach.";
+      const code = inviteCode.toUpperCase();
+      if (!allTeams.find((t) => t.inviteCode === code))
+        return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+    }
+
+    if (role === "parent") {
+      if (!inviteCode) return "Ange inbjudningskoden från din coach.";
+      const code = inviteCode.toUpperCase();
+      if (!allTeams.find((t) => t.parentInviteCode === code))
+        return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+    }
+
+    if (role === "player") {
+      if (!inviteCode) return "Ange inbjudningskoden från din coach.";
+      const code = inviteCode.toUpperCase();
+      if (!allTeams.find((t) => t.playerInviteCode === code))
+        return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+    }
+
+    // --- Create user ---
     const newUser: User = {
       id: crypto.randomUUID(),
       name,
@@ -117,13 +167,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role,
       teamId: null,
       ...(childName ? { childName } : {}),
+      // Admins get a coach invite code so they can invite coaches
+      ...(role === "admin"
+        ? {
+            coachInviteCode: generateCode(),
+          }
+        : {}),
       createdAt: new Date().toISOString(),
     };
 
-    let allTeams: Team[] = JSON.parse(
-      localStorage.getItem(TEAMS_KEY) || "[]"
-    );
-
+    // Coaches create a new team
     if (role === "coach" && teamName) {
       const newTeam: Team = {
         id: crypto.randomUUID(),
@@ -131,8 +184,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ageGroup: ageGroup || "",
         coachId: newUser.id,
         memberIds: [newUser.id],
-        inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
-        parentInviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        inviteCode: generateCode(),
+        parentInviteCode: generateCode(),
+        playerInviteCode: generateCode(),
       };
       newUser.teamId = newTeam.id;
       allTeams = [...allTeams, newTeam];
@@ -145,22 +199,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(newUser);
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
 
-    // Auto-join team for assistant/parent using invite code
-    if ((role === "assistant" || role === "parent") && inviteCode) {
-      const freshUser = { ...newUser };
+    // Auto-join team for assistant / parent / player using invite code
+    if (
+      (role === "assistant" || role === "parent" || role === "player") &&
+      inviteCode
+    ) {
       const code = inviteCode.toUpperCase();
       const team = allTeams.find(
-        (t) => t.inviteCode === code || t.parentInviteCode === code
+        (t) =>
+          t.inviteCode === code ||
+          t.parentInviteCode === code ||
+          t.playerInviteCode === code
       );
       if (team) {
         const updatedTeams = allTeams.map((t) =>
           t.id === team.id
-            ? { ...t, memberIds: [...new Set([...t.memberIds, freshUser.id])] }
+            ? { ...t, memberIds: [...new Set([...t.memberIds, newUser.id])] }
             : t
         );
         localStorage.setItem(TEAMS_KEY, JSON.stringify(updatedTeams));
         setTeams(updatedTeams);
-        const joinedUser = { ...freshUser, teamId: team.id };
+        const joinedUser = { ...newUser, teamId: team.id };
         const finalUsers = updatedUsers.map((u) =>
           u.id === joinedUser.id ? joinedUser : u
         );
@@ -170,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    return true;
+    return null;
   };
 
   const joinTeam = (inviteCode: string, childName?: string): boolean => {
@@ -180,7 +239,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
     const code = inviteCode.toUpperCase();
     const team = allTeams.find(
-      (t) => t.inviteCode === code || t.parentInviteCode === code
+      (t) =>
+        t.inviteCode === code ||
+        t.parentInviteCode === code ||
+        t.playerInviteCode === code
     );
     if (!team) return false;
 

@@ -33,7 +33,9 @@ export default function Navbar() {
   const roleLinks =
     user?.role === "parent"
       ? [{ href: "/familj", label: "👪 Min sida" }]
-      : user?.role === "coach" || user?.role === "assistant" || user?.role === "admin"
+      : user?.role === "admin"
+      ? [{ href: "/admin", label: "🏛 Admin" }]
+      : user?.role === "coach" || user?.role === "assistant" || user?.role === "player"
       ? [{ href: "/lag", label: "🏀 Laget" }]
       : [];
 
@@ -172,6 +174,8 @@ export default function Navbar() {
                     ? "🎽"
                     : user.role === "parent"
                     ? "👪"
+                    : user.role === "player"
+                    ? "🏃"
                     : "👋"}{" "}
                   {user.name}
                 </span>
