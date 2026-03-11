@@ -146,6 +146,47 @@ function isNetworkError(message: string): boolean {
   return m.includes("failed to fetch") || m.includes("networkerror");
 }
 
+/* ─── Swedish translation of Supabase error messages ─────── */
+
+/**
+ * Maps common English Supabase error messages to user-friendly Swedish.
+ * Falls back to the original message for unknown errors.
+ */
+function translateSupabaseError(message: string): string {
+  if (isNetworkError(message)) {
+    return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
+  }
+  const m = message.toLowerCase();
+  if (m.includes("user already registered") || m.includes("already registered")) {
+    return "Det finns redan ett konto med den e-postadressen. Prova att logga in istället.";
+  }
+  if (m.includes("email not confirmed")) {
+    return "E-postadressen är inte bekräftad. Kontrollera din inkorg.";
+  }
+  if (m.includes("invalid login credentials") || m.includes("invalid email or password")) {
+    return "Fel e-post eller lösenord. Försök igen.";
+  }
+  if (m.includes("password should be at least") || m.includes("password is too short")) {
+    return "Lösenordet måste vara minst 6 tecken.";
+  }
+  if (m.includes("invalid email")) {
+    return "Ogiltig e-postadress. Kontrollera att du skrivit rätt.";
+  }
+  if (m.includes("email rate limit") || m.includes("rate limit exceeded") || m.includes("too many requests")) {
+    return "För många försök. Vänta en stund och försök igen.";
+  }
+  if (m.includes("database error") || m.includes("unexpected_failure") || m.includes("error saving new user")) {
+    return "Ett tekniskt fel uppstod. Försök igen eller kontakta supporten.";
+  }
+  if (m.includes("invalid api key") || m.includes("invalid api") || m.includes("no api key") || m.includes("apikey")) {
+    return "Tjänsten är inte tillgänglig just nu. Försök igen senare eller kontakta supporten.";
+  }
+  if (m.includes("signup is disabled") || m.includes("signups not allowed")) {
+    return "Registrering är inaktiverad i projektinställningarna. Kontakta administratören.";
+  }
+  return message;
+}
+
 /* ─── Context ────────────────────────────────────────────── */
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -231,10 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       });
       if (!error) return null;
-      if (isNetworkError(error.message)) {
-        return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
-      }
-      return "Fel e-post eller lösenord. Försök igen.";
+      return translateSupabaseError(error.message);
     } catch {
       return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
     }
@@ -336,7 +374,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
 
-    if (signUpError) return signUpError.message;
+    if (signUpError) return translateSupabaseError(signUpError.message);
     if (!authData.user)
       return "Registreringen misslyckades. Försök igen.";
 
@@ -390,10 +428,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null; // success
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (isNetworkError(msg)) {
-        return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
-      }
-      return msg || "Ett oväntat fel uppstod. Försök igen.";
+      return translateSupabaseError(msg) || "Ett oväntat fel uppstod. Försök igen.";
     }
   };
 
