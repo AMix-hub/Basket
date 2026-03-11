@@ -2,46 +2,49 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import type { Message } from "../meddelanden/page";
-
-const MESSAGES_KEY = "basketball_messages";
-
-function computeUnread(userId: string, teamId: string): number {
-  if (typeof window === "undefined") return 0;
-  const raw = localStorage.getItem(MESSAGES_KEY);
-  const all: Message[] = raw ? JSON.parse(raw) : [];
-  return all.filter(
-    (m) =>
-      m.teamId === teamId &&
-      m.senderId !== userId &&
-      !m.readBy.includes(userId)
-  ).length;
-}
+import { supabase } from "../../lib/supabaseClient";
 
 /**
  * Returns the total count of unread messages (team chat + DMs)
  * for the currently logged-in user in their team.
- * Computes on mount and polls every 4 seconds.
+ * Subscribes to Supabase Realtime for instant updates.
  */
 export function useUnreadCount(): number {
   const { user, getMyTeam } = useAuth();
-
-  const [count, setCount] = useState(() => {
-    if (typeof window === "undefined" || !user) return 0;
-    const team = getMyTeam();
-    if (!team) return 0;
-    return computeUnread(user.id, team.id);
-  });
+  const [count, setCount]   = useState(0);
 
   useEffect(() => {
-    if (!user) return;
     const team = getMyTeam();
-    if (!team) return;
+    if (!user || !team) return;
 
-    const id = setInterval(() => {
-      setCount(computeUnread(user.id, team.id));
-    }, 4000);
-    return () => clearInterval(id);
+    const fetchCount = async () => {
+      const { count: c } = await supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("team_id", team.id)
+        .neq("sender_id", user.id)
+        .not("read_by", "cs", `{${user.id}}`);
+      setCount(c ?? 0);
+    };
+
+    fetchCount();
+
+    /* Subscribe to new messages in this team */
+    const channel = supabase
+      .channel(`unread-${team.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `team_id=eq.${team.id}`,
+        },
+        () => fetchCount()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [user, getMyTeam]);
 
   return count;

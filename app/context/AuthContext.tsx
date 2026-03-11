@@ -4,8 +4,13 @@ import {
   createContext,
   useContext,
   useState,
+  useEffect,
+  useCallback,
   ReactNode,
 } from "react";
+import { supabase } from "../../lib/supabaseClient";
+
+/* ─── Types ──────────────────────────────────────────────── */
 
 export type UserRole = "admin" | "coach" | "assistant" | "parent" | "player";
 
@@ -13,12 +18,12 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  passwordHash: string;
   role: UserRole;
+  /** ID of the team this user belongs to (null if not in a team) */
   teamId: string | null;
-  childName?: string;       // for parents – the name of their child on the team
-  coachInviteCode?: string; // for admins – coaches use this to register
-  clubName?: string;        // for admins – the name of their club/association
+  childName?: string;        // parent: child's name in the player list
+  coachInviteCode?: string;  // admin:  code coaches use to register
+  clubName?: string;         // admin:  association / club name
   createdAt: string;
 }
 
@@ -27,19 +32,24 @@ export interface Team {
   name: string;
   ageGroup: string;
   coachId: string;
-  adminId: string;           // which admin's association this team belongs to
-  clubName: string;          // the club/association name (inherited from admin)
+  adminId: string;
+  clubName: string;
   memberIds: string[];
-  inviteCode: string;        // staff code (coach shares with assistants)
-  parentInviteCode: string;  // parent code (coach shares with parents)
-  playerInviteCode: string;  // player code (coach shares with players)
+  inviteCode: string;        // assistants
+  parentInviteCode: string;  // parents
+  playerInviteCode: string;  // players
 }
 
 interface AuthContextType {
   user: User | null;
-  teams: Team[];
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  /**
+   * Returns null on success, or a Swedish error string on failure.
+   * Special return value "CONFIRM_EMAIL" means the user must verify
+   * their e-mail before the account is fully active.
+   */
   register: (
     name: string,
     email: string,
@@ -50,25 +60,70 @@ interface AuthContextType {
     inviteCode?: string,
     childName?: string,
     clubName?: string
-  ) => string | null;
-  joinTeam: (inviteCode: string, childName?: string) => boolean;
+  ) => Promise<string | null>;
+  joinTeam: (inviteCode: string, childName?: string) => Promise<boolean>;
   getMyTeam: () => Team | null;
-  getAllTeams: () => Team[];
-  clearUsers: () => void;
+  getAllTeams: () => Promise<Team[]>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+/* ─── DB row shapes (snake_case from Supabase) ──────────── */
 
-const USERS_KEY = "basketball_users";
-const TEAMS_KEY = "basketball_teams";
-const CURRENT_USER_KEY = "basketball_current_user";
-
-/* Simple deterministic hash – client-side only, not a security measure */
-function simpleHash(str: string): string {
-  return btoa(encodeURIComponent(str));
+interface DbProfile {
+  id: string;
+  name: string;
+  role: string;
+  club_name: string | null;
+  coach_invite_code: string | null;
+  child_name: string | null;
+  created_at: string;
 }
 
-/* Cryptographically random 6-character uppercase alphanumeric code */
+interface DbTeam {
+  id: string;
+  name: string;
+  age_group: string;
+  coach_id: string | null;
+  admin_id: string;
+  club_name: string;
+  member_ids: string[];
+  invite_code: string;
+  parent_invite_code: string;
+  player_invite_code: string;
+}
+
+/* ─── Converters ─────────────────────────────────────────── */
+
+function toUser(p: DbProfile, email: string): User {
+  return {
+    id: p.id,
+    name: p.name,
+    email,
+    role: p.role as UserRole,
+    teamId: null, // resolved separately via team_members
+    childName: p.child_name ?? undefined,
+    coachInviteCode: p.coach_invite_code ?? undefined,
+    clubName: p.club_name ?? undefined,
+    createdAt: p.created_at,
+  };
+}
+
+function toTeam(t: DbTeam): Team {
+  return {
+    id: t.id,
+    name: t.name,
+    ageGroup: t.age_group,
+    coachId: t.coach_id ?? "",
+    adminId: t.admin_id,
+    clubName: t.club_name,
+    memberIds: t.member_ids ?? [],
+    inviteCode: t.invite_code,
+    parentInviteCode: t.parent_invite_code,
+    playerInviteCode: t.player_invite_code,
+  };
+}
+
+/* ─── Cryptographically random 6-char code ──────────────── */
+
 function generateCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   return Array.from(
@@ -77,39 +132,101 @@ function generateCode(): string {
   ).join("");
 }
 
+/* ─── Context ────────────────────────────────────────────── */
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window === "undefined") return null;
-    const saved = localStorage.getItem(CURRENT_USER_KEY);
-    return saved ? (JSON.parse(saved) as User) : null;
-  });
-  const [teams, setTeams] = useState<Team[]>(() => {
-    if (typeof window === "undefined") return [];
-    const saved = localStorage.getItem(TEAMS_KEY);
-    return saved ? (JSON.parse(saved) as Team[]) : [];
-  });
+  const [user, setUser]           = useState<User | null>(null);
+  const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
+  const [loading, setLoading]     = useState(true);
 
-  const login = (email: string, password: string): boolean => {
-    const allUsers: User[] = JSON.parse(
-      localStorage.getItem(USERS_KEY) || "[]"
-    );
-    const found = allUsers.find(
-      (u) => u.email === email && u.passwordHash === simpleHash(password)
-    );
-    if (found) {
-      setUser(found);
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(found));
-      return true;
-    }
-    return false;
+  /* Load the profile + team for a given auth user */
+  const loadProfile = useCallback(
+    async (authId: string, email: string): Promise<User | null> => {
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authId)
+        .single<DbProfile>();
+
+      if (error || !profile) return null;
+
+      /* Find team membership */
+      const { data: membership } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", authId)
+        .limit(1)
+        .maybeSingle();
+
+      const u: User = {
+        ...toUser(profile, email),
+        teamId: membership?.team_id ?? null,
+      };
+
+      setUser(u);
+
+      if (membership?.team_id) {
+        const { data: teamRow } = await supabase
+          .from("teams")
+          .select("*")
+          .eq("id", membership.team_id)
+          .single<DbTeam>();
+        if (teamRow) setCurrentTeam(toTeam(teamRow));
+      } else {
+        setCurrentTeam(null);
+      }
+
+      return u;
+    },
+    []
+  );
+
+  /* ── Initialise session on mount ── */
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadProfile(session.user.id, session.user.email ?? "").finally(() =>
+          setLoading(false)
+        );
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        loadProfile(session.user.id, session.user.email ?? "");
+      } else {
+        setUser(null);
+        setCurrentTeam(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadProfile]);
+
+  /* ── login ── */
+  const login = async (email: string, password: string): Promise<boolean> => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    return !error;
   };
 
-  const logout = () => {
+  /* ── logout ── */
+  const logout = async (): Promise<void> => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem(CURRENT_USER_KEY);
+    setCurrentTeam(null);
   };
 
-  const register = (
+  /* ── register ── */
+  const register = async (
     name: string,
     email: string,
     password: string,
@@ -119,200 +236,207 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     inviteCode?: string,
     childName?: string,
     clubName?: string
-  ): string | null => {
-    const allUsers: User[] = JSON.parse(
-      localStorage.getItem(USERS_KEY) || "[]"
-    );
-    if (allUsers.find((u) => u.email === email))
-      return "E-postadressen används redan. Prova en annan.";
+  ): Promise<string | null> => {
 
-    let allTeams: Team[] = JSON.parse(
-      localStorage.getItem(TEAMS_KEY) || "[]"
-    );
+    /* 1 ─ Validate invite codes before touching auth ────────── */
+    let invitingAdminId: string | null = null;
+    let invitingAdminClubName: string | null = null;
+    let teamFromCode: DbTeam | null = null;
 
-    // --- Invite-code gates; for coaches, keep a ref to the admin to inherit club info ---
-    let invitingAdmin: User | null = null;
     if (role === "coach") {
       if (!inviteCode)
         return "Ange admin-inbjudningskoden för att registrera dig som coach.";
       const code = inviteCode.toUpperCase();
-      const found = allUsers.find(
-        (u) => u.role === "admin" && u.coachInviteCode === code
-      );
-      if (!found)
+      const { data: adminRow } = await supabase
+        .from("profiles")
+        .select("id, club_name")
+        .eq("coach_invite_code", code)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (!adminRow)
         return "Ogiltig admin-inbjudningskod. Kontakta din föreningsadmin.";
-      invitingAdmin = found;
+      invitingAdminId       = adminRow.id;
+      invitingAdminClubName = adminRow.club_name ?? "";
     }
 
     if (role === "assistant") {
       if (!inviteCode) return "Ange inbjudningskoden från din coach.";
       const code = inviteCode.toUpperCase();
-      if (!allTeams.find((t) => t.inviteCode === code))
-        return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      const { data: teamRow } = await supabase
+        .from("teams")
+        .select("*")
+        .eq("invite_code", code)
+        .maybeSingle<DbTeam>();
+      if (!teamRow) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      teamFromCode = teamRow;
     }
 
     if (role === "parent") {
       if (!inviteCode) return "Ange inbjudningskoden från din coach.";
       const code = inviteCode.toUpperCase();
-      if (!allTeams.find((t) => t.parentInviteCode === code))
-        return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      const { data: teamRow } = await supabase
+        .from("teams")
+        .select("*")
+        .eq("parent_invite_code", code)
+        .maybeSingle<DbTeam>();
+      if (!teamRow) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      teamFromCode = teamRow;
     }
 
     if (role === "player") {
       if (!inviteCode) return "Ange inbjudningskoden från din coach.";
       const code = inviteCode.toUpperCase();
-      if (!allTeams.find((t) => t.playerInviteCode === code))
-        return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      const { data: teamRow } = await supabase
+        .from("teams")
+        .select("*")
+        .eq("player_invite_code", code)
+        .maybeSingle<DbTeam>();
+      if (!teamRow) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      teamFromCode = teamRow;
     }
 
-    // --- Create user ---
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      name,
-      email,
-      passwordHash: simpleHash(password),
-      role,
-      teamId: null,
-      ...(childName ? { childName } : {}),
-      // Admins get a coach invite code + store their club name
-      ...(role === "admin"
-        ? {
-            coachInviteCode: generateCode(),
-            ...(clubName ? { clubName } : {}),
-          }
-        : {}),
-      createdAt: new Date().toISOString(),
-    };
+    /* 2 ─ Create Supabase auth user ────────────────────────────
+         The handle_new_user trigger will INSERT the profile row
+         automatically from raw_user_meta_data.               */
+    const { data: authData, error: signUpError } =
+      await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role,
+            club_name:  role === "admin"  ? (clubName  ?? "") : "",
+            child_name: role === "parent" ? (childName ?? "") : "",
+            // coach_invite_code is generated server-side by the trigger
+          },
+        },
+      });
 
-    // Coaches create a new team, inheriting the club from the inviting admin
-    if (role === "coach" && teamName && invitingAdmin) {
-      const newTeam: Team = {
-        id: crypto.randomUUID(),
-        name: teamName,
-        ageGroup: ageGroup || "",
-        coachId: newUser.id,
-        adminId: invitingAdmin.id,
-        clubName: invitingAdmin.clubName ?? "",
-        memberIds: [newUser.id],
-        inviteCode: generateCode(),
-        parentInviteCode: generateCode(),
-        playerInviteCode: generateCode(),
+    if (signUpError) return signUpError.message;
+    if (!authData.user)
+      return "Registreringen misslyckades. Försök igen.";
+
+    const userId = authData.user.id;
+
+    /* 3 ─ Email confirmation required? ─────────────────────── */
+    if (!authData.session) {
+      return "CONFIRM_EMAIL";
+    }
+
+    /* 4 ─ For coaches: create a new team ────────────────────── */
+    let teamId: string | null = null;
+
+    if (role === "coach" && teamName && invitingAdminId) {
+      const newTeam = {
+        id:                  crypto.randomUUID(),
+        name:                teamName,
+        age_group:           ageGroup ?? "",
+        coach_id:            userId,
+        admin_id:            invitingAdminId,
+        club_name:           invitingAdminClubName ?? "",
+        member_ids:          [userId],
+        invite_code:         generateCode(),
+        parent_invite_code:  generateCode(),
+        player_invite_code:  generateCode(),
       };
-      newUser.teamId = newTeam.id;
-      allTeams = [...allTeams, newTeam];
-      localStorage.setItem(TEAMS_KEY, JSON.stringify(allTeams));
-      setTeams(allTeams);
+      const { error: teamErr } = await supabase.from("teams").insert(newTeam);
+      if (teamErr) return "Kunde inte skapa laget. Försök igen.";
+      teamId = newTeam.id;
+
+      await supabase
+        .from("team_members")
+        .insert({ team_id: teamId, user_id: userId });
     }
 
-    const updatedUsers = [...allUsers, newUser];
-    localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
-    setUser(newUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newUser));
-
-    // Auto-join team for assistant / parent / player using invite code
-    if (
-      (role === "assistant" || role === "parent" || role === "player") &&
-      inviteCode
-    ) {
-      const code = inviteCode.toUpperCase();
-      const team = allTeams.find(
-        (t) =>
-          t.inviteCode === code ||
-          t.parentInviteCode === code ||
-          t.playerInviteCode === code
-      );
-      if (team) {
-        const updatedTeams = allTeams.map((t) =>
-          t.id === team.id
-            ? { ...t, memberIds: [...new Set([...t.memberIds, newUser.id])] }
-            : t
-        );
-        localStorage.setItem(TEAMS_KEY, JSON.stringify(updatedTeams));
-        setTeams(updatedTeams);
-        const joinedUser = { ...newUser, teamId: team.id };
-        const finalUsers = updatedUsers.map((u) =>
-          u.id === joinedUser.id ? joinedUser : u
-        );
-        localStorage.setItem(USERS_KEY, JSON.stringify(finalUsers));
-        setUser(joinedUser);
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(joinedUser));
-      }
+    /* 5 ─ For assistant / parent / player: join existing team ─ */
+    if (teamFromCode) {
+      teamId = teamFromCode.id;
+      const newMemberIds = [
+        ...new Set([...( teamFromCode.member_ids ?? []), userId]),
+      ];
+      await supabase
+        .from("teams")
+        .update({ member_ids: newMemberIds })
+        .eq("id", teamFromCode.id);
+      await supabase
+        .from("team_members")
+        .insert({ team_id: teamId, user_id: userId });
     }
 
-    return null;
+    return null; // success
   };
 
-  const joinTeam = (inviteCode: string, childName?: string): boolean => {
+  /* ── joinTeam (for users who already have an account) ── */
+  const joinTeam = async (
+    inviteCode: string,
+    childName?: string
+  ): Promise<boolean> => {
     if (!user) return false;
-    const allTeams: Team[] = JSON.parse(
-      localStorage.getItem(TEAMS_KEY) || "[]"
-    );
     const code = inviteCode.toUpperCase();
-    const team = allTeams.find(
-      (t) =>
-        t.inviteCode === code ||
-        t.parentInviteCode === code ||
-        t.playerInviteCode === code
-    );
-    if (!team) return false;
 
-    const updatedTeams = allTeams.map((t) =>
-      t.id === team.id
-        ? { ...t, memberIds: [...new Set([...t.memberIds, user.id])] }
-        : t
-    );
-    localStorage.setItem(TEAMS_KEY, JSON.stringify(updatedTeams));
-    setTeams(updatedTeams);
+    const { data: teamRow } = await supabase
+      .from("teams")
+      .select("*")
+      .or(
+        `invite_code.eq.${code},` +
+        `parent_invite_code.eq.${code},` +
+        `player_invite_code.eq.${code}`
+      )
+      .maybeSingle<DbTeam>();
 
-    const allUsers: User[] = JSON.parse(
-      localStorage.getItem(USERS_KEY) || "[]"
-    );
+    if (!teamRow) return false;
+
+    const newMemberIds = [
+      ...new Set([...(teamRow.member_ids ?? []), user.id]),
+    ];
+
+    await supabase
+      .from("teams")
+      .update({ member_ids: newMemberIds })
+      .eq("id", teamRow.id);
+
+    await supabase
+      .from("team_members")
+      .upsert({ team_id: teamRow.id, user_id: user.id });
+
+    if (childName) {
+      await supabase
+        .from("profiles")
+        .update({ child_name: childName })
+        .eq("id", user.id);
+    }
+
     const updatedUser: User = {
       ...user,
-      teamId: team.id,
+      teamId: teamRow.id,
       ...(childName ? { childName } : {}),
     };
-    const updatedUsers = allUsers.map((u) =>
-      u.id === user.id ? updatedUser : u
-    );
-    localStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
     setUser(updatedUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+    setCurrentTeam(toTeam(teamRow));
     return true;
   };
 
-  const getMyTeam = (): Team | null => {
-    if (!user?.teamId) return null;
-    const allTeams: Team[] = JSON.parse(
-      localStorage.getItem(TEAMS_KEY) || "[]"
-    );
-    return allTeams.find((t) => t.id === user.teamId) ?? null;
-  };
+  /* ── getMyTeam (synchronous, cached) ── */
+  const getMyTeam = (): Team | null => currentTeam;
 
-  const getAllTeams = (): Team[] => {
-    return JSON.parse(localStorage.getItem(TEAMS_KEY) || "[]");
-  };
-
-  const clearUsers = () => {
-    localStorage.removeItem(USERS_KEY);
-    localStorage.removeItem(TEAMS_KEY);
-    localStorage.removeItem(CURRENT_USER_KEY);
-    setUser(null);
-    setTeams([]);
+  /* ── getAllTeams (for admin page) ── */
+  const getAllTeams = async (): Promise<Team[]> => {
+    const { data } = await supabase.from("teams").select("*");
+    return (data ?? []).map((t) => toTeam(t as DbTeam));
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        teams,
+        loading,
         login,
         logout,
         register,
         joinTeam,
         getMyTeam,
         getAllTeams,
-        clearUsers,
       }}
     >
       {children}
@@ -325,3 +449,4 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+

@@ -3,43 +3,21 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth, UserRole } from "../context/AuthContext";
+import { useAuth } from "../context/AuthContext";
 
 export default function RegisterPage() {
-  const { register, clearUsers } = useAuth();
+  const { register } = useAuth();
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName]         = useState("");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  // "admin" is the only role that can self-register without an invite code,
-  // so it is the natural default for the registration form.
-  const [role, setRole] = useState<UserRole>("admin");
   const [clubName, setClubName] = useState("");
-  const [teamName, setTeamName] = useState("");
-  const [ageGroup, setAgeGroup] = useState("≤7 år");
-  const [inviteCode, setInviteCode] = useState("");
-  const [childName, setChildName] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError]       = useState("");
+  const [busy, setBusy]         = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
-  // Roles that require an invite code to register
-  const needsInviteCode = role !== "admin";
-
-  const inviteCodeLabel: Partial<Record<UserRole, string>> = {
-    coach: "Admin-inbjudningskod",
-    assistant: "Inbjudningskod från coach",
-    parent: "Inbjudningskod från coach",
-    player: "Inbjudningskod från coach",
-  };
-
-  const inviteCodeHint: Partial<Record<UserRole, string>> = {
-    coach: "Fråga din föreningsadmin om koden.",
-    assistant: "Fråga din coach om assistentkoden.",
-    parent: "Fråga din coach om föräldrainbjudningskoden.",
-    player: "Fråga din coach om spelarkoden.",
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -47,54 +25,66 @@ export default function RegisterPage() {
       setError("Lösenordet måste vara minst 6 tecken.");
       return;
     }
-
-    if (role === "parent" && !childName.trim()) {
-      setError("Ange barnets namn för att kopplas till rätt spelare.");
-      return;
-    }
-
-    if (role === "admin" && !clubName.trim()) {
+    if (!clubName.trim()) {
       setError("Ange föreningens namn.");
       return;
     }
 
-    const err = register(
+    setBusy(true);
+    const result = await register(
       name.trim(),
       email.trim().toLowerCase(),
       password,
-      role,
-      role === "coach" ? teamName.trim() : undefined,
-      role === "coach" ? ageGroup : undefined,
-      needsInviteCode ? inviteCode.trim() : undefined,
-      role === "parent" ? childName.trim() : undefined,
-      role === "admin" ? clubName.trim() : undefined
+      "admin",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      clubName.trim()
     );
+    setBusy(false);
 
-    if (err === null) {
+    if (result === null) {
       router.push("/");
+    } else if (result === "CONFIRM_EMAIL") {
+      setEmailSent(true);
     } else {
-      setError(err);
+      setError(result);
     }
   };
 
-  const roles: { value: UserRole; label: string; desc: string }[] = [
-    { value: "admin", label: "🏛 Föreningsadmin", desc: "Administrerar föreningen" },
-    { value: "coach", label: "🎽 Coach", desc: "Leder ett lag" },
-    { value: "assistant", label: "👋 Assistent", desc: "Hjälper coachen" },
-    { value: "parent", label: "👪 Förälder", desc: "Följer sitt barns lag" },
-    { value: "player", label: "🏃 Spelare", desc: "Spelar i laget" },
-  ];
+  if (emailSent) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-full max-w-sm text-center">
+          <span className="text-5xl">📧</span>
+          <h1 className="text-2xl font-extrabold text-slate-900 mt-4 mb-2">
+            Bekräfta din e-post
+          </h1>
+          <p className="text-slate-500 text-sm leading-relaxed">
+            Vi har skickat ett bekräftelsemail till{" "}
+            <strong>{email}</strong>. Klicka på länken i mailet för att
+            aktivera ditt konto och sedan{" "}
+            <Link href="/login" className="text-orange-600 font-semibold hover:underline">
+              logga in
+            </Link>
+            .
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <span className="text-4xl">🏀</span>
+          <span className="text-4xl">🏛</span>
           <h1 className="text-2xl font-extrabold text-slate-900 mt-3">
-            Skapa konto
+            Skapa föreningskonto
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Registrera dig för att komma igång
+            Registrera dig som föreningsadmin för att komma igång
           </p>
         </div>
 
@@ -145,135 +135,20 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Role */}
+            {/* Club name */}
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
-                Roll
+                Föreningens namn
               </label>
-              <div className="grid grid-cols-2 gap-2">
-                {roles.map(({ value, label, desc }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setRole(value);
-                      setError("");
-                      // Only clear fields that don't apply to the new role
-                      if (value !== "admin") setClubName("");
-                      if (value === "admin") setInviteCode("");
-                      if (value !== "parent") setChildName("");
-                    }}
-                    className={`py-2.5 px-3 text-left rounded-xl transition-all border ${
-                      role === value
-                        ? "bg-orange-500 text-white border-orange-500"
-                        : "bg-slate-50 text-slate-700 border-slate-200 hover:border-orange-300"
-                    }`}
-                  >
-                    <span className="text-xs font-bold block">{label}</span>
-                    <span
-                      className={`text-xs block mt-0.5 ${
-                        role === value ? "text-orange-100" : "text-slate-400"
-                      }`}
-                    >
-                      {desc}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <input
+                type="text"
+                required
+                value={clubName}
+                onChange={(e) => setClubName(e.target.value)}
+                placeholder="T.ex. Borlänge Basket"
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
             </div>
-
-            {/* Admin-specific: club name */}
-            {role === "admin" && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Föreningens namn
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={clubName}
-                  onChange={(e) => setClubName(e.target.value)}
-                  placeholder="T.ex. Kungsholmen Basket"
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-              </div>
-            )}
-
-            {/* Coach-specific: team name + age group */}
-            {role === "coach" && (
-              <>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    Lagets namn
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    placeholder="T.ex. Röda Laget U9"
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
-                    Åldersgrupp
-                  </label>
-                  <select
-                    value={ageGroup}
-                    onChange={(e) => setAgeGroup(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-                  >
-                    <option value="≤7 år">≤7 år (År 1)</option>
-                    <option value="8 år">8 år (År 2)</option>
-                    <option value="9 år">9 år (År 3)</option>
-                  </select>
-                </div>
-              </>
-            )}
-
-            {/* Parent-specific: child name */}
-            {role === "parent" && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Barnets namn
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={childName}
-                  onChange={(e) => setChildName(e.target.value)}
-                  placeholder="Vad heter ditt barn?"
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Används för att koppla dig till ditt barns närvaro.
-                </p>
-              </div>
-            )}
-
-            {/* Invite code – required for all roles except admin */}
-            {needsInviteCode && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  {inviteCodeLabel[role]}
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={inviteCode}
-                  onChange={(e) =>
-                    setInviteCode(e.target.value.toUpperCase())
-                  }
-                  placeholder="XXXXXX"
-                  maxLength={6}
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  {inviteCodeHint[role]}
-                </p>
-              </div>
-            )}
 
             {error && (
               <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
@@ -283,9 +158,10 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl transition-colors"
+              disabled={busy}
+              className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold text-sm rounded-xl transition-colors"
             >
-              Skapa konto
+              {busy ? "Skapar konto…" : "Skapa konto"}
             </button>
           </form>
 
@@ -298,34 +174,21 @@ export default function RegisterPage() {
               Logga in
             </Link>
           </p>
+        </div>
 
-          <div className="mt-6 pt-5 border-t border-slate-100 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Detta tar bort ALLA konton och lag. Är du säker?"
-                  )
-                ) {
-                  clearUsers();
-                  setName("");
-                  setEmail("");
-                  setPassword("");
-                  setRole("admin");
-                  setClubName("");
-                  setTeamName("");
-                  setAgeGroup("≤7 år");
-                  setInviteCode("");
-                  setChildName("");
-                  setError("");
-                }
-              }}
-              className="text-xs text-slate-400 hover:text-red-500 underline underline-offset-2 transition-colors"
-            >
-              Rensa alla konton
-            </button>
-          </div>
+        {/* Invite-code join link */}
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-700 text-center">
+          <p className="font-semibold mb-1">Har du fått en inbjudningskod?</p>
+          <p className="text-blue-600 text-xs mb-2">
+            Coacher, assistenter, föräldrar och spelare registrerar sig via
+            inbjudningskoden de fått av admin eller coach.
+          </p>
+          <Link
+            href="/anslut"
+            className="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-xl transition-colors"
+          >
+            Gå med med inbjudningskod →
+          </Link>
         </div>
       </div>
     </div>
