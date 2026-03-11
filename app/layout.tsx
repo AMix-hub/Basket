@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "./components/Navbar";
+import CoachClipboard from "./components/CoachClipboard";
 
 export const metadata: Metadata = {
   title: "Basket Träningsplanering",
@@ -18,6 +19,7 @@ export default function RootLayout({
       <body className="antialiased bg-slate-50 text-slate-900">
         <Navbar />
         <main className="max-w-5xl mx-auto px-4 py-10">{children}</main>
+        <CoachClipboard />
       </body>
     </html>
   );
