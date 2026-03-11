@@ -9,15 +9,7 @@
 -- 0. Rensa befintliga objekt (idempotent)
 -- =========================================================
 
-DROP TRIGGER  IF EXISTS on_auth_user_created        ON auth.users;
-DROP TRIGGER  IF EXISTS trg_attendance_updated_at   ON attendance;
-DROP TRIGGER  IF EXISTS trg_tactic_live_updated_at  ON tactic_live_state;
-DROP TRIGGER  IF EXISTS trg_coach_notes_updated_at  ON coach_notes;
-
-DROP FUNCTION IF EXISTS public.handle_new_user();
-DROP FUNCTION IF EXISTS public.update_updated_at_column();
-
--- Drop tables in reverse dependency order
+-- Drop tables first (CASCADE removes their triggers automatically)
 DROP TABLE IF EXISTS coach_notes       CASCADE;
 DROP TABLE IF EXISTS tactic_live_state CASCADE;
 DROP TABLE IF EXISTS tactics           CASCADE;
@@ -28,6 +20,12 @@ DROP TABLE IF EXISTS messages          CASCADE;
 DROP TABLE IF EXISTS team_members      CASCADE;
 DROP TABLE IF EXISTS teams             CASCADE;
 DROP TABLE IF EXISTS profiles          CASCADE;
+
+-- auth.users is never dropped here, so its trigger must be dropped explicitly
+DROP TRIGGER  IF EXISTS on_auth_user_created ON auth.users;
+
+DROP FUNCTION IF EXISTS public.handle_new_user();
+DROP FUNCTION IF EXISTS public.update_updated_at_column();
 
 
 -- =========================================================
