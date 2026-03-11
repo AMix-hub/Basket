@@ -2,7 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Miljövariabler / Environment Variables
 
-Det här projektet använder [Firebase](https://firebase.google.com) som backend (Authentication + Firestore) och kräver sex miljövariabler för att fungera:
+Det här projektet använder [Firebase](https://firebase.google.com) som backend (Authentication + Firestore) och kräver sju miljövariabler för att fungera:
 
 | Variabel | Beskrivning |
 |---|---|
@@ -12,6 +12,7 @@ Det här projektet använder [Firebase](https://firebase.google.com) som backend
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase Storage-bucket |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase App ID |
+| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Firebase Analytics mätnings-ID (valfritt) |
 
 Du hittar alla värden i [Firebase Console](https://console.firebase.google.com) under **Project Settings → General → Your apps**.
 
@@ -27,6 +28,11 @@ Du hittar alla värden i [Firebase Console](https://console.firebase.google.com)
    firebase login
    firebase deploy --only firestore:rules
    ```
+6. Lägg till din Vercel-domän som auktoriserad i Firebase:
+   Gå till **Authentication → Settings → Authorized domains** och klicka **Add domain**.
+   Ange din Vercel-URL, t.ex. `ditt-projekt.vercel.app`.
+
+> **OBS:** Utan steg 6 kommer inloggningen att misslyckas på den deployade appen.
 
 ### Driftsättning via Vercel (rekommenderat)
 
@@ -35,7 +41,7 @@ Lägg istället till variablerna direkt i Vercel-dashboarden:
 
 1. Gå till ditt projekt på [vercel.com](https://vercel.com)
 2. Välj **Settings → Environment Variables**
-3. Lägg till de sex variablerna ovan med dina riktiga värden
+3. Lägg till alla sju variablerna ovan med dina riktiga värden
 4. Gör en ny deploy (eller tryck **Redeploy**) – Vercel hämtar automatiskt värdena
 
 ### Lokal utveckling (valfritt)
@@ -54,6 +60,7 @@ Om du någon gång vill köra projektet på din egen dator:
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=ditt-projekt.firebasestorage.app
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789012
    NEXT_PUBLIC_FIREBASE_APP_ID=1:123...
+   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
    ```
 
 > **OBS:** `.env.local` är undantagen från git (via `.gitignore`) och ska aldrig committas till repot.
