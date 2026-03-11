@@ -51,7 +51,7 @@ export default function Home() {
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_50%,_#f97316_0%,_transparent_60%)]" />
         <div className="relative">
           <span className="inline-flex items-center gap-2 bg-orange-500/20 text-orange-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-5 tracking-wide uppercase">
-            🏀 Kungsholmen Basket
+            🏀 Basket Träningsplanering
           </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight">
             Träningsplanering<br className="hidden sm:block" /> för coacher

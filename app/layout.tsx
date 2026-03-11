@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import CoachClipboard from "./components/CoachClipboard";
+import { AuthProvider } from "./context/AuthContext";
 
 export const metadata: Metadata = {
   title: "Basket Träningsplanering",
@@ -17,9 +18,11 @@ export default function RootLayout({
   return (
     <html lang="sv">
       <body className="antialiased bg-slate-50 text-slate-900">
-        <Navbar />
-        <main className="max-w-5xl mx-auto px-4 py-10">{children}</main>
-        <CoachClipboard />
+        <AuthProvider>
+          <Navbar />
+          <main className="max-w-5xl mx-auto px-4 py-10">{children}</main>
+          <CoachClipboard />
+        </AuthProvider>
       </body>
     </html>
   );

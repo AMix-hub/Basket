@@ -18,7 +18,7 @@ interface Shot {
   timestamp: string;
 }
 
-type ViewMode = "log" | "stats";
+type ViewMode = "log" | "stats" | "närvaro";
 
 /* ─── Court dimensions ────────────────────────────────────────── */
 const CW = 400; // court width
@@ -92,6 +92,8 @@ function getZone(xPct: number, yPct: number): string {
 /* ─── Storage keys ──────────────────────────────────────────── */
 const PLAYERS_KEY = "basketball_players";
 const SHOTS_KEY = "basketball_shots";
+const SESSIONS_KEY = "basketball_calendar_sessions";
+const ATTENDANCE_KEY = "basketball_attendance";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function StatistikPage() {
@@ -104,6 +106,22 @@ export default function StatistikPage() {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [newPlayerNumber, setNewPlayerNumber] = useState("");
   const [showPlayerForm, setShowPlayerForm] = useState(false);
+
+  /* Attendance data (read-only from kalender storage) */
+  const [calSessions] = useState<
+    { id: string; date: string; title: string; type: string }[]
+  >(() => {
+    if (typeof window === "undefined") return [];
+    const cs = localStorage.getItem(SESSIONS_KEY);
+    return cs ? JSON.parse(cs) : [];
+  });
+  const [calAttendance] = useState<
+    { sessionId: string; playerId: string; status: string }[]
+  >(() => {
+    if (typeof window === "undefined") return [];
+    const ca = localStorage.getItem(ATTENDANCE_KEY);
+    return ca ? JSON.parse(ca) : [];
+  });
 
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -254,6 +272,16 @@ export default function StatistikPage() {
           }`}
         >
           📊 Statistik
+        </button>
+        <button
+          onClick={() => setViewMode("närvaro")}
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
+            viewMode === "närvaro"
+              ? "bg-orange-500 text-white"
+              : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          📋 Närvaro
         </button>
       </div>
 
@@ -567,6 +595,133 @@ export default function StatistikPage() {
                 <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4 text-sm text-slate-500 text-center">
                   Logga skott på planen för att se statistik här.
                 </div>
+              )}
+            </>
+          )}
+
+          {/* ── Attendance view ── */}
+          {viewMode === "närvaro" && (
+            <>
+              {players.length === 0 || calSessions.length === 0 ? (
+                <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 text-center text-slate-500 text-sm">
+                  <p className="text-2xl mb-2">📋</p>
+                  {players.length === 0
+                    ? "Lägg till spelare i Kalender-sidan för att se närvaro här."
+                    : "Inga träningspass registrerade i Kalender-sidan ännu."}
+                </div>
+              ) : (
+                <>
+                  {/* Per-player attendance summary */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-4">
+                    <h3 className="font-bold text-slate-900 mb-3">Närvaro per spelare</h3>
+                    <div className="space-y-3">
+                      {players.map((p) => {
+                        const playerAtt = calAttendance.filter(
+                          (a) => a.playerId === p.id
+                        );
+                        const present = playerAtt.filter(
+                          (a) => a.status === "present"
+                        ).length;
+                        const total = playerAtt.length;
+                        const pct =
+                          total > 0 ? Math.round((present / total) * 100) : null;
+                        return (
+                          <div key={p.id} className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-slate-800">
+                                #{p.number} {p.name}
+                              </p>
+                              <p className="text-xs text-slate-400">
+                                {present} av {total} pass
+                              </p>
+                            </div>
+                            {pct !== null ? (
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      pct >= 70
+                                        ? "bg-emerald-400"
+                                        : pct >= 40
+                                        ? "bg-amber-400"
+                                        : "bg-red-400"
+                                    }`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span
+                                  className={`text-sm font-bold w-10 text-right ${
+                                    pct >= 70
+                                      ? "text-emerald-600"
+                                      : pct >= 40
+                                      ? "text-amber-600"
+                                      : "text-red-600"
+                                  }`}
+                                >
+                                  {pct}%
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-300 shrink-0">
+                                Ej registrerat
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Session history */}
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                    <h3 className="font-bold text-slate-900 mb-3">
+                      Sessionshistorik
+                    </h3>
+                    <div className="space-y-2">
+                      {calSessions
+                        .filter((s) => s.type === "träning")
+                        .sort((a, b) => b.date.localeCompare(a.date))
+                        .slice(0, 10)
+                        .map((s) => {
+                          const sessAtt = calAttendance.filter(
+                            (a) => a.sessionId === s.id
+                          );
+                          const presentCount = sessAtt.filter(
+                            (a) => a.status === "present"
+                          ).length;
+                          const d = new Date(s.date + "T12:00:00");
+                          return (
+                            <div
+                              key={s.id}
+                              className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-800 truncate">
+                                  {s.title}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  {d.toLocaleDateString("sv-SE", {
+                                    weekday: "short",
+                                    month: "short",
+                                    day: "numeric",
+                                  })}
+                                </p>
+                              </div>
+                              {sessAtt.length > 0 ? (
+                                <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full shrink-0">
+                                  ✓ {presentCount}/{players.length} spelare
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-300 shrink-0">
+                                  Ej registrerat
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                </>
               )}
             </>
           )}
