@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useAuth } from "@/app/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Player {
@@ -26,7 +28,34 @@ interface Tactic {
   createdAt: string;
 }
 
+interface LiveState {
+  team_id: string;
+  players: Player[];
+  arrows: Arrow[];
+  animation_playing: boolean;
+  animation_start_time: string | null;
+  updated_by: string | null;
+}
+
 type Tool = "select" | "addO" | "addX" | "arrow" | "erase";
+
+const ANIMATION_DURATION = 1600; // ms
+
+/* ─── Connection-status badge ────────────────────────────────── */
+function SyncBadge({ status }: { status: "offline" | "connecting" | "live" }) {
+  const cfg = {
+    offline: { dot: "bg-slate-400", text: "Offline (lokal)" },
+    connecting: { dot: "bg-yellow-400 animate-pulse", text: "Ansluter…" },
+    live: { dot: "bg-green-400", text: "Realtid aktiv" },
+  }[status];
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} aria-hidden="true" />
+      {cfg.text}
+    </span>
+  );
+}
 
 /* ─── Court dimensions ────────────────────────────────────────── */
 const W = 380;
@@ -127,26 +156,68 @@ function buildArrowPlayerMap(
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function TaktikPage() {
+  const { user, getMyTeam } = useAuth();
+  const myTeam = getMyTeam();
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [tool, setTool] = useState<Tool>("select");
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
-  const [tactics, setTactics] = useState<Tactic[]>(() => {
-    if (typeof window === "undefined") return [];
-    const saved = localStorage.getItem("basketball_tactics");
-    return saved ? (JSON.parse(saved) as Tactic[]) : [];
-  });  const [tacticName, setTacticName] = useState("");
+
+  const [tactics, setTactics] = useState<Tactic[]>([]);
+  const [tacticName, setTacticName] = useState("");
   const [showPanel, setShowPanel] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  /* Animation state */
   const [isAnimating, setIsAnimating] = useState(false);
   const [animPos, setAnimPos] = useState<Map<string, { x: number; y: number }>>(
     new Map()
   );
   const animFrameRef = useRef<number>(0);
+
+  const [syncStatus, setSyncStatus] = useState<"offline" | "connecting" | "live">("offline");
+
+  /*
+   * Echo suppression counter: incremented before each push to Supabase,
+   * decremented when we receive our own event back. Using a counter (instead
+   * of a boolean) handles the case where multiple rapid local updates result
+   * in multiple subscription callbacks.
+   */
+  const suppressCountRef = useRef(0);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isOnline = !!supabase && !!myTeam;
+
+  /* ─── Push live board state to Supabase (debounced 120 ms) ─── */
+  const pushLiveState = useCallback(
+    (
+      nextPlayers: Player[],
+      nextArrows: Arrow[],
+      animPlaying = false,
+      animStartTime: string | null = null
+    ) => {
+      if (!isOnline || !user) return;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(async () => {
+        suppressCountRef.current += 1;
+        await supabase!.from("tactic_live_state").upsert(
+          {
+            team_id: myTeam!.id,
+            players: nextPlayers,
+            arrows: nextArrows,
+            animation_playing: animPlaying,
+            animation_start_time: animStartTime,
+            updated_at: new Date().toISOString(),
+            updated_by: user.id,
+          },
+          { onConflict: "team_id" }
+        );
+      }, 120);
+    },
+    [isOnline, user, myTeam]
+  );
 
   const getSVGCoords = useCallback(
     (clientX: number, clientY: number) => {
@@ -167,15 +238,17 @@ export default function TaktikPage() {
     if (isAnimating) return;
     const coords = getSVGCoords(e.clientX, e.clientY);
     if (tool === "addO" || tool === "addX") {
-      setPlayers((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          type: tool === "addO" ? "O" : "X",
-          x: coords.x,
-          y: coords.y,
-        },
-      ]);
+      const newPlayer: Player = {
+        id: crypto.randomUUID(),
+        type: tool === "addO" ? "O" : "X",
+        x: coords.x,
+        y: coords.y,
+      };
+      setPlayers((prev) => {
+        const next = [...prev, newPlayer];
+        pushLiveState(next, arrows);
+        return next;
+      });
     } else if (tool === "arrow") {
       setDrawStart(coords);
       setCursorPos(coords);
@@ -190,11 +263,13 @@ export default function TaktikPage() {
     }
     if (tool === "select" && draggingId) {
       const coords = getSVGCoords(e.clientX, e.clientY);
-      setPlayers((prev) =>
-        prev.map((p) =>
+      setPlayers((prev) => {
+        const next = prev.map((p) =>
           p.id === draggingId ? { ...p, x: coords.x, y: coords.y } : p
-        )
-      );
+        );
+        pushLiveState(next, arrows);
+        return next;
+      });
     }
   };
 
@@ -205,16 +280,18 @@ export default function TaktikPage() {
       const dx = coords.x - drawStart.x;
       const dy = coords.y - drawStart.y;
       if (Math.sqrt(dx * dx + dy * dy) > 10) {
-        setArrows((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            x1: drawStart.x,
-            y1: drawStart.y,
-            x2: coords.x,
-            y2: coords.y,
-          },
-        ]);
+        const newArrow: Arrow = {
+          id: crypto.randomUUID(),
+          x1: drawStart.x,
+          y1: drawStart.y,
+          x2: coords.x,
+          y2: coords.y,
+        };
+        setArrows((prev) => {
+          const next = [...prev, newArrow];
+          pushLiveState(players, next);
+          return next;
+        });
       }
       setDrawStart(null);
       setCursorPos(null);
@@ -230,68 +307,221 @@ export default function TaktikPage() {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
     } else if (tool === "erase") {
       e.stopPropagation();
-      setPlayers((prev) => prev.filter((p) => p.id !== id));
+      setPlayers((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        pushLiveState(next, arrows);
+        return next;
+      });
     }
   };
 
   const handleArrowClick = (id: string) => {
     if (isAnimating) return;
     if (tool === "erase") {
-      setArrows((prev) => prev.filter((a) => a.id !== id));
+      setArrows((prev) => {
+        const next = prev.filter((a) => a.id !== id);
+        pushLiveState(players, next);
+        return next;
+      });
     }
   };
 
-  /* ─── Play animation ─────────────────────────────────────── */
-  const playAnimation = () => {
-    if (isAnimating || arrows.length === 0) return;
-    cancelAnimationFrame(animFrameRef.current);
+  /* ─── Animation engine ──────────────────────────────────────── */
+  /**
+   * Start (or resume) an animation from `offsetMs` milliseconds in.
+   * Works for both local playback and synced playback from other clients.
+   */
+  const startAnimationAt = useCallback(
+    (offsetMs: number, sourcePlayers: Player[], sourceArrows: Arrow[]) => {
+      cancelAnimationFrame(animFrameRef.current);
 
-    const arrowPlayerMap = buildArrowPlayerMap(arrows, players);
-    if (arrowPlayerMap.size === 0) return;
+      const arrowPlayerMap = buildArrowPlayerMap(sourceArrows, sourcePlayers);
+      if (arrowPlayerMap.size === 0) return;
 
-    const DURATION = 1600; // ms
-    const startTime = performance.now();
-
-    const tick = (now: number) => {
-      const raw = Math.min((now - startTime) / DURATION, 1);
-      const t = easeInOut(raw);
-
-      const newPos = new Map<string, { x: number; y: number }>();
-      for (const [arrowId, playerId] of arrowPlayerMap) {
-        const arrow = arrows.find((a) => a.id === arrowId);
-        if (!arrow) continue;
-        newPos.set(playerId, {
-          x: arrow.x1 + (arrow.x2 - arrow.x1) * t,
-          y: arrow.y1 + (arrow.y2 - arrow.y1) * t,
-        });
-      }
-      setAnimPos(newPos);
-
-      if (raw < 1) {
-        animFrameRef.current = requestAnimationFrame(tick);
-      } else {
-        // Settle players at arrow endpoints
-        setPlayers((prev) =>
-          prev.map((p) => {
-            const pos = newPos.get(p.id);
-            return pos ? { ...p, x: pos.x, y: pos.y } : p;
+      /* If the animation has already finished by the time we receive the event,
+       * settle players at their end positions immediately without animating. */
+      if (offsetMs >= ANIMATION_DURATION) {
+        setPlayers(
+          sourcePlayers.map((p) => {
+            const arrowId = [...arrowPlayerMap.entries()].find(([, pid]) => pid === p.id)?.[0];
+            if (!arrowId) return p;
+            const arrow = sourceArrows.find((a) => a.id === arrowId);
+            return arrow ? { ...p, x: arrow.x2, y: arrow.y2 } : p;
           })
         );
-        setAnimPos(new Map());
-        setIsAnimating(false);
+        return;
+      }
+
+      const startTime = performance.now() - offsetMs;
+      setIsAnimating(true);
+
+      const tick = (now: number) => {
+        const raw = Math.min((now - startTime) / ANIMATION_DURATION, 1);
+        const t = easeInOut(raw);
+
+        const newPos = new Map<string, { x: number; y: number }>();
+        for (const [arrowId, playerId] of arrowPlayerMap) {
+          const arrow = sourceArrows.find((a) => a.id === arrowId);
+          if (!arrow) continue;
+          newPos.set(playerId, {
+            x: arrow.x1 + (arrow.x2 - arrow.x1) * t,
+            y: arrow.y1 + (arrow.y2 - arrow.y1) * t,
+          });
+        }
+        setAnimPos(newPos);
+
+        if (raw < 1) {
+          animFrameRef.current = requestAnimationFrame(tick);
+        } else {
+          setPlayers((prev) =>
+            prev.map((p) => {
+              const pos = newPos.get(p.id);
+              return pos ? { ...p, x: pos.x, y: pos.y } : p;
+            })
+          );
+          setAnimPos(new Map());
+          setIsAnimating(false);
+        }
+      };
+
+      animFrameRef.current = requestAnimationFrame(tick);
+    },
+    []
+  );
+
+  /* ─── Initial load + real-time subscription ─────────────────── */
+  useEffect(() => {
+    if (!isOnline) {
+      const saved = localStorage.getItem("basketball_tactics");
+      if (saved) setTactics(JSON.parse(saved) as Tactic[]);
+      return;
+    }
+
+    setSyncStatus("connecting");
+    let cancelled = false;
+
+    /* Shared helper: fetch saved tactics from Supabase and update state */
+    const fetchTactics = async () => {
+      const { data } = await supabase!
+        .from("tactics")
+        .select("*")
+        .eq("team_id", myTeam!.id)
+        .order("created_at", { ascending: false });
+      if (data) {
+        setTactics(
+          data.map((r) => ({
+            id: r.id as string,
+            name: r.name as string,
+            players: r.players as Player[],
+            arrows: r.arrows as Arrow[],
+            createdAt: r.created_at as string,
+          }))
+        );
       }
     };
 
-    setIsAnimating(true);
-    animFrameRef.current = requestAnimationFrame(tick);
-  };
+    (async () => {
+      await fetchTactics();
+
+      /* Current live board state */
+      const { data: liveData } = await supabase!
+        .from("tactic_live_state")
+        .select("*")
+        .eq("team_id", myTeam!.id)
+        .single();
+
+      if (!cancelled && liveData) {
+        const live = liveData as LiveState;
+        setPlayers(live.players ?? []);
+        setArrows(live.arrows ?? []);
+      }
+
+      if (!cancelled) setSyncStatus("live");
+    })();
+
+    /* Real-time: live board state */
+    const channel = supabase!
+      .channel(`tactic_live_${myTeam!.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tactic_live_state",
+          filter: `team_id=eq.${myTeam!.id}`,
+        },
+        (payload) => {
+          /* Suppress echoes of our own writes */
+          if (suppressCountRef.current > 0) {
+            suppressCountRef.current -= 1;
+            return;
+          }
+          const live = payload.new as LiveState;
+          if (!live) return;
+
+          setPlayers(live.players ?? []);
+          setArrows(live.arrows ?? []);
+
+          /* Animation sync: start at the correct offset so all clients stay in sync */
+          if (live.animation_playing && live.animation_start_time) {
+            const elapsed = Date.now() - new Date(live.animation_start_time).getTime();
+            startAnimationAt(elapsed, live.players ?? [], live.arrows ?? []);
+          } else if (!live.animation_playing) {
+            cancelAnimationFrame(animFrameRef.current);
+            setIsAnimating(false);
+            setAnimPos(new Map());
+          }
+        }
+      )
+      /* Real-time: saved tactics list */
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tactics",
+          filter: `team_id=eq.${myTeam!.id}`,
+        },
+        () => { fetchTactics(); }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase!.removeChannel(channel);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, myTeam?.id]);
 
   /* Cleanup RAF on unmount */
   useEffect(() => {
     return () => cancelAnimationFrame(animFrameRef.current);
   }, []);
 
-  const saveTactic = () => {
+  /* ─── Play animation (broadcast start time to all team members) */
+  const playAnimation = () => {
+    if (isAnimating || arrows.length === 0) return;
+    const startTime = new Date().toISOString();
+    startAnimationAt(0, players, arrows);
+    if (isOnline && user) {
+      suppressCountRef.current += 1;
+      supabase!.from("tactic_live_state").upsert(
+        {
+          team_id: myTeam!.id,
+          players,
+          arrows,
+          animation_playing: true,
+          animation_start_time: startTime,
+          updated_at: new Date().toISOString(),
+          updated_by: user.id,
+        },
+        { onConflict: "team_id" }
+      );
+    }
+  };
+
+  const saveTactic = async () => {
     if (!tacticName.trim()) return;
     const newTactic: Tactic = {
       id: crypto.randomUUID(),
@@ -300,9 +530,22 @@ export default function TaktikPage() {
       arrows,
       createdAt: new Date().toISOString(),
     };
-    const updated = [newTactic, ...tactics];
-    setTactics(updated);
-    localStorage.setItem("basketball_tactics", JSON.stringify(updated));
+
+    if (isOnline) {
+      await supabase!.from("tactics").insert({
+        id: newTactic.id,
+        name: newTactic.name,
+        team_id: myTeam!.id,
+        players: newTactic.players,
+        arrows: newTactic.arrows,
+        created_at: newTactic.createdAt,
+      });
+      /* List update arrives via subscription */
+    } else {
+      const updated = [newTactic, ...tactics];
+      setTactics(updated);
+      localStorage.setItem("basketball_tactics", JSON.stringify(updated));
+    }
     setTacticName("");
   };
 
@@ -311,12 +554,18 @@ export default function TaktikPage() {
     setArrows(t.arrows);
     setAnimPos(new Map());
     setShowPanel(false);
+    pushLiveState(t.players, t.arrows);
   };
 
-  const deleteTactic = (id: string) => {
-    const updated = tactics.filter((t) => t.id !== id);
-    setTactics(updated);
-    localStorage.setItem("basketball_tactics", JSON.stringify(updated));
+  const deleteTactic = async (id: string) => {
+    if (isOnline) {
+      await supabase!.from("tactics").delete().eq("id", id).eq("team_id", myTeam!.id);
+      /* List update arrives via subscription */
+    } else {
+      const updated = tactics.filter((t) => t.id !== id);
+      setTactics(updated);
+      localStorage.setItem("basketball_tactics", JSON.stringify(updated));
+    }
   };
 
   const clearBoard = () => {
@@ -325,6 +574,7 @@ export default function TaktikPage() {
     setAnimPos(new Map());
     setPlayers([]);
     setArrows([]);
+    pushLiveState([], [], false, null);
   };
 
   const toolConfig: { id: Tool; label: string; color: string }[] = [
@@ -346,18 +596,58 @@ export default function TaktikPage() {
 
   const canPlay = !isAnimating && arrows.length > 0 && players.length > 0;
 
+  /* ─── Auth guard ────────────────────────────────────────────── */
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <span className="text-5xl">🔒</span>
+        <h2 className="text-xl font-bold text-slate-800">
+          Logga in för att använda taktiktavlan
+        </h2>
+        <p className="text-slate-500 text-sm text-center max-w-sm">
+          Du måste vara inloggad för att se och redigera lagets taktiktavla.
+        </p>
+      </div>
+    );
+  }
+
+  if (!myTeam) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4">
+        <span className="text-5xl">👥</span>
+        <h2 className="text-xl font-bold text-slate-800">
+          Du tillhör inget lag ännu
+        </h2>
+        <p className="text-slate-500 text-sm text-center max-w-sm">
+          Gå med i ett lag via inbjudningskoden du fått av din tränare för att
+          komma åt lagets taktiktavla.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-3xl">🏀</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Interaktiv Taktiktavla
-          </h1>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🏀</span>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              Interaktiv Taktiktavla
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
+              {myTeam.name}
+            </span>
+            <SyncBadge status={isOnline ? syncStatus : "offline"} />
+          </div>
         </div>
         <p className="text-slate-500 text-sm">
-          Placera spelare, rita rörelsepillar och animera övningen med Play-knappen.
+          Placera spelare, rita rörelsepillar och animera övningen med
+          Play-knappen.
+          {isOnline && " Ändringar synkas i realtid med alla i laget."}
         </p>
       </div>
 
@@ -415,6 +705,7 @@ export default function TaktikPage() {
       {arrows.length > 0 && players.length > 0 && !isAnimating && (
         <div className="mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-medium">
           💡 Tryck på <strong>▶ Spela upp</strong> för att animera spelarna längs pilarna.
+          {isOnline && " Alla i laget ser animationen samtidigt."}
         </div>
       )}
       {isAnimating && (
