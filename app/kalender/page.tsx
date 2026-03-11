@@ -1,0 +1,531 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
+/* ─── Types ─────────────────────────────────────────────────── */
+interface Player {
+  id: string;
+  name: string;
+  number: number;
+}
+
+interface TrainingSession {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  type: "träning" | "match";
+  time: string; // HH:MM
+}
+
+type AttendanceStatus = "present" | "absent" | "sick";
+
+interface Attendance {
+  sessionId: string;
+  playerId: string;
+  status: AttendanceStatus;
+}
+
+/* ─── Helpers ────────────────────────────────────────────────── */
+const MONTHS_SV = [
+  "Januari", "Februari", "Mars", "April", "Maj", "Juni",
+  "Juli", "Augusti", "September", "Oktober", "November", "December",
+];
+const DAYS_SV = ["Mån", "Tis", "Ons", "Tor", "Fre", "Lör", "Sön"];
+
+function toYMD(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function getDaysInMonth(year: number, month: number): Date[] {
+  const days: Date[] = [];
+  const d = new Date(year, month, 1);
+  while (d.getMonth() === month) {
+    days.push(new Date(d));
+    d.setDate(d.getDate() + 1);
+  }
+  return days;
+}
+
+function startDayOfMonth(year: number, month: number): number {
+  // Monday=0, Sunday=6
+  const d = new Date(year, month, 1).getDay();
+  return (d + 6) % 7;
+}
+
+/* ─── Storage keys ──────────────────────────────────────────── */
+const PLAYERS_KEY = "basketball_players";
+const SESSIONS_KEY = "basketball_calendar_sessions";
+const ATTENDANCE_KEY = "basketball_attendance";
+
+/* ─── Main page ──────────────────────────────────────────────── */
+export default function KalenderPage() {
+  const today = new Date();
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [sessions, setSessions] = useState<TrainingSession[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+
+  // Modal state
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
+
+  // New session form
+  const [newTitle, setNewTitle] = useState("");
+  const [newType, setNewType] = useState<"träning" | "match">("träning");
+  const [newTime, setNewTime] = useState("17:00");
+
+  // New player form
+  const [newPlayerName, setNewPlayerName] = useState("");
+  const [newPlayerNumber, setNewPlayerNumber] = useState("");
+  const [showPlayerPanel, setShowPlayerPanel] = useState(false);
+
+  // Load from localStorage
+  useEffect(() => {
+    const p = localStorage.getItem(PLAYERS_KEY);
+    if (p) setPlayers(JSON.parse(p));
+    const s = localStorage.getItem(SESSIONS_KEY);
+    if (s) setSessions(JSON.parse(s));
+    const a = localStorage.getItem(ATTENDANCE_KEY);
+    if (a) setAttendance(JSON.parse(a));
+  }, []);
+
+  const savePlayers = (updated: Player[]) => {
+    setPlayers(updated);
+    localStorage.setItem(PLAYERS_KEY, JSON.stringify(updated));
+  };
+
+  const saveSessions = (updated: TrainingSession[]) => {
+    setSessions(updated);
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(updated));
+  };
+
+  const saveAttendance = (updated: Attendance[]) => {
+    setAttendance(updated);
+    localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(updated));
+  };
+
+  /* ── Navigation ── */
+  const prevMonth = () => {
+    if (month === 0) { setMonth(11); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (month === 11) { setMonth(0); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  };
+
+  /* ── Calendar grid ── */
+  const days = getDaysInMonth(year, month);
+  const startOffset = startDayOfMonth(year, month);
+  const totalCells = Math.ceil((days.length + startOffset) / 7) * 7;
+
+  /* ── Add session ── */
+  const addSession = () => {
+    if (!newTitle.trim() || !selectedDate) return;
+    const s: TrainingSession = {
+      id: crypto.randomUUID(),
+      date: selectedDate,
+      title: newTitle.trim(),
+      type: newType,
+      time: newTime,
+    };
+    saveSessions([...sessions, s]);
+    setNewTitle("");
+    setNewType("träning");
+    setNewTime("17:00");
+  };
+
+  const deleteSession = (id: string) => {
+    saveSessions(sessions.filter((s) => s.id !== id));
+    const updatedAtt = attendance.filter((a) => a.sessionId !== id);
+    saveAttendance(updatedAtt);
+    if (selectedSession?.id === id) setSelectedSession(null);
+  };
+
+  /* ── Attendance ── */
+  const getAttendance = (sessionId: string, playerId: string): AttendanceStatus | null => {
+    return attendance.find(
+      (a) => a.sessionId === sessionId && a.playerId === playerId
+    )?.status ?? null;
+  };
+
+  const setPlayerAttendance = (
+    sessionId: string,
+    playerId: string,
+    status: AttendanceStatus
+  ) => {
+    const filtered = attendance.filter(
+      (a) => !(a.sessionId === sessionId && a.playerId === playerId)
+    );
+    saveAttendance([...filtered, { sessionId, playerId, status }]);
+  };
+
+  /* ── Player management ── */
+  const addPlayer = () => {
+    if (!newPlayerName.trim()) return;
+    const p: Player = {
+      id: crypto.randomUUID(),
+      name: newPlayerName.trim(),
+      number: parseInt(newPlayerNumber) || 0,
+    };
+    savePlayers([...players, p]);
+    setNewPlayerName("");
+    setNewPlayerNumber("");
+  };
+
+  const deletePlayer = (id: string) => {
+    savePlayers(players.filter((p) => p.id !== id));
+  };
+
+  /* ── Attendance summary for a session ── */
+  const attendanceSummary = (sessionId: string) => {
+    const sess = attendance.filter((a) => a.sessionId === sessionId);
+    return {
+      present: sess.filter((a) => a.status === "present").length,
+      absent: sess.filter((a) => a.status === "absent").length,
+      sick: sess.filter((a) => a.status === "sick").length,
+    };
+  };
+
+  const statusConfig: Record<AttendanceStatus, { label: string; bg: string; text: string }> = {
+    present: { label: "Närvarande", bg: "bg-emerald-100", text: "text-emerald-700" },
+    absent: { label: "Frånvarande", bg: "bg-red-100", text: "text-red-700" },
+    sick: { label: "Sjuk", bg: "bg-amber-100", text: "text-amber-700" },
+  };
+
+  const sessionsOnDate = (date: string) => sessions.filter((s) => s.date === date);
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl">📅</span>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              Kalender & Närvaro
+            </h1>
+          </div>
+          <p className="text-slate-500 text-sm">
+            Schemalägg träningar och matcher. Registrera närvaro för varje pass.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowPlayerPanel((s) => !s)}
+          className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 text-white hover:bg-slate-700 transition-colors shrink-0"
+        >
+          👥 Spelare ({players.length})
+        </button>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Calendar */}
+        <div className="flex-1 min-w-0">
+          {/* Month navigation */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={prevMonth}
+              className="p-2 rounded-xl hover:bg-slate-200 transition-colors text-slate-700 font-bold"
+            >
+              ‹
+            </button>
+            <h2 className="text-lg font-bold text-slate-900">
+              {MONTHS_SV[month]} {year}
+            </h2>
+            <button
+              onClick={nextMonth}
+              className="p-2 rounded-xl hover:bg-slate-200 transition-colors text-slate-700 font-bold"
+            >
+              ›
+            </button>
+          </div>
+
+          {/* Day headers */}
+          <div className="grid grid-cols-7 mb-1">
+            {DAYS_SV.map((d) => (
+              <div key={d} className="text-center text-xs font-semibold text-slate-500 py-2">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: totalCells }).map((_, i) => {
+              const dayIndex = i - startOffset;
+              if (dayIndex < 0 || dayIndex >= days.length) {
+                return <div key={i} className="aspect-square" />;
+              }
+              const date = days[dayIndex];
+              const ymd = toYMD(date);
+              const isToday = ymd === toYMD(today);
+              const daySessions = sessionsOnDate(ymd);
+              const isSelected = selectedDate === ymd;
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setSelectedDate(ymd);
+                    setSelectedSession(null);
+                  }}
+                  className={`aspect-square rounded-xl flex flex-col items-center pt-1.5 pb-1 px-0.5 text-xs transition-all relative ${
+                    isSelected
+                      ? "bg-orange-500 text-white shadow-md"
+                      : isToday
+                      ? "bg-orange-100 text-orange-700 font-bold"
+                      : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-100"
+                  }`}
+                >
+                  <span className="font-semibold">{date.getDate()}</span>
+                  {daySessions.length > 0 && (
+                    <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
+                      {daySessions.map((s) => (
+                        <span
+                          key={s.id}
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            isSelected
+                              ? "bg-white"
+                              : s.type === "match"
+                              ? "bg-red-400"
+                              : "bg-emerald-400"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex gap-4 mt-3 text-xs text-slate-500">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
+              Träning
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
+              Match
+            </div>
+          </div>
+        </div>
+
+        {/* Right panel */}
+        <div className="w-full lg:w-80 shrink-0 space-y-4">
+          {/* Selected date panel */}
+          {selectedDate && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+              <h3 className="font-bold text-slate-900 mb-3">
+                {new Date(selectedDate + "T12:00:00").toLocaleDateString("sv-SE", {
+                  weekday: "long",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </h3>
+
+              {/* Sessions on this date */}
+              {sessionsOnDate(selectedDate).map((s) => {
+                const summary = attendanceSummary(s.id);
+                return (
+                  <div
+                    key={s.id}
+                    className={`mb-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                      selectedSession?.id === s.id
+                        ? "border-orange-400 bg-orange-50"
+                        : "border-slate-200 hover:border-orange-300"
+                    }`}
+                    onClick={() =>
+                      setSelectedSession(selectedSession?.id === s.id ? null : s)
+                    }
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            s.type === "match"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-emerald-100 text-emerald-700"
+                          }`}
+                        >
+                          {s.type === "match" ? "Match" : "Träning"}
+                        </span>
+                        <span className="text-xs text-slate-500">{s.time}</span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(s.id);
+                        }}
+                        className="text-slate-400 hover:text-red-500 transition-colors text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <p className="font-semibold text-sm text-slate-800 mt-1">{s.title}</p>
+                    {players.length > 0 && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        {summary.present}✓ {summary.absent}✗ {summary.sick}🤒 av {players.length}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Add session form */}
+              <div className="mt-3 space-y-2">
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addSession()}
+                  placeholder="Titel på passet..."
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={newType}
+                    onChange={(e) => setNewType(e.target.value as "träning" | "match")}
+                    className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  >
+                    <option value="träning">Träning</option>
+                    <option value="match">Match</option>
+                  </select>
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <button
+                  onClick={addSession}
+                  disabled={!newTitle.trim()}
+                  className="w-full py-2 rounded-xl bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 disabled:opacity-40 transition-colors"
+                >
+                  + Lägg till pass
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Attendance panel */}
+          {selectedSession && players.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+              <h3 className="font-bold text-slate-900 mb-1">Närvaro</h3>
+              <p className="text-sm text-slate-500 mb-3">{selectedSession.title}</p>
+              <div className="space-y-2">
+                {players.map((p) => {
+                  const current = getAttendance(selectedSession.id, p.id);
+                  return (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium text-slate-800">
+                          #{p.number} {p.name}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        {(["present", "absent", "sick"] as AttendanceStatus[]).map(
+                          (status) => {
+                            const cfg = statusConfig[status];
+                            return (
+                              <button
+                                key={status}
+                                onClick={() =>
+                                  setPlayerAttendance(selectedSession.id, p.id, status)
+                                }
+                                title={cfg.label}
+                                className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${
+                                  current === status
+                                    ? `${cfg.bg} ${cfg.text} ring-1 ring-current`
+                                    : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                                }`}
+                              >
+                                {status === "present" ? "✓" : status === "absent" ? "✗" : "🤒"}
+                              </button>
+                            );
+                          }
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Summary */}
+              {(() => {
+                const s = attendanceSummary(selectedSession.id);
+                return (
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex gap-4 text-xs">
+                    <span className="text-emerald-600 font-semibold">✓ {s.present} Närvarande</span>
+                    <span className="text-red-600 font-semibold">✗ {s.absent} Frånvar.</span>
+                    <span className="text-amber-600 font-semibold">🤒 {s.sick} Sjuka</span>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {selectedSession && players.length === 0 && (
+            <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4 text-sm text-amber-700">
+              Lägg till spelare i spelarlistan för att registrera närvaro.
+            </div>
+          )}
+
+          {/* Player panel */}
+          {showPlayerPanel && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+              <h3 className="font-bold text-slate-900 mb-3">Spelarlistan</h3>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="number"
+                  value={newPlayerNumber}
+                  onChange={(e) => setNewPlayerNumber(e.target.value)}
+                  placeholder="#"
+                  className="w-16 px-2 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <input
+                  type="text"
+                  value={newPlayerName}
+                  onChange={(e) => setNewPlayerName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addPlayer()}
+                  placeholder="Spelarens namn..."
+                  className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <button
+                  onClick={addPlayer}
+                  disabled={!newPlayerName.trim()}
+                  className="px-3 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors"
+                >
+                  +
+                </button>
+              </div>
+              {players.length === 0 ? (
+                <p className="text-slate-400 text-sm">Inga spelare tillagda ännu.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {players.map((p) => (
+                    <li key={p.id} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+                      <span className="text-xs font-bold text-slate-500 w-8">#{p.number}</span>
+                      <span className="flex-1 text-sm font-medium text-slate-800">{p.name}</span>
+                      <button
+                        onClick={() => deletePlayer(p.id)}
+                        className="text-slate-400 hover:text-red-500 transition-colors text-sm"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

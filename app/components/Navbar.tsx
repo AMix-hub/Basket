@@ -8,6 +8,9 @@ const links = [
   { href: "/ar1", label: "År 1 (≤7 år)" },
   { href: "/ar2", label: "År 2 (8 år)" },
   { href: "/ar3", label: "År 3 (9 år)" },
+  { href: "/taktik", label: "Taktiktavla" },
+  { href: "/kalender", label: "Kalender" },
+  { href: "/statistik", label: "Statistik" },
 ];
 
 export default function Navbar() {
