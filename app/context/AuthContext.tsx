@@ -43,7 +43,10 @@ export interface Team {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  /**
+   * Returns null on success, or a Swedish error string on failure.
+   */
+  login: (email: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   /**
    * Returns null on success, or a Swedish error string on failure.
@@ -132,6 +135,17 @@ function generateCode(): string {
   ).join("");
 }
 
+/* ─── Network error helper ───────────────────────────────── */
+
+/**
+ * Returns true when the error message indicates a network-level failure
+ * (e.g. DNS not found, no internet, CORS) rather than an application error.
+ */
+function isNetworkError(message: string): boolean {
+  const m = message.toLowerCase();
+  return m.includes("failed to fetch") || m.includes("networkerror");
+}
+
 /* ─── Context ────────────────────────────────────────────── */
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -210,12 +224,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile]);
 
   /* ── login ── */
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return !error;
+  const login = async (email: string, password: string): Promise<string | null> => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (!error) return null;
+      if (isNetworkError(error.message)) {
+        return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
+      }
+      return "Fel e-post eller lösenord. Försök igen.";
+    } catch {
+      return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
+    }
   };
 
   /* ── logout ── */
@@ -237,6 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     childName?: string,
     clubName?: string
   ): Promise<string | null> => {
+    try {
 
     /* 1 ─ Validate invite codes before touching auth ────────── */
     let invitingAdminId: string | null = null;
@@ -365,6 +388,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     return null; // success
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isNetworkError(msg)) {
+        return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
+      }
+      return msg || "Ett oväntat fel uppstod. Försök igen.";
+    }
   };
 
   /* ── joinTeam (for users who already have an account) ── */

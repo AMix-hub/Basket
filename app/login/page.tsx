@@ -18,12 +18,12 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setBusy(true);
-    const ok = await login(email.trim().toLowerCase(), password);
+    const err = await login(email.trim().toLowerCase(), password);
     setBusy(false);
-    if (ok) {
+    if (err === null) {
       router.push("/");
     } else {
-      setError("Fel e-post eller lösenord. Försök igen.");
+      setError(err);
     }
   };
 
