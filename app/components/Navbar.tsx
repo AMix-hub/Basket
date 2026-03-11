@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
+import { useUnreadCount } from "../hooks/useUnreadCount";
 
 const yearLinks = [
   { href: "/ar1", label: "År 1", sub: "≤7 år" },
@@ -21,6 +22,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const unread = useUnreadCount();
 
   const handleLogout = () => {
     logout();
@@ -130,6 +132,32 @@ export default function Navbar() {
                   );
                 })}
               </div>
+            </>
+          )}
+
+          {/* Messages link – only for logged-in users */}
+          {user && (
+            <>
+              <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
+              <Link
+                href="/meddelanden"
+                className={`relative flex items-center gap-1.5 px-3 py-1 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+                  pathname === "/meddelanden"
+                    ? "text-orange-400"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                <span>💬</span>
+                <span>Chatt</span>
+                {unread > 0 && (
+                  <span className="absolute -top-0.5 -right-1 text-xs font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 leading-none">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+                {pathname === "/meddelanden" && (
+                  <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t" />
+                )}
+              </Link>
             </>
           )}
 
