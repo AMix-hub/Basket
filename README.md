@@ -1,5 +1,42 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Miljövariabler / Environment Variables
+
+Det här projektet använder [Supabase](https://supabase.com) som backend och kräver två miljövariabler för att fungera:
+
+| Variabel | Beskrivning |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Projektets URL från Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publik anon-nyckel från Supabase |
+
+Du hittar värdena i [Supabase Dashboard](https://app.supabase.com) under **Project Settings → API**.
+
+### Driftsättning via Vercel (rekommenderat)
+
+Om du kör projektet via **GitHub + Vercel** behöver du **inte** köra några lokala kommandon.
+Lägg istället till variablerna direkt i Vercel-dashboarden:
+
+1. Gå till ditt projekt på [vercel.com](https://vercel.com)
+2. Välj **Settings → Environment Variables**
+3. Lägg till de två variablerna ovan med dina riktiga värden
+4. Gör en ny deploy (eller tryck **Redeploy**) – Vercel hämtar automatiskt värdena
+
+### Lokal utveckling (valfritt)
+
+Om du någon gång vill köra projektet på din egen dator:
+
+1. Kopiera `.env.example` till `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Fyll i dina riktiga värden i `.env.local`:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://<ditt-projekt-id>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<din-anon-nyckel>
+   ```
+
+> **OBS:** `.env.local` är undantagen från git (via `.gitignore`) och ska aldrig committas till repot.
+
 ## Getting Started
 
 First, run the development server:
