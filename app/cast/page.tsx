@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebaseClient";
 
 /* ─── Types (mirrors taktik/page.tsx) ───────────────────────── */
 interface Player {
@@ -21,11 +22,11 @@ interface Arrow {
 }
 
 interface LiveState {
-  team_id: string;
+  teamId: string;
   players: Player[];
   arrows: Arrow[];
-  animation_playing: boolean;
-  animation_start_time: string | null;
+  animationPlaying: boolean;
+  animationStartTime: string | null;
 }
 
 /* ─── Court dimensions ────────────────────────────────────────── */
@@ -192,71 +193,39 @@ function CastBoard() {
     []
   );
 
-  /* ─── Supabase subscription ─────────────────────────────────── */
+  /* ─── Firestore subscription ─────────────────────────────────── */
   useEffect(() => {
-    if (!teamId || !supabase) return;
+    if (!teamId) return;
 
-    /* Capture non-null reference so the cleanup function can use it safely. */
-    const db = supabase;
     let cancelled = false;
 
-    /* Load initial live board state */
-    (async () => {
-      const { data } = await db
-        .from("tactic_live_state")
-        .select("*")
-        .eq("team_id", teamId)
-        .single();
+    /* Real-time subscription */
+    const unsubscribe = onSnapshot(
+      doc(db, "tactic_live_state", teamId),
+      (snap) => {
+        if (cancelled || !snap.exists()) return;
 
-      if (!cancelled && data) {
-        const live = data as LiveState;
+        const live = snap.data() as LiveState;
         setPlayers(live.players ?? []);
         setArrows(live.arrows ?? []);
 
-        /* Resume animation if it started before we connected */
-        if (live.animation_playing && live.animation_start_time) {
+        if (!connected) setConnected(true);
+
+        if (live.animationPlaying && live.animationStartTime) {
           const elapsed =
-            Date.now() - new Date(live.animation_start_time).getTime();
+            Date.now() - new Date(live.animationStartTime).getTime();
           startAnimationAt(elapsed, live.players ?? [], live.arrows ?? []);
+        } else if (!live.animationPlaying) {
+          cancelAnimationFrame(animFrameRef.current);
+          setIsAnimating(false);
+          setAnimPos(new Map());
         }
       }
-      if (!cancelled) setConnected(true);
-    })();
-
-    /* Real-time subscription */
-    const channel = db
-      .channel(`cast_recv_${teamId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tactic_live_state",
-          filter: `team_id=eq.${teamId}`,
-        },
-        (payload) => {
-          const live = payload.new as LiveState;
-          if (!live) return;
-
-          setPlayers(live.players ?? []);
-          setArrows(live.arrows ?? []);
-
-          if (live.animation_playing && live.animation_start_time) {
-            const elapsed =
-              Date.now() - new Date(live.animation_start_time).getTime();
-            startAnimationAt(elapsed, live.players ?? [], live.arrows ?? []);
-          } else if (!live.animation_playing) {
-            cancelAnimationFrame(animFrameRef.current);
-            setIsAnimating(false);
-            setAnimPos(new Map());
-          }
-        }
-      )
-      .subscribe();
+    );
 
     return () => {
       cancelled = true;
-      db.removeChannel(channel);
+      unsubscribe();
       cancelAnimationFrame(animFrameRef.current);
     };
   }, [teamId, startAnimationAt]);
@@ -270,21 +239,6 @@ function CastBoard() {
           Ingen lag-ID angiven. Öppna taktiktavlan i appen och tryck på{" "}
           <strong className="text-white/80">📺 Casta</strong> för att starta
           visningen på den här skärmen.
-        </p>
-      </div>
-    );
-  }
-
-  /* ─── No Supabase ────────────────────────────────────────────── */
-  if (!supabase) {
-    return (
-      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-4 p-8">
-        <span className="text-6xl">⚠️</span>
-        <p className="text-yellow-300/80 text-base text-center max-w-sm">
-          Supabase är inte konfigurerat. Realtidssynk är inte tillgänglig.
-          Konfigurera <code className="text-white/60">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
-          och <code className="text-white/60">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>{" "}
-          för att aktivera cast-läget.
         </p>
       </div>
     );

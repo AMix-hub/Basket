@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../../lib/supabaseClient";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
 
 /**
  * Returns the total count of unread messages (team chat + DMs)
  * for the currently logged-in user in their team.
- * Subscribes to Supabase Realtime for instant updates.
+ * Uses Firestore real-time listener for instant updates.
  */
 export function useUnreadCount(): number {
   const { user, getMyTeam } = useAuth();
@@ -17,34 +18,27 @@ export function useUnreadCount(): number {
     const team = getMyTeam();
     if (!user || !team) return;
 
-    const fetchCount = async () => {
-      const { count: c } = await supabase
-        .from("messages")
-        .select("id", { count: "exact", head: true })
-        .eq("team_id", team.id)
-        .neq("sender_id", user.id)
-        .not("read_by", "cs", `{${user.id}}`);
-      setCount(c ?? 0);
-    };
+    /* Listen to all messages in this team where the user is not the sender */
+    const q = query(
+      collection(db, "messages"),
+      where("teamId", "==", team.id),
+    );
 
-    fetchCount();
+    const unsubscribe = onSnapshot(q, (snap) => {
+      let unread = 0;
+      snap.forEach((docSnap) => {
+        const msg = docSnap.data();
+        if (
+          msg.senderId !== user.id &&
+          !(msg.readBy as string[] ?? []).includes(user.id)
+        ) {
+          unread++;
+        }
+      });
+      setCount(unread);
+    });
 
-    /* Subscribe to new messages in this team */
-    const channel = supabase
-      .channel(`unread-${team.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-          filter: `team_id=eq.${team.id}`,
-        },
-        () => fetchCount()
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    return () => unsubscribe();
   }, [user, getMyTeam]);
 
   return count;

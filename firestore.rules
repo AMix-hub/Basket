@@ -1,0 +1,120 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper functions ────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function getProfile(userId) {
+      return get(/databases/$(database)/documents/profiles/$(userId)).data;
+    }
+
+    function isTeamMember(teamId) {
+      return exists(/databases/$(database)/documents/team_members/$(teamId + '_' + request.auth.uid));
+    }
+
+    function userRole() {
+      return getProfile(request.auth.uid).role;
+    }
+
+    function isCoachOrAbove() {
+      return userRole() in ['coach', 'assistant', 'admin'];
+    }
+
+    // ─── profiles ────────────────────────────────────────────────
+    // Public read (needed for invite-code validation before sign-up).
+    // Each user manages only their own row.
+    match /profiles/{userId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && isOwner(userId);
+    }
+
+    // ─── teams ───────────────────────────────────────────────────
+    // Public read (invite-code validation).
+    // Authenticated users can create teams.
+    // Only coach or admin can update their own team.
+    match /teams/{teamId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource.data.coachId == request.auth.uid ||
+        resource.data.adminId == request.auth.uid
+      );
+      allow delete: if isSignedIn() && resource.data.adminId == request.auth.uid;
+    }
+
+    // ─── team_members ─────────────────────────────────────────────
+    // Authenticated users can read all memberships.
+    // Users can only add themselves.
+    match /team_members/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        isTeamMember(resource.data.teamId)
+      );
+    }
+
+    // ─── messages ────────────────────────────────────────────────
+    // Only team members can read/write messages in their team.
+    match /messages/{msgId} {
+      allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
+      allow create: if isSignedIn() &&
+        request.resource.data.senderId == request.auth.uid &&
+        isTeamMember(request.resource.data.teamId);
+      allow update: if isSignedIn() && isTeamMember(resource.data.teamId);
+    }
+
+    // ─── players ─────────────────────────────────────────────────
+    match /players/{playerId} {
+      allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
+      allow write: if isSignedIn() &&
+        isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+    }
+
+    // ─── sessions ────────────────────────────────────────────────
+    match /sessions/{sessionId} {
+      allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
+      allow write: if isSignedIn() &&
+        isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+    }
+
+    // ─── attendance ───────────────────────────────────────────────
+    match /attendance/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isCoachOrAbove();
+    }
+
+    // ─── tactics ─────────────────────────────────────────────────
+    match /tactics/{tacticId} {
+      allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
+      allow write: if isSignedIn() &&
+        isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+      allow delete: if isSignedIn() && isTeamMember(resource.data.teamId) && isCoachOrAbove();
+    }
+
+    // ─── tactic_live_state ────────────────────────────────────────
+    // One document per team (document ID = teamId).
+    match /tactic_live_state/{teamId} {
+      allow read: if isSignedIn() && isTeamMember(teamId);
+      allow write: if isSignedIn() && isTeamMember(teamId) && isCoachOrAbove();
+    }
+
+    // ─── coach_notes ──────────────────────────────────────────────
+    // Each user can only access their own notes.
+    match /coach_notes/{userId} {
+      allow read, write: if isSignedIn() && isOwner(userId);
+    }
+  }
+}

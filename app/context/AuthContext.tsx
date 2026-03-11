@@ -8,7 +8,25 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  or,
+  getDocs,
+  limit,
+} from "firebase/firestore";
+import { auth, db } from "../../lib/firebaseClient";
 
 /* ─── Types ──────────────────────────────────────────────── */
 
@@ -69,59 +87,57 @@ interface AuthContextType {
   getAllTeams: () => Promise<Team[]>;
 }
 
-/* ─── DB row shapes (snake_case from Supabase) ──────────── */
+/* ─── Firestore document shapes ──────────────────────────── */
 
 interface DbProfile {
-  id: string;
   name: string;
   role: string;
-  club_name: string | null;
-  coach_invite_code: string | null;
-  child_name: string | null;
-  created_at: string;
+  clubName: string | null;
+  coachInviteCode: string | null;
+  childName: string | null;
+  createdAt: string;
 }
 
 interface DbTeam {
-  id: string;
   name: string;
-  age_group: string;
-  coach_id: string | null;
-  admin_id: string;
-  club_name: string;
-  member_ids: string[];
-  invite_code: string;
-  parent_invite_code: string;
-  player_invite_code: string;
+  ageGroup: string;
+  coachId: string | null;
+  adminId: string;
+  clubName: string;
+  memberIds: string[];
+  inviteCode: string;
+  parentInviteCode: string;
+  playerInviteCode: string;
 }
 
 /* ─── Converters ─────────────────────────────────────────── */
 
-function toUser(p: DbProfile, email: string): User {
+function toUser(id: string, p: DbProfile, email: string): User {
   return {
-    id: p.id,
+    id,
     name: p.name,
     email,
     role: p.role as UserRole,
     teamId: null, // resolved separately via team_members
-    childName: p.child_name ?? undefined,
-    coachInviteCode: p.coach_invite_code ?? undefined,
-    clubName: p.club_name ?? undefined,
-    createdAt: p.created_at,
+    childName: p.childName ?? undefined,
+    coachInviteCode: p.coachInviteCode ?? undefined,
+    clubName: p.clubName ?? undefined,
+    createdAt: p.createdAt,
   };
 }
 
-function toTeam(t: DbTeam): Team {
+function toTeam(id: string, t: DbTeam): Team {
   return {
-    id: t.id,
+    id,
     name: t.name,
-    ageGroup: t.age_group,
-    coachId: t.coach_id ?? "",
-    adminId: t.admin_id,
-    clubName: t.club_name,
-    memberIds: t.member_ids ?? [],
-    inviteCode: t.invite_code,
-    parentInviteCode: t.parent_invite_code,
-    playerInviteCode: t.player_invite_code,
+    ageGroup: t.ageGroup,
+    coachId: t.coachId ?? "",
+    adminId: t.adminId,
+    clubName: t.clubName,
+    memberIds: t.memberIds ?? [],
+    inviteCode: t.inviteCode,
+    parentInviteCode: t.parentInviteCode,
+    playerInviteCode: t.playerInviteCode,
   };
 }
 
@@ -146,43 +162,40 @@ function isNetworkError(message: string): boolean {
   return m.includes("failed to fetch") || m.includes("networkerror");
 }
 
-/* ─── Swedish translation of Supabase error messages ─────── */
+/* ─── Swedish translation of Firebase error messages ─────── */
 
 /**
- * Maps common English Supabase error messages to user-friendly Swedish.
+ * Maps common English Firebase error codes to user-friendly Swedish.
  * Falls back to the original message for unknown errors.
  */
-function translateSupabaseError(message: string): string {
+function translateFirebaseError(message: string): string {
   if (isNetworkError(message)) {
     return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
   }
   const m = message.toLowerCase();
-  if (m.includes("user already registered") || m.includes("already registered")) {
+  if (m.includes("email-already-in-use") || m.includes("already registered")) {
     return "Det finns redan ett konto med den e-postadressen. Prova att logga in istället.";
   }
-  if (m.includes("email not confirmed")) {
-    return "E-postadressen är inte bekräftad. Kontrollera din inkorg.";
-  }
-  if (m.includes("invalid login credentials") || m.includes("invalid email or password")) {
+  if (m.includes("user-not-found") || m.includes("wrong-password") || m.includes("invalid-credential")) {
     return "Fel e-post eller lösenord. Försök igen.";
   }
-  if (m.includes("password should be at least") || m.includes("password is too short")) {
+  if (m.includes("weak-password") || m.includes("password should be at least")) {
     return "Lösenordet måste vara minst 6 tecken.";
   }
-  if (m.includes("invalid email")) {
+  if (m.includes("invalid-email")) {
     return "Ogiltig e-postadress. Kontrollera att du skrivit rätt.";
   }
-  if (m.includes("email rate limit") || m.includes("rate limit exceeded") || m.includes("too many requests")) {
+  if (m.includes("too-many-requests")) {
     return "För många försök. Vänta en stund och försök igen.";
   }
-  if (m.includes("database error") || m.includes("unexpected_failure") || m.includes("error saving new user")) {
-    return "Ett tekniskt fel uppstod. Försök igen eller kontakta supporten.";
+  if (m.includes("operation-not-allowed") || m.includes("signups not allowed")) {
+    return "Registrering är inaktiverad. Kontakta administratören.";
   }
-  if (m.includes("invalid api key") || m.includes("invalid api") || m.includes("no api key") || m.includes("apikey")) {
+  if (m.includes("network-request-failed")) {
+    return "Nätverksfel. Kontrollera din internetanslutning och försök igen.";
+  }
+  if (m.includes("api-key-not-valid") || m.includes("invalid api")) {
     return "Tjänsten är inte tillgänglig just nu. Försök igen senare eller kontakta supporten.";
-  }
-  if (m.includes("signup is disabled") || m.includes("signups not allowed")) {
-    return "Registrering är inaktiverad i projektinställningarna. Kontakta administratören.";
   }
   return message;
 }
@@ -199,66 +212,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /* Load the profile + team for a given auth user */
   const loadProfile = useCallback(
     async (authId: string, email: string): Promise<User | null> => {
-      let dbProfile: DbProfile | null = null;
+      /* Fetch profile document */
+      const profileSnap = await getDoc(doc(db, "profiles", authId));
+      let profileData = profileSnap.exists() ? (profileSnap.data() as DbProfile) : null;
 
-      {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", authId)
-          .single<DbProfile>();
-        dbProfile = data ?? null;
+      /* Fallback: profile missing – create from provided info */
+      if (!profileData) {
+        const fallbackProfile: DbProfile = {
+          name: "Okänd",
+          role: "player",
+          clubName: null,
+          coachInviteCode: null,
+          childName: null,
+          createdAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, "profiles", authId), fallbackProfile);
+        profileData = fallbackProfile;
       }
-
-      /* Fallback: profilen saknas (triggern misslyckades) – skapa från auth-metadata */
-      if (!dbProfile) {
-        const { data: authData } = await supabase.auth.getUser();
-        const meta = authData?.user?.user_metadata ?? {};
-        const role = (meta.role as string) || "player";
-        if (meta.name || meta.role) {
-          const { error: insertErr } = await supabase.from("profiles").insert({
-            id: authId,
-            name: (meta.name as string) || "Okänd",
-            role,
-            club_name: (meta.club_name as string) || null,
-            child_name: (meta.child_name as string) || null,
-            coach_invite_code: role === "admin" ? generateCode() : null,
-          });
-          if (!insertErr) {
-            const { data } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", authId)
-              .single<DbProfile>();
-            dbProfile = data ?? null;
-          }
-        }
-      }
-
-      if (!dbProfile) return null;
 
       /* Find team membership */
-      const { data: membership } = await supabase
-        .from("team_members")
-        .select("team_id")
-        .eq("user_id", authId)
-        .limit(1)
-        .maybeSingle();
+      let teamId: string | null = null;
+      const membershipSnap = await getDocs(
+        query(
+          collection(db, "team_members"),
+          where("userId", "==", authId),
+          limit(1)
+        )
+      );
+      if (!membershipSnap.empty) {
+        teamId = membershipSnap.docs[0].data().teamId as string;
+      }
 
       const u: User = {
-        ...toUser(dbProfile, email),
-        teamId: membership?.team_id ?? null,
+        ...toUser(authId, profileData, email),
+        teamId,
       };
 
       setUser(u);
 
-      if (membership?.team_id) {
-        const { data: teamRow } = await supabase
-          .from("teams")
-          .select("*")
-          .eq("id", membership.team_id)
-          .single<DbTeam>();
-        if (teamRow) setCurrentTeam(toTeam(teamRow));
+      if (teamId) {
+        const teamSnap = await getDoc(doc(db, "teams", teamId));
+        if (teamSnap.exists()) setCurrentTeam(toTeam(teamId, teamSnap.data() as DbTeam));
       } else {
         setCurrentTeam(null);
       }
@@ -270,49 +264,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /* ── Initialise session on mount ── */
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        loadProfile(session.user.id, session.user.email ?? "").finally(() =>
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        loadProfile(firebaseUser.uid, firebaseUser.email ?? "").finally(() =>
           setLoading(false)
         );
       } else {
+        setUser(null);
+        setCurrentTeam(null);
         setLoading(false);
       }
     });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        loadProfile(session.user.id, session.user.email ?? "");
-      } else {
-        setUser(null);
-        setCurrentTeam(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, [loadProfile]);
 
   /* ── login ── */
   const login = async (email: string, password: string): Promise<string | null> => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (!error) return null;
-      return translateSupabaseError(error.message);
-    } catch {
-      return "Kunde inte ansluta till servern. Kontrollera din internetanslutning och försök igen.";
+      await signInWithEmailAndPassword(auth, email, password);
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return translateFirebaseError(msg);
     }
-  };
-
-  /* ── logout ── */
-  const logout = async (): Promise<void> => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setCurrentTeam(null);
   };
 
   /* ── register ── */
@@ -332,159 +306,122 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     /* 1 ─ Validate invite codes before touching auth ────────── */
     let invitingAdminId: string | null = null;
     let invitingAdminClubName: string | null = null;
-    let teamFromCode: DbTeam | null = null;
+    let teamFromCode: { id: string; data: DbTeam } | null = null;
 
     if (role === "coach") {
       if (!inviteCode)
         return "Ange admin-inbjudningskoden för att registrera dig som coach.";
       const code = inviteCode.toUpperCase();
-      const { data: adminRow } = await supabase
-        .from("profiles")
-        .select("id, club_name")
-        .eq("coach_invite_code", code)
-        .eq("role", "admin")
-        .maybeSingle();
-      if (!adminRow)
+      const adminSnap = await getDocs(
+        query(
+          collection(db, "profiles"),
+          where("coachInviteCode", "==", code),
+          where("role", "==", "admin"),
+          limit(1)
+        )
+      );
+      if (adminSnap.empty)
         return "Ogiltig admin-inbjudningskod. Kontakta din föreningsadmin.";
-      invitingAdminId       = adminRow.id;
-      invitingAdminClubName = adminRow.club_name ?? "";
+      const adminDoc = adminSnap.docs[0];
+      invitingAdminId       = adminDoc.id;
+      invitingAdminClubName = (adminDoc.data().clubName as string) ?? "";
     }
 
     if (role === "assistant") {
       if (!inviteCode) return "Ange inbjudningskoden från din coach.";
       const code = inviteCode.toUpperCase();
-      const { data: teamRow } = await supabase
-        .from("teams")
-        .select("*")
-        .eq("invite_code", code)
-        .maybeSingle<DbTeam>();
-      if (!teamRow) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
-      teamFromCode = teamRow;
+      const teamSnap = await getDocs(
+        query(collection(db, "teams"), where("inviteCode", "==", code), limit(1))
+      );
+      if (teamSnap.empty) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      teamFromCode = { id: teamSnap.docs[0].id, data: teamSnap.docs[0].data() as DbTeam };
     }
 
     if (role === "parent") {
       if (!inviteCode) return "Ange inbjudningskoden från din coach.";
       const code = inviteCode.toUpperCase();
-      const { data: teamRow } = await supabase
-        .from("teams")
-        .select("*")
-        .eq("parent_invite_code", code)
-        .maybeSingle<DbTeam>();
-      if (!teamRow) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
-      teamFromCode = teamRow;
+      const teamSnap = await getDocs(
+        query(collection(db, "teams"), where("parentInviteCode", "==", code), limit(1))
+      );
+      if (teamSnap.empty) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      teamFromCode = { id: teamSnap.docs[0].id, data: teamSnap.docs[0].data() as DbTeam };
     }
 
     if (role === "player") {
       if (!inviteCode) return "Ange inbjudningskoden från din coach.";
       const code = inviteCode.toUpperCase();
-      const { data: teamRow } = await supabase
-        .from("teams")
-        .select("*")
-        .eq("player_invite_code", code)
-        .maybeSingle<DbTeam>();
-      if (!teamRow) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
-      teamFromCode = teamRow;
+      const teamSnap = await getDocs(
+        query(collection(db, "teams"), where("playerInviteCode", "==", code), limit(1))
+      );
+      if (teamSnap.empty) return "Ogiltig inbjudningskod. Kontrollera att du skrivit rätt.";
+      teamFromCode = { id: teamSnap.docs[0].id, data: teamSnap.docs[0].data() as DbTeam };
     }
 
-    /* 2 ─ Create Supabase auth user ────────────────────────────
-         The handle_new_user trigger will INSERT the profile row
-         automatically from raw_user_meta_data.               */
-    const { data: authData, error: signUpError } =
-      await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role,
-            club_name:  role === "admin"  ? (clubName  ?? "") : "",
-            child_name: role === "parent" ? (childName ?? "") : "",
-            // coach_invite_code is generated server-side by the trigger
-          },
-        },
-      });
+    /* 2 ─ Create Firebase auth user ────────────────────────── */
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    const userId = credential.user.uid;
 
-    if (signUpError) return translateSupabaseError(signUpError.message);
-    if (!authData.user)
-      return "Registreringen misslyckades. Försök igen.";
-
-    const userId = authData.user.id;
-
-    /* 3 ─ Email confirmation required? ─────────────────────── */
-    if (!authData.session) {
-      return "CONFIRM_EMAIL";
-    }
-
-    /* 3.5 ─ Ensure profile exists (fallback if trigger failed) ─
-         The handle_new_user trigger creates the profile automatically,
-         but if it failed for any reason we create it here from the
-         client side (user is now authenticated so RLS passes).      */
-    {
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (!existingProfile) {
-        const fallbackCode = role === "admin" ? generateCode() : null;
-        const { error: profileErr } = await supabase.from("profiles").insert({
-          id: userId,
-          name: name || "Okänd",
-          role,
-          club_name: role === "admin" ? (clubName ?? null) : null,
-          child_name: role === "parent" ? (childName ?? null) : null,
-          coach_invite_code: fallbackCode,
-        });
-        if (profileErr) return translateSupabaseError(profileErr.message);
-      }
-    }
+    /* 3 ─ Create profile in Firestore ───────────────────────── */
+    const newProfile: DbProfile = {
+      name: name || "Okänd",
+      role,
+      clubName:        role === "admin"  ? (clubName  ?? null) : null,
+      childName:       role === "parent" ? (childName ?? null) : null,
+      coachInviteCode: role === "admin"  ? generateCode()      : null,
+      createdAt:       new Date().toISOString(),
+    };
+    await setDoc(doc(db, "profiles", userId), newProfile);
 
     /* 4 ─ For coaches: create a new team ────────────────────── */
-    let teamId: string | null = null;
+    let newTeamId: string | null = null;
 
     if (role === "coach" && teamName && invitingAdminId) {
-      const newTeam = {
-        id:                  crypto.randomUUID(),
-        name:                teamName,
-        age_group:           ageGroup ?? "",
-        coach_id:            userId,
-        admin_id:            invitingAdminId,
-        club_name:           invitingAdminClubName ?? "",
-        member_ids:          [userId],
-        invite_code:         generateCode(),
-        parent_invite_code:  generateCode(),
-        player_invite_code:  generateCode(),
+      newTeamId = crypto.randomUUID();
+      const newTeam: DbTeam = {
+        name:              teamName,
+        ageGroup:          ageGroup ?? "",
+        coachId:           userId,
+        adminId:           invitingAdminId,
+        clubName:          invitingAdminClubName ?? "",
+        memberIds:         [userId],
+        inviteCode:        generateCode(),
+        parentInviteCode:  generateCode(),
+        playerInviteCode:  generateCode(),
       };
-      const { error: teamErr } = await supabase.from("teams").insert(newTeam);
-      if (teamErr) return "Kunde inte skapa laget. Försök igen.";
-      teamId = newTeam.id;
-
-      await supabase
-        .from("team_members")
-        .insert({ team_id: teamId, user_id: userId });
+      await setDoc(doc(db, "teams", newTeamId), newTeam);
+      await setDoc(doc(db, "team_members", `${newTeamId}_${userId}`), {
+        teamId: newTeamId,
+        userId,
+        joinedAt: new Date().toISOString(),
+      });
     }
 
     /* 5 ─ For assistant / parent / player: join existing team ─ */
     if (teamFromCode) {
-      teamId = teamFromCode.id;
+      newTeamId = teamFromCode.id;
       const newMemberIds = [
-        ...new Set([...( teamFromCode.member_ids ?? []), userId]),
+        ...new Set([...(teamFromCode.data.memberIds ?? []), userId]),
       ];
-      await supabase
-        .from("teams")
-        .update({ member_ids: newMemberIds })
-        .eq("id", teamFromCode.id);
-      await supabase
-        .from("team_members")
-        .insert({ team_id: teamId, user_id: userId });
+      await updateDoc(doc(db, "teams", teamFromCode.id), { memberIds: newMemberIds });
+      await setDoc(doc(db, "team_members", `${teamFromCode.id}_${userId}`), {
+        teamId: teamFromCode.id,
+        userId,
+        joinedAt: new Date().toISOString(),
+      });
     }
 
     return null; // success
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return translateSupabaseError(msg) || "Ett oväntat fel uppstod. Försök igen.";
+      return translateFirebaseError(msg) || "Ett oväntat fel uppstod. Försök igen.";
     }
+  };
+
+  /* ── logout ── */
+  const logout = async (): Promise<void> => {
+    await firebaseSignOut(auth);
+    setUser(null);
+    setCurrentTeam(null);
   };
 
   /* ── joinTeam (for users who already have an account) ── */
@@ -495,45 +432,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return false;
     const code = inviteCode.toUpperCase();
 
-    const { data: teamRow } = await supabase
-      .from("teams")
-      .select("*")
-      .or(
-        `invite_code.eq.${code},` +
-        `parent_invite_code.eq.${code},` +
-        `player_invite_code.eq.${code}`
-      )
-      .maybeSingle<DbTeam>();
+    /* Try all three invite code fields in a single query */
+    let teamId: string | null = null;
+    let teamData: DbTeam | null = null;
 
-    if (!teamRow) return false;
+    const snap = await getDocs(
+      query(
+        collection(db, "teams"),
+        or(
+          where("inviteCode", "==", code),
+          where("parentInviteCode", "==", code),
+          where("playerInviteCode", "==", code)
+        ),
+        limit(1)
+      )
+    );
+    if (!snap.empty) {
+      teamId   = snap.docs[0].id;
+      teamData = snap.docs[0].data() as DbTeam;
+    }
+
+    if (!teamId || !teamData) return false;
 
     const newMemberIds = [
-      ...new Set([...(teamRow.member_ids ?? []), user.id]),
+      ...new Set([...(teamData.memberIds ?? []), user.id]),
     ];
 
-    await supabase
-      .from("teams")
-      .update({ member_ids: newMemberIds })
-      .eq("id", teamRow.id);
-
-    await supabase
-      .from("team_members")
-      .upsert({ team_id: teamRow.id, user_id: user.id });
+    await updateDoc(doc(db, "teams", teamId), { memberIds: newMemberIds });
+    await setDoc(doc(db, "team_members", `${teamId}_${user.id}`), {
+      teamId,
+      userId: user.id,
+      joinedAt: new Date().toISOString(),
+    });
 
     if (childName) {
-      await supabase
-        .from("profiles")
-        .update({ child_name: childName })
-        .eq("id", user.id);
+      await updateDoc(doc(db, "profiles", user.id), { childName });
     }
 
     const updatedUser: User = {
       ...user,
-      teamId: teamRow.id,
+      teamId,
       ...(childName ? { childName } : {}),
     };
     setUser(updatedUser);
-    setCurrentTeam(toTeam(teamRow));
+    setCurrentTeam(toTeam(teamId, teamData));
     return true;
   };
 
@@ -542,8 +484,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /* ── getAllTeams (for admin page) ── */
   const getAllTeams = async (): Promise<Team[]> => {
-    const { data } = await supabase.from("teams").select("*");
-    return (data ?? []).map((t) => toTeam(t as DbTeam));
+    const snap = await getDocs(collection(db, "teams"));
+    return snap.docs.map((d) => toTeam(d.id, d.data() as DbTeam));
   };
 
   return (

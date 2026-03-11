@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { supabase } from "../../lib/supabaseClient";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
 
 export default function CoachClipboard() {
   const { user } = useAuth();
@@ -23,17 +24,15 @@ export default function CoachClipboard() {
   });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* Override with Supabase data once the user is known */
+  /* Override with Firestore data once the user is known */
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("coach_notes")
-      .select("content")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.content !== undefined) setNotes(data.content);
-      });
+    getDoc(doc(db, "coach_notes", user.id)).then((snap) => {
+      if (snap.exists()) {
+        const content = snap.data().content as string | undefined;
+        if (content !== undefined) setNotes(content);
+      }
+    });
   }, [user]);
 
   /* Debounced save */
@@ -42,9 +41,10 @@ export default function CoachClipboard() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(async () => {
       if (user) {
-        await supabase.from("coach_notes").upsert(
-          { user_id: user.id, content: value },
-          { onConflict: "user_id" }
+        await setDoc(
+          doc(db, "coach_notes", user.id),
+          { content: value, updatedAt: new Date().toISOString() },
+          { merge: true }
         );
       } else {
         localStorage.setItem("coach_clipboard_notes", value);
