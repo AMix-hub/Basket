@@ -4,7 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
-import { supabase } from "../../lib/supabaseClient";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
 
 interface ProfileRow {
   id: string;
@@ -24,24 +32,30 @@ export default function LagPage() {
   const [joinError, setJoinError]   = useState("");
   const [joinSuccess, setJoinSuccess] = useState(false);
 
-  /* Load team members from Supabase */
+  /* Load team members from Firestore */
   useEffect(() => {
     if (!team) return;
     (async () => {
-      const { data: memberRows } = await supabase
-        .from("team_members")
-        .select("user_id")
-        .eq("team_id", team.id);
+      const memberSnap = await getDocs(
+        query(collection(db, "team_members"), where("teamId", "==", team.id))
+      );
 
-      const ids = (memberRows ?? []).map((m) => m.user_id);
+      const ids = memberSnap.docs.map((d) => d.data().userId as string);
       if (ids.length === 0) { setMembers([]); return; }
 
-      const { data: profileRows } = await supabase
-        .from("profiles")
-        .select("id, name, role, child_name")
-        .in("id", ids);
+      const profilePromises = ids.map((id) => getDoc(doc(db, "profiles", id)));
+      const profileSnaps = await Promise.all(profilePromises);
 
-      setMembers((profileRows ?? []) as ProfileRow[]);
+      setMembers(
+        profileSnaps
+          .filter((s) => s.exists())
+          .map((s) => ({
+            id: s.id,
+            name: s.data()!.name as string,
+            role: s.data()!.role as string,
+            child_name: (s.data()!.childName as string | null) ?? null,
+          }))
+      );
     })();
   }, [team]);
 

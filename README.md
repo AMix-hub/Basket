@@ -2,14 +2,31 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Miljövariabler / Environment Variables
 
-Det här projektet använder [Supabase](https://supabase.com) som backend och kräver två miljövariabler för att fungera:
+Det här projektet använder [Firebase](https://firebase.google.com) som backend (Authentication + Firestore) och kräver sex miljövariabler för att fungera:
 
 | Variabel | Beskrivning |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Projektets URL från Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publik anon-nyckel från Supabase |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Web API-nyckel |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase autentiseringsdomän |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase projekt-ID |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Firebase Storage-bucket |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase App ID |
 
-Du hittar värdena i [Supabase Dashboard](https://app.supabase.com) under **Project Settings → API**.
+Du hittar alla värden i [Firebase Console](https://console.firebase.google.com) under **Project Settings → General → Your apps**.
+
+### Konfigurera Firebase
+
+1. Gå till [Firebase Console](https://console.firebase.google.com) och skapa ett nytt projekt
+2. Lägg till en **Web-app** i projektet och kopiera konfigurationsvärden
+3. Aktivera **Authentication** → Email/Password
+4. Skapa en **Firestore Database** (börja i produktionsläge)
+5. Distribuera säkerhetsreglerna i `firestore.rules` via Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   firebase deploy --only firestore:rules
+   ```
 
 ### Driftsättning via Vercel (rekommenderat)
 
@@ -18,7 +35,7 @@ Lägg istället till variablerna direkt i Vercel-dashboarden:
 
 1. Gå till ditt projekt på [vercel.com](https://vercel.com)
 2. Välj **Settings → Environment Variables**
-3. Lägg till de två variablerna ovan med dina riktiga värden
+3. Lägg till de sex variablerna ovan med dina riktiga värden
 4. Gör en ny deploy (eller tryck **Redeploy**) – Vercel hämtar automatiskt värdena
 
 ### Lokal utveckling (valfritt)
@@ -31,8 +48,12 @@ Om du någon gång vill köra projektet på din egen dator:
    ```
 2. Fyll i dina riktiga värden i `.env.local`:
    ```
-   NEXT_PUBLIC_SUPABASE_URL=https://<ditt-projekt-id>.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<din-anon-nyckel>
+   NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSy...
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=ditt-projekt.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=ditt-projekt-id
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=ditt-projekt.firebasestorage.app
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789012
+   NEXT_PUBLIC_FIREBASE_APP_ID=1:123...
    ```
 
 > **OBS:** `.env.local` är undantagen från git (via `.gitignore`) och ska aldrig committas till repot.

@@ -2,7 +2,18 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
+import {
+  doc,
+  setDoc,
+  addDoc,
+  deleteDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "@/lib/firebaseClient";
 import { useCast } from "@/app/hooks/useCast";
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -30,12 +41,12 @@ interface Tactic {
 }
 
 interface LiveState {
-  team_id: string;
+  teamId: string;
   players: Player[];
   arrows: Arrow[];
-  animation_playing: boolean;
-  animation_start_time: string | null;
-  updated_by: string | null;
+  animationPlaying: boolean;
+  animationStartTime: string | null;
+  updatedBy: string | null;
 }
 
 type Tool = "select" | "addO" | "addX" | "arrow" | "erase";
@@ -181,7 +192,7 @@ export default function TaktikPage() {
   const [syncStatus, setSyncStatus] = useState<"offline" | "connecting" | "live">("offline");
 
   /*
-   * Echo suppression counter: incremented before each push to Supabase,
+   * Echo suppression counter: incremented before each push to Firestore,
    * decremented when we receive our own event back. Using a counter (instead
    * of a boolean) handles the case where multiple rapid local updates result
    * in multiple subscription callbacks.
@@ -189,7 +200,7 @@ export default function TaktikPage() {
   const suppressCountRef = useRef(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isOnline = !!supabase && !!myTeam;
+  const isOnline = !!myTeam;
 
   /* ─── Cast URL (computed client-side to avoid SSR mismatch) ─── */
   /* Derive a stable cast URL from the team's id and name so the useCast hook
@@ -211,7 +222,7 @@ export default function TaktikPage() {
   const { isAvailable: castAvailable, isPresenting, startCast, stopCast } =
     useCast(castUrl);
 
-  /* ─── Push live board state to Supabase (debounced 120 ms) ─── */
+  /* ─── Push live board state to Firestore (debounced 120 ms) ─── */
   const pushLiveState = useCallback(
     (
       nextPlayers: Player[],
@@ -223,17 +234,17 @@ export default function TaktikPage() {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(async () => {
         suppressCountRef.current += 1;
-        await supabase!.from("tactic_live_state").upsert(
+        await setDoc(
+          doc(db, "tactic_live_state", myTeam!.id),
           {
-            team_id: myTeam!.id,
+            teamId: myTeam!.id,
             players: nextPlayers,
             arrows: nextArrows,
-            animation_playing: animPlaying,
-            animation_start_time: animStartTime,
-            updated_at: new Date().toISOString(),
-            updated_by: user.id,
-          },
-          { onConflict: "team_id" }
+            animationPlaying: animPlaying,
+            animationStartTime: animStartTime,
+            updatedAt: new Date().toISOString(),
+            updatedBy: user.id,
+          }
         );
       }, 120);
     },
@@ -421,95 +432,64 @@ export default function TaktikPage() {
     setSyncStatus("connecting");
     let cancelled = false;
 
-    /* Shared helper: fetch saved tactics from Supabase and update state */
-    const fetchTactics = async () => {
-      const { data } = await supabase!
-        .from("tactics")
-        .select("*")
-        .eq("team_id", myTeam!.id)
-        .order("created_at", { ascending: false });
-      if (data) {
+    /* Real-time: live board state */
+    const liveUnsub = onSnapshot(
+      doc(db, "tactic_live_state", myTeam!.id),
+      (snap) => {
+        if (!snap.exists() || cancelled) return;
+        const live = snap.data();
+
+        /* hasPendingWrites is true when the snapshot reflects a local write
+         * that has not yet been confirmed by the server. Suppressing these
+         * echoes prevents the board from jumping while the user is drawing. */
+        if (snap.metadata.hasPendingWrites) return;
+        if (suppressCountRef.current > 0) {
+          suppressCountRef.current -= 1;
+          return;
+        }
+
+        setPlayers((live.players as Player[]) ?? []);
+        setArrows((live.arrows as Arrow[]) ?? []);
+
+        /* Animation sync */
+        if (live.animationPlaying && live.animationStartTime) {
+          const elapsed = Date.now() - new Date(live.animationStartTime as string).getTime();
+          startAnimationAt(elapsed, (live.players as Player[]) ?? [], (live.arrows as Arrow[]) ?? []);
+        } else if (!live.animationPlaying) {
+          cancelAnimationFrame(animFrameRef.current);
+          setIsAnimating(false);
+          setAnimPos(new Map());
+        }
+
+        if (!cancelled) setSyncStatus("live");
+      }
+    );
+
+    /* Real-time: saved tactics list */
+    const tacticsUnsub = onSnapshot(
+      query(
+        collection(db, "tactics"),
+        where("teamId", "==", myTeam!.id),
+        orderBy("createdAt", "desc")
+      ),
+      (snap) => {
+        if (cancelled) return;
         setTactics(
-          data.map((r) => ({
-            id: r.id as string,
-            name: r.name as string,
-            players: r.players as Player[],
-            arrows: r.arrows as Arrow[],
-            createdAt: r.created_at as string,
+          snap.docs.map((d) => ({
+            id:        d.id,
+            name:      d.data().name as string,
+            players:   d.data().players as Player[],
+            arrows:    d.data().arrows as Arrow[],
+            createdAt: d.data().createdAt as string,
           }))
         );
       }
-    };
-
-    (async () => {
-      await fetchTactics();
-
-      /* Current live board state */
-      const { data: liveData } = await supabase!
-        .from("tactic_live_state")
-        .select("*")
-        .eq("team_id", myTeam!.id)
-        .single();
-
-      if (!cancelled && liveData) {
-        const live = liveData as LiveState;
-        setPlayers(live.players ?? []);
-        setArrows(live.arrows ?? []);
-      }
-
-      if (!cancelled) setSyncStatus("live");
-    })();
-
-    /* Real-time: live board state */
-    const channel = supabase!
-      .channel(`tactic_live_${myTeam!.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tactic_live_state",
-          filter: `team_id=eq.${myTeam!.id}`,
-        },
-        (payload) => {
-          /* Suppress echoes of our own writes */
-          if (suppressCountRef.current > 0) {
-            suppressCountRef.current -= 1;
-            return;
-          }
-          const live = payload.new as LiveState;
-          if (!live) return;
-
-          setPlayers(live.players ?? []);
-          setArrows(live.arrows ?? []);
-
-          /* Animation sync: start at the correct offset so all clients stay in sync */
-          if (live.animation_playing && live.animation_start_time) {
-            const elapsed = Date.now() - new Date(live.animation_start_time).getTime();
-            startAnimationAt(elapsed, live.players ?? [], live.arrows ?? []);
-          } else if (!live.animation_playing) {
-            cancelAnimationFrame(animFrameRef.current);
-            setIsAnimating(false);
-            setAnimPos(new Map());
-          }
-        }
-      )
-      /* Real-time: saved tactics list */
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "tactics",
-          filter: `team_id=eq.${myTeam!.id}`,
-        },
-        () => { fetchTactics(); }
-      )
-      .subscribe();
+    );
 
     return () => {
       cancelled = true;
-      supabase!.removeChannel(channel);
+      liveUnsub();
+      tacticsUnsub();
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -527,18 +507,15 @@ export default function TaktikPage() {
     startAnimationAt(0, players, arrows);
     if (isOnline && user) {
       suppressCountRef.current += 1;
-      supabase!.from("tactic_live_state").upsert(
-        {
-          team_id: myTeam!.id,
-          players,
-          arrows,
-          animation_playing: true,
-          animation_start_time: startTime,
-          updated_at: new Date().toISOString(),
-          updated_by: user.id,
-        },
-        { onConflict: "team_id" }
-      );
+      setDoc(doc(db, "tactic_live_state", myTeam!.id), {
+        teamId: myTeam!.id,
+        players,
+        arrows,
+        animationPlaying: true,
+        animationStartTime: startTime,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id,
+      });
     }
   };
 
@@ -553,13 +530,12 @@ export default function TaktikPage() {
     };
 
     if (isOnline) {
-      await supabase!.from("tactics").insert({
-        id: newTactic.id,
-        name: newTactic.name,
-        team_id: myTeam!.id,
-        players: newTactic.players,
-        arrows: newTactic.arrows,
-        created_at: newTactic.createdAt,
+      await addDoc(collection(db, "tactics"), {
+        name:      newTactic.name,
+        teamId:    myTeam!.id,
+        players:   newTactic.players,
+        arrows:    newTactic.arrows,
+        createdAt: newTactic.createdAt,
       });
       /* List update arrives via subscription */
     } else {
@@ -580,7 +556,7 @@ export default function TaktikPage() {
 
   const deleteTactic = async (id: string) => {
     if (isOnline) {
-      await supabase!.from("tactics").delete().eq("id", id).eq("team_id", myTeam!.id);
+      await deleteDoc(doc(db, "tactics", id));
       /* List update arrives via subscription */
     } else {
       const updated = tactics.filter((t) => t.id !== id);

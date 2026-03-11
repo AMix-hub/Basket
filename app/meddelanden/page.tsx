@@ -3,7 +3,19 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth, User } from "../context/AuthContext";
-import { supabase } from "../../lib/supabaseClient";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
+  getDoc,
+  getDocs,
+} from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 export interface Message {
@@ -17,30 +29,6 @@ export interface Message {
   sentAt: string;
   /** IDs of users who have read this message */
   readBy: string[];
-}
-
-interface DbMessage {
-  id: string;
-  team_id: string;
-  sender_id: string;
-  sender_name: string;
-  recipient_id: string | null;
-  text: string;
-  sent_at: string;
-  read_by: string[];
-}
-
-function toMessage(m: DbMessage): Message {
-  return {
-    id:          m.id,
-    teamId:      m.team_id,
-    senderId:    m.sender_id,
-    senderName:  m.sender_name,
-    recipientId: m.recipient_id,
-    text:        m.text,
-    sentAt:      m.sent_at,
-    readBy:      m.read_by ?? [],
-  };
 }
 
 /* ─── Helpers ────────────────────────────────────────────────── */
@@ -70,29 +58,35 @@ export default function MeddelandenPage() {
   useEffect(() => {
     if (!team || !user) return;
     (async () => {
-      const { data: memberRows } = await supabase
-        .from("team_members")
-        .select("user_id")
-        .eq("team_id", team.id);
+      const memberSnap = await getDocs(
+        query(collection(db, "team_members"), where("teamId", "==", team.id))
+      );
 
-      const ids = (memberRows ?? [])
-        .map((m) => m.user_id)
+      const ids = memberSnap.docs
+        .map((d) => d.data().userId as string)
         .filter((id) => id !== user.id);
 
       if (ids.length === 0) { setTeamMembers([]); return; }
 
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, name, role, child_name")
-        .in("id", ids);
+      // Fetch profiles by document ID directly (more efficient than query)
+      const profilePromises = ids.map((id) => getDoc(doc(db, "profiles", id)));
+      const profileSnaps = await Promise.all(profilePromises);
 
       setTeamMembers(
-        (profiles ?? []).map((p) => ({
-          id: p.id, name: p.name, email: "",
-          role: p.role, teamId: team.id,
-          childName: p.child_name ?? undefined,
-          createdAt: "",
-        }))
+        profileSnaps
+          .filter((s) => s.exists())
+          .map((s) => {
+            const p = s.data()!;
+            return {
+              id: s.id,
+              name: p.name as string,
+              email: "",
+              role: p.role as string,
+              teamId: team.id,
+              childName: p.childName as string | undefined,
+              createdAt: "",
+            } as User;
+          })
       );
     })();
   }, [team, user]);
@@ -101,27 +95,31 @@ export default function MeddelandenPage() {
   useEffect(() => {
     if (!team) return;
 
-    const fetchMessages = async () => {
-      const { data } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("team_id", team.id)
-        .order("sent_at", { ascending: true });
-      setMessages((data ?? []).map(toMessage));
-    };
+    const q = query(
+      collection(db, "messages"),
+      where("teamId", "==", team.id),
+      orderBy("sentAt", "asc")
+    );
 
-    fetchMessages();
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setMessages(
+        snap.docs.map((d) => {
+          const m = d.data();
+          return {
+            id:          d.id,
+            teamId:      m.teamId as string,
+            senderId:    m.senderId as string,
+            senderName:  m.senderName as string,
+            recipientId: (m.recipientId as string | null) ?? null,
+            text:        m.text as string,
+            sentAt:      m.sentAt as string,
+            readBy:      (m.readBy as string[]) ?? [],
+          } as Message;
+        })
+      );
+    });
 
-    const channel = supabase
-      .channel(`messages-${team.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "messages", filter: `team_id=eq.${team.id}` },
-        () => fetchMessages()
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    return () => unsubscribe();
   }, [team]);
 
   /* ── Mark visible messages as read ── */
@@ -139,10 +137,7 @@ export default function MeddelandenPage() {
 
     toMark.forEach(async (m) => {
       const newReadBy = [...m.readBy, user.id];
-      await supabase
-        .from("messages")
-        .update({ read_by: newReadBy })
-        .eq("id", m.id);
+      await updateDoc(doc(db, "messages", m.id), { readBy: newReadBy });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, messages.length, user?.id, team?.id]);
@@ -175,16 +170,15 @@ export default function MeddelandenPage() {
   const sendMessage = async () => {
     if (!draft.trim() || !user || !team) return;
     const msg = {
-      id:           crypto.randomUUID(),
-      team_id:      team.id,
-      sender_id:    user.id,
-      sender_name:  user.name,
-      recipient_id: selected === "team" ? null : selected,
-      text:         draft.trim(),
-      sent_at:      new Date().toISOString(),
-      read_by:      [user.id],
+      teamId:      team.id,
+      senderId:    user.id,
+      senderName:  user.name,
+      recipientId: selected === "team" ? null : selected,
+      text:        draft.trim(),
+      sentAt:      new Date().toISOString(),
+      readBy:      [user.id],
     };
-    await supabase.from("messages").insert(msg);
+    await addDoc(collection(db, "messages"), msg);
     setDraft("");
   };
 

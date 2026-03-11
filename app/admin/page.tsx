@@ -4,7 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
-import { supabase } from "../../lib/supabaseClient";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
 
 interface TeamRow {
   id: string;
@@ -35,42 +43,64 @@ export default function AdminPage() {
 
     (async () => {
       /* Fetch all teams belonging to this admin */
-      const { data: teamRows } = await supabase
-        .from("teams")
-        .select("id, name, age_group, coach_id")
-        .eq("admin_id", user.id);
+      const teamSnap = await getDocs(
+        query(collection(db, "teams"), where("adminId", "==", user.id))
+      );
 
-      if (!teamRows || teamRows.length === 0) {
+      if (teamSnap.empty) {
         setTeams([]);
         return;
       }
 
-      /* Fetch members for each team via team_members junction */
+      const teamRows = teamSnap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name as string,
+        age_group: d.data().ageGroup as string,
+        coach_id: (d.data().coachId as string | null) ?? null,
+      }));
+
+      /* Fetch members for each team via team_members collection
+       * Firestore supports up to 10 items in an "in" query, so we batch. */
       const teamIds = teamRows.map((t) => t.id);
 
-      const { data: memberRows } = await supabase
-        .from("team_members")
-        .select("team_id, user_id")
-        .in("team_id", teamIds);
+      const allMemberRows: { teamId: string; userId: string }[] = [];
+      // Process teamIds in chunks of 10 (Firestore "in" query limit)
+      for (let i = 0; i < teamIds.length; i += 10) {
+        const chunk = teamIds.slice(i, i + 10);
+        const memberSnap = await getDocs(
+          query(collection(db, "team_members"), where("teamId", "in", chunk))
+        );
+        memberSnap.docs.forEach((d) => {
+          allMemberRows.push({
+            teamId: d.data().teamId as string,
+            userId: d.data().userId as string,
+          });
+        });
+      }
 
-      const userIds = [...new Set((memberRows ?? []).map((m) => m.user_id))];
+      const userIds = [...new Set(allMemberRows.map((m) => m.userId))];
 
       const profileMap: Record<string, ProfileRow> = {};
       if (userIds.length > 0) {
-        const { data: profileRows } = await supabase
-          .from("profiles")
-          .select("id, name, role, child_name")
-          .in("id", userIds);
-        (profileRows ?? []).forEach((p) => {
-          profileMap[p.id] = p as ProfileRow;
+        const profilePromises = userIds.map((id) => getDoc(doc(db, "profiles", id)));
+        const profileSnaps = await Promise.all(profilePromises);
+        profileSnaps.forEach((s) => {
+          if (s.exists()) {
+            profileMap[s.id] = {
+              id: s.id,
+              name: s.data().name as string,
+              role: s.data().role as string,
+              child_name: (s.data().childName as string | null) ?? null,
+            };
+          }
         });
       }
 
       const enriched: TeamWithMembers[] = teamRows.map((t) => ({
         ...t,
-        members: (memberRows ?? [])
-          .filter((m) => m.team_id === t.id)
-          .map((m) => profileMap[m.user_id])
+        members: allMemberRows
+          .filter((m) => m.teamId === t.id)
+          .map((m) => profileMap[m.userId])
           .filter(Boolean),
       }));
 
