@@ -257,9 +257,9 @@ export default function MeddelandenPage() {
       </div>
 
       {/* Layout: sidebar + thread */}
-      <div className="flex gap-4" style={{ height: "calc(100vh - 230px)", minHeight: 440 }}>
+      <div className="flex flex-col gap-3 md:flex-row md:gap-4 h-[calc(100vh-310px)] md:h-[calc(100vh-230px)]" style={{ minHeight: 380 }}>
         {/* ── Sidebar ── */}
-        <div className="w-56 shrink-0 flex flex-col gap-1">
+        <div className="w-full shrink-0 flex flex-col gap-1 overflow-y-auto max-h-36 md:w-56 md:max-h-none">
           {/* Team chat */}
           <button
             onClick={() => setSelected("team")}
@@ -329,7 +329,7 @@ export default function MeddelandenPage() {
         </div>
 
         {/* ── Thread panel ── */}
-        <div className="flex-1 min-w-0 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Thread header */}
           <div className="px-4 py-3 border-b border-slate-100 shrink-0">
             <p className="font-bold text-slate-900 text-sm">{threadTitle}</p>
