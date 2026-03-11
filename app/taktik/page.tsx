@@ -133,8 +133,11 @@ export default function TaktikPage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
-  const [tactics, setTactics] = useState<Tactic[]>([]);
-  const [tacticName, setTacticName] = useState("");
+  const [tactics, setTactics] = useState<Tactic[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem("basketball_tactics");
+    return saved ? (JSON.parse(saved) as Tactic[]) : [];
+  });  const [tacticName, setTacticName] = useState("");
   const [showPanel, setShowPanel] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -144,11 +147,6 @@ export default function TaktikPage() {
     new Map()
   );
   const animFrameRef = useRef<number>(0);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("basketball_tactics");
-    if (saved) setTactics(JSON.parse(saved));
-  }, []);
 
   const getSVGCoords = useCallback(
     (clientX: number, clientY: number) => {

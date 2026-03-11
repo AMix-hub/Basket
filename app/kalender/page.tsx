@@ -559,7 +559,7 @@ export default function KalenderPage() {
                       Övningsförslag
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Baserat på {presentCount} nearvarande spelare
+                      Baserat på {presentCount} närvarande spelare
                     </p>
                   </div>
                 </div>

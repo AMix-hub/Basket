@@ -16,7 +16,10 @@ export default function RegisterPage() {
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("≤7 år");
   const [inviteCode, setInviteCode] = useState("");
+  const [childName, setChildName] = useState("");
   const [error, setError] = useState("");
+
+  const needsInviteCode = role === "assistant" || role === "parent";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,13 +30,20 @@ export default function RegisterPage() {
       return;
     }
 
+    if (role === "parent" && !childName.trim()) {
+      setError("Ange barnets namn för att kopplas till rätt spelare.");
+      return;
+    }
+
     const ok = register(
       name.trim(),
       email.trim().toLowerCase(),
       password,
       role,
       role === "coach" ? teamName.trim() : undefined,
-      role === "coach" ? ageGroup : undefined
+      role === "coach" ? ageGroup : undefined,
+      needsInviteCode ? inviteCode.trim() : undefined,
+      role === "parent" ? childName.trim() : undefined
     );
 
     if (ok) {
@@ -42,6 +52,13 @@ export default function RegisterPage() {
       setError("E-postadressen används redan. Prova en annan.");
     }
   };
+
+  const roles: { value: UserRole; label: string; desc: string }[] = [
+    { value: "admin", label: "🏛 Föreningsadmin", desc: "Ser alla lag" },
+    { value: "coach", label: "🎽 Coach", desc: "Skapar och leder ett lag" },
+    { value: "assistant", label: "👋 Assistent", desc: "Hjälper coachen" },
+    { value: "parent", label: "👪 Förälder", desc: "Följer sitt barns lag" },
+  ];
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
@@ -108,25 +125,26 @@ export default function RegisterPage() {
               <label className="block text-sm font-semibold text-slate-700 mb-1">
                 Roll
               </label>
-              <div className="flex gap-2">
-                {(
-                  [
-                    { value: "admin", label: "🏛 Föreningsadmin" },
-                    { value: "coach", label: "🎽 Coach" },
-                    { value: "assistant", label: "👋 Assistent" },
-                  ] as const
-                ).map(({ value, label }) => (
+              <div className="grid grid-cols-2 gap-2">
+                {roles.map(({ value, label, desc }) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setRole(value)}
-                    className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
+                    className={`py-2.5 px-3 text-left rounded-xl transition-all border ${
                       role === value
-                        ? "bg-orange-500 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:border-orange-300"
                     }`}
                   >
-                    {label}
+                    <span className="text-xs font-bold block">{label}</span>
+                    <span
+                      className={`text-xs block mt-0.5 ${
+                        role === value ? "text-orange-100" : "text-slate-400"
+                      }`}
+                    >
+                      {desc}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -165,11 +183,32 @@ export default function RegisterPage() {
               </>
             )}
 
-            {/* Assistant-specific: join via invite code */}
-            {role === "assistant" && (
+            {/* Parent-specific: child name */}
+            {role === "parent" && (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Inbjudningskod (valfri)
+                  Barnets namn
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={childName}
+                  onChange={(e) => setChildName(e.target.value)}
+                  placeholder="Vad heter ditt barn?"
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Används för att koppla dig till ditt barns närvaro.
+                </p>
+              </div>
+            )}
+
+            {/* Invite code for assistant and parent */}
+            {needsInviteCode && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  {role === "parent" ? "Föräldrainbjudningskod" : "Inbjudningskod"}{" "}
+                  <span className="text-slate-400 font-normal">(valfri)</span>
                 </label>
                 <input
                   type="text"
@@ -179,10 +218,12 @@ export default function RegisterPage() {
                   }
                   placeholder="XXXXXX"
                   maxLength={6}
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest"
+                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
                 />
                 <p className="text-xs text-slate-400 mt-1">
-                  Fråga din coach om koden för att gå med i laget.
+                  {role === "parent"
+                    ? "Fråga coachen om föräldrainbjudningskoden för att gå med i laget direkt."
+                    : "Fråga din coach om koden för att gå med i laget."}
                 </p>
               </div>
             )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 interface VideoEntry {
   id: string;
@@ -23,12 +23,22 @@ const CATEGORIES = [
   "Övrigt",
 ];
 
+const YOUTUBE_HOSTNAMES = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+]);
+
 function getYouTubeId(url: string): string | null {
   try {
     const u = new URL(url);
-    if (u.hostname === "youtu.be") return u.pathname.slice(1).split("?")[0];
-    if (u.hostname.includes("youtube.com")) {
-      return u.searchParams.get("v");
+    if (u.hostname === "youtu.be") {
+      const id = u.pathname.slice(1).split("?")[0];
+      return /^[\w-]{11}$/.test(id) ? id : null;
+    }
+    if (YOUTUBE_HOSTNAMES.has(u.hostname)) {
+      const id = u.searchParams.get("v");
+      return id && /^[\w-]{11}$/.test(id) ? id : null;
     }
   } catch {
     // not a valid URL
@@ -51,7 +61,11 @@ function YouTubeEmbed({ videoId }: { videoId: string }) {
 }
 
 export default function VideorPage() {
-  const [videos, setVideos] = useState<VideoEntry[]>([]);
+  const [videos, setVideos] = useState<VideoEntry[]>(() => {
+    if (typeof window === "undefined") return [];
+    const saved = localStorage.getItem(VIDEOS_KEY);
+    return saved ? (JSON.parse(saved) as VideoEntry[]) : [];
+  });
   const [activeCategory, setActiveCategory] = useState("Alla");
 
   // Add form state
@@ -60,11 +74,6 @@ export default function VideorPage() {
   const [newUrl, setNewUrl] = useState("");
   const [newCategory, setNewCategory] = useState("Övrigt");
   const [urlError, setUrlError] = useState("");
-
-  useEffect(() => {
-    const saved = localStorage.getItem(VIDEOS_KEY);
-    if (saved) setVideos(JSON.parse(saved));
-  }, []);
 
   const saveVideos = (updated: VideoEntry[]) => {
     setVideos(updated);

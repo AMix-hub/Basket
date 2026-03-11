@@ -27,6 +27,14 @@ export default function Navbar() {
     router.push("/");
   };
 
+  /* Extra links shown based on role */
+  const roleLinks =
+    user?.role === "parent"
+      ? [{ href: "/familj", label: "👪 Min sida" }]
+      : user?.role === "coach" || user?.role === "assistant" || user?.role === "admin"
+      ? [{ href: "/lag", label: "🏀 Laget" }]
+      : [];
+
   return (
     <nav
       className="bg-slate-900 text-white shadow-lg sticky top-0 z-50 w-full"
@@ -97,6 +105,34 @@ export default function Navbar() {
             })}
           </div>
 
+          {/* Role-based links */}
+          {roleLinks.length > 0 && (
+            <>
+              <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
+              <div className="flex items-stretch shrink-0">
+                {roleLinks.map(({ href, label }) => {
+                  const isActive = pathname === href;
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`relative flex items-center px-4 py-1 text-sm font-medium transition-colors whitespace-nowrap ${
+                        isActive
+                          ? "text-orange-400"
+                          : "text-slate-300 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                      {isActive && (
+                        <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
           {/* Auth section */}
           <div className="ml-auto flex items-center gap-2 shrink-0">
             {user ? (
@@ -106,6 +142,8 @@ export default function Navbar() {
                     ? "🏛"
                     : user.role === "coach"
                     ? "🎽"
+                    : user.role === "parent"
+                    ? "👪"
                     : "👋"}{" "}
                   {user.name}
                 </span>
