@@ -21,11 +21,11 @@ const mainLinks = [
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const unread = useUnreadCount();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/");
   };
 
@@ -194,12 +194,14 @@ export default function Navbar() {
                 >
                   Logga in
                 </Link>
-                <Link
-                  href="/registrera"
-                  className="px-3 py-1.5 text-xs font-semibold bg-orange-500 hover:bg-orange-600 rounded-full text-white transition-colors whitespace-nowrap"
-                >
-                  Registrera
-                </Link>
+                {!loading && (
+                  <Link
+                    href="/registrera"
+                    className="px-3 py-1.5 text-xs font-semibold bg-orange-500 hover:bg-orange-600 rounded-full text-white transition-colors whitespace-nowrap"
+                  >
+                    Registrera
+                  </Link>
+                )}
               </>
             )}
           </div>

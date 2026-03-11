@@ -9,14 +9,17 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError]       = useState("");
+  const [busy, setBusy]         = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const ok = login(email.trim().toLowerCase(), password);
+    setBusy(true);
+    const ok = await login(email.trim().toLowerCase(), password);
+    setBusy(false);
     if (ok) {
       router.push("/");
     } else {
@@ -74,9 +77,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl transition-colors"
+              disabled={busy}
+              className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold text-sm rounded-xl transition-colors"
             >
-              Logga in
+              {busy ? "Loggar in…" : "Logga in"}
             </button>
           </form>
 
@@ -94,3 +98,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

@@ -1,25 +1,56 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../../lib/supabaseClient";
 
 export default function CoachClipboard() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"stopwatch" | "notes">("stopwatch");
+  const [tab, setTab]   = useState<"stopwatch" | "notes">("stopwatch");
 
   // Stopwatch state
-  const [running, setRunning] = useState(false);
+  const [running, setRunning]               = useState(false);
   const [displayElapsed, setDisplayElapsed] = useState(0);
-  const startRef = useRef(0);
-  const baseElapsedRef = useRef(0);
-  const rafRef = useRef<number>(0);
+  const startRef        = useRef(0);
+  const baseElapsedRef  = useRef(0);
+  const rafRef          = useRef<number>(0);
 
-  // Notes state
-  const [notes, setNotes] = useState("");
+  // Notes state – initialised from localStorage so no synchronous setState in effect
+  const [notes, setNotes] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("coach_clipboard_notes") ?? "";
+  });
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* Override with Supabase data once the user is known */
   useEffect(() => {
-    const saved = localStorage.getItem("coach_clipboard_notes");
-    if (saved) setNotes(saved);
-  }, []);
+    if (!user) return;
+    supabase
+      .from("coach_notes")
+      .select("content")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.content !== undefined) setNotes(data.content);
+      });
+  }, [user]);
+
+  /* Debounced save */
+  const handleNotesChange = (value: string) => {
+    setNotes(value);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      if (user) {
+        await supabase.from("coach_notes").upsert(
+          { user_id: user.id, content: value },
+          { onConflict: "user_id" }
+        );
+      } else {
+        localStorage.setItem("coach_clipboard_notes", value);
+      }
+    }, 800);
+  };
 
   useEffect(() => {
     if (running) {
@@ -34,16 +65,16 @@ export default function CoachClipboard() {
   }, [running]);
 
   const formatTime = (ms: number) => {
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
+    const m  = Math.floor(ms / 60000);
+    const s  = Math.floor((ms % 60000) / 1000);
     const cs = Math.floor((ms % 1000) / 10);
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
   };
 
   const playWhistle = () => {
     try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
+      const ctx  = new AudioContext();
+      const osc  = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -133,14 +164,8 @@ export default function CoachClipboard() {
             <div className="p-5">
               <textarea
                 value={notes}
-                onChange={(e) => {
-                  setNotes(e.target.value);
-                  localStorage.setItem(
-                    "coach_clipboard_notes",
-                    e.target.value
-                  );
-                }}
-                placeholder="Snabbanteckningar... (sparas automatiskt)"
+                onChange={(e) => handleNotesChange(e.target.value)}
+                placeholder="Snabbanteckningar… (sparas automatiskt)"
                 className="w-full h-44 p-3 text-sm border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
               <p className="text-xs text-slate-400 mt-1.5 text-right">
@@ -161,3 +186,4 @@ export default function CoachClipboard() {
     </div>
   );
 }
+
