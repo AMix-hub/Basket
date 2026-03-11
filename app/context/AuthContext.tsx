@@ -48,6 +48,7 @@ interface AuthContextType {
   joinTeam: (inviteCode: string, childName?: string) => boolean;
   getMyTeam: () => Team | null;
   getAllTeams: () => Team[];
+  clearUsers: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -220,6 +221,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return JSON.parse(localStorage.getItem(TEAMS_KEY) || "[]");
   };
 
+  const clearUsers = () => {
+    localStorage.removeItem(USERS_KEY);
+    localStorage.removeItem(TEAMS_KEY);
+    localStorage.removeItem(CURRENT_USER_KEY);
+    setUser(null);
+    setTeams([]);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -231,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         joinTeam,
         getMyTeam,
         getAllTeams,
+        clearUsers,
       }}
     >
       {children}

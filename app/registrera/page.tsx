@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth, UserRole } from "../context/AuthContext";
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, clearUsers } = useAuth();
   const router = useRouter();
 
   const [name, setName] = useState("");
@@ -251,6 +251,33 @@ export default function RegisterPage() {
               Logga in
             </Link>
           </p>
+
+          <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Detta tar bort ALLA konton och lag. Är du säker?"
+                  )
+                ) {
+                  clearUsers();
+                  setName("");
+                  setEmail("");
+                  setPassword("");
+                  setRole("coach");
+                  setTeamName("");
+                  setAgeGroup("≤7 år");
+                  setInviteCode("");
+                  setChildName("");
+                  setError("");
+                }
+              }}
+              className="text-xs text-slate-400 hover:text-red-500 underline underline-offset-2 transition-colors"
+            >
+              Rensa alla konton
+            </button>
+          </div>
         </div>
       </div>
     </div>
