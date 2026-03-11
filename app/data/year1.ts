@@ -29,7 +29,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Genomgång av skottet`,
           description: `Fokus i skottet blir att ha fötterna någorlunda parallellt i riktning mot korgen, böja på benen så att man får kraften därifrån, placera bollen ungefär i näshöjd och samtidigt som man trycker ifrån med benen sträcker ut armarna.`,
-          tips: `Tips! Förklara samtidigt som du visar. Victors tips - Introducera ”Svanen”, ”giraffen” så barnen har en liknelse att relatera till.`,
+          tips: `Tips! Förklara samtidigt som du visar. Coachtips - Introducera ”Svanen”, ”giraffen” så barnen har en liknelse att relatera till.`,
         },
         {
           name: `Skott`,
@@ -60,12 +60,12 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Dribbling`,
           description: `Två och två med en boll ståendes på långsidan. Paren får olika dribblingsuppgifter som de utför till motsatt långsida och tillbaka innan de överlämnar bollen till sin kamrat som utför samma uppgift. Varje övning gör man två gånger var. a) dribbla med en hand b) dribbla två studs med en hand, handbyte och två studs med andra handen c) dribbla en studs med en hand, handbyte och en studs med andra d) dribbla och byt hand hela tiden.`,
-          tips: `Tips: Paren blir klara olika snabbt. Viktigt att man ger de grupper som hinner bli klara extrauppgifter under tiden de väntar. Kom också ihåg att vi vill att barnen studsar bollen med en hand i taget, hittar timing i studsen samt har träffpunkten på bollen längre ut på handen och fingrarna. Victors tips - Prata om att bollen ska studsa på sidan av kroppen, använd handleden och fingrar.`,
+          tips: `Tips: Paren blir klara olika snabbt. Viktigt att man ger de grupper som hinner bli klara extrauppgifter under tiden de väntar. Kom också ihåg att vi vill att barnen studsar bollen med en hand i taget, hittar timing i studsen samt har träffpunkten på bollen längre ut på handen och fingrarna. Coachtips - Prata om att bollen ska studsa på sidan av kroppen, använd handleden och fingrar.`,
         },
         {
           name: `Dribbling och skott`,
           description: `Två och två med en boll ställer man sig innanför mittcirkeln. När tränaren ropar ”kör” börjar barnen med boll i handen med att dribbla till en korg för att skjuta ett skott. Efter att man skjutit sitt skott dribblar man tillbaka till sin kompis i mittcirkeln som gör samma sak. Övningen håller på i 2 min där varje par ska samla ihop så många poäng som möjligt. Träffar bollen plankan, nätet eller ringen får man 1 poäng. Lyckas man göra mål får man 2 poäng. Gör övningen två gånger där man andra gången ska göra fler poäng än första.`,
-          tips: `Tips! Kom ihåg att ha en genomgång av hur skottet går till. Skott-tävling - Fördela tre till fem barn på varje sidokorg med två bollar i varje grupp. De två första i varje grupp har bollarna som de skjuter med. Oavsett om man sätter eller missar tar man bollen och ger den till nästa för ett skott. Första laget till 15 poäng. 1 poäng om bollen träffar plankan, nätet eller ringen. 2 poäng om man gör mål. Efter varje omgång roterar grupperna så att de byter sidokorg. Kör första gruppen till 3 vinster. Tips! Be grupperna ropa ut sina poäng så att alla grupper hör vad andra grupper har. Victors tips - Kom ihåg att inte släppa på tekniken, risk finns att när farten går upp när dom tävlar så fallerar tekniken direkt!`,
+          tips: `Tips! Kom ihåg att ha en genomgång av hur skottet går till. Skott-tävling - Fördela tre till fem barn på varje sidokorg med två bollar i varje grupp. De två första i varje grupp har bollarna som de skjuter med. Oavsett om man sätter eller missar tar man bollen och ger den till nästa för ett skott. Första laget till 15 poäng. 1 poäng om bollen träffar plankan, nätet eller ringen. 2 poäng om man gör mål. Efter varje omgång roterar grupperna så att de byter sidokorg. Kör första gruppen till 3 vinster. Tips! Be grupperna ropa ut sina poäng så att alla grupper hör vad andra grupper har. Coachtips - Kom ihåg att inte släppa på tekniken, risk finns att när farten går upp när dom tävlar så fallerar tekniken direkt!`,
         },
       ],
     },
@@ -112,7 +112,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Passa, dribbla och skjuta`,
           description: `En och en varsin boll utspridda över hela salen. Passning till tränarna (3-4 stycken) för en ”give and go”. Så fort man fångat bollen dribblar man till närmaste korg och skjuter en gång. Därefter tar man sig till en tränare igen för nästa give and go. 1 poäng får man om bollen träffar plankan, nätet eller ringen. 2 poäng om man gör mål. Övningen genomförs två gånger, första gången 2 min och andra gången 2 min och 30 sek.`,
-          tips: `Tips! Vi vill att passningarna slås från magen och att man fångar bollen med endast händerna genom att man visar ”måltavla”. Barnen behöver också vrida huvudet mot den riktningen de ska fånga passningen. Tränaren passar bollen framför barnen så de får jaga ikapp bollen. Behövs det flera passar kan man be föräldrar som finns på plats att ställa upp. Victors tips - Teknik, teknik och teknik, om vi får in dom ”enkla” sakerna tidigt så underlättar det senare.`,
+          tips: `Tips! Vi vill att passningarna slås från magen och att man fångar bollen med endast händerna genom att man visar ”måltavla”. Barnen behöver också vrida huvudet mot den riktningen de ska fånga passningen. Tränaren passar bollen framför barnen så de får jaga ikapp bollen. Behövs det flera passar kan man be föräldrar som finns på plats att ställa upp. Coachtips - Teknik, teknik och teknik, om vi får in dom ”enkla” sakerna tidigt så underlättar det senare.`,
         },
         {
           name: `Avslutningsstafett`,
@@ -226,7 +226,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Svanskull`,
           description: `Alla barnen tar varsitt axelband som de sätter i byxorna så att större delen av bandet syns. Leken går ut på att man ska sno åt sig en så många band som möjligt. Har man flera band lägger man banden runt axlarna. Kör leken 2-3 gånger där varje omgång håller på i 1 minut.`,
-          tips: `Tips! För att inte få sitt band taget springer man bort utan att hålla i själva bandet. Håller man i sitt eget band när man blir jagad får man lämna över bandet till den som jagade en. Victors tips - Ha med basketboll! Bollen måste studsas för att kunna ta band. ”Tränaren säger” - Barnen ställer sig på valfri plats i salen. Tränarens uppgift blir att ropa ut uppgifter barnen ska utföra, tex spring till blåa linjen eller lyft höger arm. Innan tränaren ropar ut det ska denne säga ”Erik säger” om det är det tränaren heter och därefter det barnen ska göra. Gör tränaren inte det ska barnen inte göra det. Leken går alltså ut på att lura barnen att göra fel. Gör alla barnen rätt får de 1 poäng. Om inte så får tränaren 1 poäng. Först till 10 poäng. Tips! Använd fantasin så att barnen lär sig så många platser i gympasalen som möjligt. Styr leken så att den blir så jämn som möjligt genom att ge lättare eller svårare uppgifter beroende på vad ställningen är.`,
+          tips: `Tips! För att inte få sitt band taget springer man bort utan att hålla i själva bandet. Håller man i sitt eget band när man blir jagad får man lämna över bandet till den som jagade en. Coachtips - Ha med basketboll! Bollen måste studsas för att kunna ta band. ”Tränaren säger” - Barnen ställer sig på valfri plats i salen. Tränarens uppgift blir att ropa ut uppgifter barnen ska utföra, tex spring till blåa linjen eller lyft höger arm. Innan tränaren ropar ut det ska denne säga ”Erik säger” om det är det tränaren heter och därefter det barnen ska göra. Gör tränaren inte det ska barnen inte göra det. Leken går alltså ut på att lura barnen att göra fel. Gör alla barnen rätt får de 1 poäng. Om inte så får tränaren 1 poäng. Först till 10 poäng. Tips! Använd fantasin så att barnen lär sig så många platser i gympasalen som möjligt. Styr leken så att den blir så jämn som möjligt genom att ge lättare eller svårare uppgifter beroende på vad ställningen är.`,
         },
         {
           name: `Dribbling`,
@@ -262,7 +262,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Samla bollar`,
           description: `Alla barnen fördelar sig så att de är lika många i varje hörn i salen. Alla basketbollar läggs i mittcirkeln. När leken sätter igång springer första barnet i varje hörn till mittcirkeln, tar en boll och skjuter ett skott på valfri korg. Missar man ställer man tillbaka bollen och sätter man skottet får man behålla bollen inom gruppen. När man är tillbaka efter sitt skott får nästa man i laget börja springa mot mittcirkeln. Varje boll som man lyckas samla ger 1 poäng. Laget med flest bollar när det inte längre finns bollar kvar i mittcirkeln har vunnit.`,
-          tips: `Tips! Påminn barnen vad som är viktigt att tänka på vid dribbling och skott. Victors tips - som i tipset innan, dribbla på sidan, blicken upp, ”svanen” – skotteknik.`,
+          tips: `Tips! Påminn barnen vad som är viktigt att tänka på vid dribbling och skott. Coachtips - som i tipset innan, dribbla på sidan, blicken upp, ”svanen” – skotteknik.`,
         },
       ],
     },
@@ -293,7 +293,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Helplansmatch`,
           description: `Dela in alla barnen i två lag med minst en tränare i varje lag för matchspel över hela plan. Börja med en boll, men efter en stund lägger ni till ytterligare en boll. Man får inte ta bollen från någon som håller i den. Vi spelar med tvåsekundersregeln, vilket innebär att från att man fångat bollen har man två sekunder på sig att passa, sätta bollen i studs eller skjuta. Görs inte detta går bollen över till motståndarlaget.`,
-          tips: `Tips! Uppmuntra barnen att hela tiden leta efter nästa passning innan man sätter igång bollen i dribbling och gå efter returen. För att enklast kunna bedöma tvåsekundersregeln följer vara tränarna varsin boll. Victors tips – Det är värt att ha en liten repetition av detaljer och regler efter ett litet uppehåll.`,
+          tips: `Tips! Uppmuntra barnen att hela tiden leta efter nästa passning innan man sätter igång bollen i dribbling och gå efter returen. För att enklast kunna bedöma tvåsekundersregeln följer vara tränarna varsin boll. Coachtips – Det är värt att ha en liten repetition av detaljer och regler efter ett litet uppehåll.`,
         },
       ],
     },
@@ -442,7 +442,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Fika`,
           description: `Lagföräldrar ansvarar för att det finns fika efteråt som trevlig avslutning`,
-          tips: `Victors tips - Prata gärna om vad de lärt sig! Ge en cool basketläxa, t.ex. studsa mellan benen.`,
+          tips: `Coachtips - Prata gärna om vad de lärt sig! Ge en cool basketläxa, t.ex. studsa mellan benen.`,
         },
       ],
     },
@@ -478,7 +478,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Spelträning`,
           description: `Dela in barnen i grupper om fyra eller sex stycken. Dessa delas in i två lag. Spelet går ut på att man ska få ihop fem passningar som lag utan att motståndarna tar bollen. Man får inte hålla i bollen längre än två sekunder och man får inte ta bollen från någon som håller i den. Så fort ett nytt lag har bollinnehav måste man passa tränaren innan man får börja passa inom laget. Uppmuntra passningar till tränaren.`,
-          tips: `Tips! Jobba aktivt med att coacha barnen för bästa samspel. Speciellt fokus på att anfallare utan boll tar löpningar för att bli spelbar. Fokus i försvarsspelet blir att påminna barnen om att täcka varsin spelare. Annars finns det stor risk att försvaret följer bollen. Victors tips - Man kan redan här prata om man-man försvar, att man inte följer bollen och står mellan spelare och korg.`,
+          tips: `Tips! Jobba aktivt med att coacha barnen för bästa samspel. Speciellt fokus på att anfallare utan boll tar löpningar för att bli spelbar. Fokus i försvarsspelet blir att påminna barnen om att täcka varsin spelare. Annars finns det stor risk att försvaret följer bollen. Coachtips - Man kan redan här prata om man-man försvar, att man inte följer bollen och står mellan spelare och korg.`,
         },
         {
           name: `Spelträning`,
@@ -556,7 +556,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Passa, dribbla och skjuta`,
           description: `En och en varsin boll utspridda över hela salen. Passning till tränarna (3-4 stycken) för en give and go. Så fort man fångat bollen dribblar man till närmaste korg och skjuter en gång. Därefter tar man sig till en tränare igen för nästa give and go. 1 poäng får man om bollen träffar plankan, nätet eller ringen. 2 poäng om man gör mål. Övningen genomförs två gånger, första gången 2 min och andra gången 2 min och 30 sek.`,
-          tips: `Tips! Vi vill att passningarna slås från magen och att man fångar bollen med endast händerna genom att man visar måltavla. Barnen behöver också vrida huvudet mot den riktningen de ska fånga passningen. Tränaren passar bollen framför barnen så de får jaga ikapp bollen. Behövs det flera passar kan man be föräldrar som finns på plats att ställa upp. Victors tips - Våga ”speeda” upp allt så de får känna på lite fart! Vi vill att de vänjer sig vid ett högre tempo tidigare.`,
+          tips: `Tips! Vi vill att passningarna slås från magen och att man fångar bollen med endast händerna genom att man visar måltavla. Barnen behöver också vrida huvudet mot den riktningen de ska fånga passningen. Tränaren passar bollen framför barnen så de får jaga ikapp bollen. Behövs det flera passar kan man be föräldrar som finns på plats att ställa upp. Coachtips - Våga ”speeda” upp allt så de får känna på lite fart! Vi vill att de vänjer sig vid ett högre tempo tidigare.`,
         },
         {
           name: `En mot en`,
@@ -603,7 +603,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Dribbla, stanna och rotera`,
           description: `Barnen dribblar runt i salen samtidigt som de rör sig. Variera övningen så att barnen rör sig på olika sätt (framåt, bakåt, joggandes). Vid tränarens signal ska de stanna och se ut som en basketspelare och därefter rotera tre gånger. När de roterat klart kan tränaren gå och slå på barnens bollar och påminna de om att hålla i bollen hårt så att det blir svårare att ta bollen ifrån de.`,
-          tips: `Tips: Påminn barnen om att se ut som basketspelare och att variera roteringsfot. Victors tips - Redan här tycker jag att man kan prata om varför vi roterar så de kan sätta det i relation till något när vi speltränar. Kull-lek - Tränarna (2-3 stycken) ska kulla barnen på ryggen. Varje barn har varsin boll som de studsar med för att röra sig bort från kullarna. Blir man kullad ställer man sig på ett ben och för att bli fri studsar en kompis två varv runt den kullade. Det finns pass med i leken och det är att barnet ställer sig i position som en basketspelare och börjar rotera när kullaren försöker komma åt dennes rygg. Då kan denne inte bli kullad. Man får inte kulla någon som håller på att hjälpa en kullad eller en som precis blivit fri. Kör leken 2-3 gånger där varje omgång håller på i 1 minut. Kullarnas uppgift är att kulla alla så att barnen inte längre kan hjälpa varandra och barnens uppgift blir att hela tiden hjälpa varandra så att kullarna inte vinner. Tips! Påminn barnen om att rädda varandra så att de utöver att inte bli kullade också blir medvetna om att hjälpa andra. Annars glöms detta enkelt bort. Påminn barnen om att böja på benen så att de verkligen ser ut som en basketspelare och naturligtvis att rotera mycket.`,
+          tips: `Tips: Påminn barnen om att se ut som basketspelare och att variera roteringsfot. Coachtips - Redan här tycker jag att man kan prata om varför vi roterar så de kan sätta det i relation till något när vi speltränar. Kull-lek - Tränarna (2-3 stycken) ska kulla barnen på ryggen. Varje barn har varsin boll som de studsar med för att röra sig bort från kullarna. Blir man kullad ställer man sig på ett ben och för att bli fri studsar en kompis två varv runt den kullade. Det finns pass med i leken och det är att barnet ställer sig i position som en basketspelare och börjar rotera när kullaren försöker komma åt dennes rygg. Då kan denne inte bli kullad. Man får inte kulla någon som håller på att hjälpa en kullad eller en som precis blivit fri. Kör leken 2-3 gånger där varje omgång håller på i 1 minut. Kullarnas uppgift är att kulla alla så att barnen inte längre kan hjälpa varandra och barnens uppgift blir att hela tiden hjälpa varandra så att kullarna inte vinner. Tips! Påminn barnen om att rädda varandra så att de utöver att inte bli kullade också blir medvetna om att hjälpa andra. Annars glöms detta enkelt bort. Påminn barnen om att böja på benen så att de verkligen ser ut som en basketspelare och naturligtvis att rotera mycket.`,
         },
         {
           name: `En mot en`,
@@ -660,12 +660,12 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Försvar på boll`,
           description: `Två och två med en boll. Ena kompisen står med bollen och den andra ungefär en meter ifrån vänd mot kompisen. Man jobbar cirka 15 sekunder i taget innan man byter uppgift; a) kompisen med boll förflyttar bollen till höger eller vänster och försvarararens uppgift blir att röra sig i sidled så att denne hela tiden har bröstkorgen framför boll. b) Kompisen med boll rör sig i olika riktningar med boll och hamnar man efter i försvar blir uppgiften att jaga ikapp, förbi och ställa sig framför. Då kör man på nytt igen.`,
-          tips: `Tips! Tyngdpunkt på rätt del av foten (främre) gör att man kan jobba på lättare fötter och därmed oftare vara på rätt plats. Victors tips - Redan i denna ålder kan man prata om att använda händerna när man flyttar fötterna för att kunna ta någon boll när anfall studsar.`,
+          tips: `Tips! Tyngdpunkt på rätt del av foten (främre) gör att man kan jobba på lättare fötter och därmed oftare vara på rätt plats. Coachtips - Redan i denna ålder kan man prata om att använda händerna när man flyttar fötterna för att kunna ta någon boll när anfall studsar.`,
         },
         {
           name: `En mot en`,
           description: `Två och två med en boll i mittcirkeln. Tränaren rullar ut bollen och den som tar bollen blir anfall och den andra försvar. Bollföraren pekar mot vilken korg den tänker anfalla och när försvararen ställt sig mellan boll och korg får anfall börja studsa mot korgen. Man spelar till 1 poäng och den som tar returen blir anfall. Så fort någon gör poäng tar man sig tillbaka till mittcirkeln för en ny omgång. Leken tar slut när första personen fått ihop 3 poäng. Kör leken i två omgångar.`,
-          tips: `Tips! Påminn barnen om att hela tiden försöka befinna sig mellan anfall och boll spela tätt och ta upp armarna när anfall är nära korgen och vill skjuta. Victors tips - Fortsätt prata försvar! Var konsekvent!`,
+          tips: `Tips! Påminn barnen om att hela tiden försöka befinna sig mellan anfall och boll spela tätt och ta upp armarna när anfall är nära korgen och vill skjuta. Coachtips - Fortsätt prata försvar! Var konsekvent!`,
         },
         {
           name: `Ballongstafett`,
@@ -717,7 +717,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `En mot en`,
           description: `Två och två med en boll i mittcirkeln. Tränaren rullar ut bollen och den som tar bollen blir anfall och den andra försvar. Bollföraren pekar mot vilken korg den tänker anfall och när försvararen ställt sig mellan boll och korg får anfall börja studsa mot korgen. Man spelar till 1 poäng och den som tar returen blir anfall. Så fort någon gör poäng tar man sig tillbaka till mittcirkeln för en ny omgång. Leken tar slut när första personen fått ihop 3 poäng. Kör leken i två omgångar.`,
-          tips: `Tips! Påminn barnen om att hela tiden försöka befinna sig mellan anfall och boll. Spela tätt och ta upp armarna när anfall är nära korgen och vill skjuta. Victors tips - Prata om att man ska finta med kroppen, egentligen bara nämna det sen blir det lite som det blir, de är väldigt små!`,
+          tips: `Tips! Påminn barnen om att hela tiden försöka befinna sig mellan anfall och boll. Spela tätt och ta upp armarna när anfall är nära korgen och vill skjuta. Coachtips - Prata om att man ska finta med kroppen, egentligen bara nämna det sen blir det lite som det blir, de är väldigt små!`,
         },
         {
           name: `Dribbling och passning`,
@@ -800,7 +800,7 @@ export const year1Plan: SeasonPlan = {
         {
           name: `Pacman`,
           description: `Barnen ställer sig med varsin boll på en linje. Man får endast röra sig på linjerna i salen och rör man sig mellan linjerna blir man självkullad. Blir man kullad blir man ställer man sig som en basketspelare. För att bli fri dribblar en kompis fram till en och rullar bollen under den kullade och tar den från andra sidan. Man får inte kulla någon som håller på att hjälpa en kullad eller en som precis blivit fri. Kör leken 2-3 gånger där varje omgång håller på i 1 minut. Kullarnas uppgift är att kulla alla så att barnen inte längre kan hjälpa varandra och barnens uppgift blir att hela tiden hjälpa varandra så att kullarna inte vinner.`,
-          tips: `Tips! Påminn barnen om att rädda varandra så att de utöver att inte bli kullade också blir medvetna om att hjälpa andra. Annars glöms detta enkelt bort. Victors tips - Repetition, alla övningar som innehåller dribbling behöver repetition om tekniken så att vi tjatar in den, t.ex. studsa på sidan av kroppen, handled, samma tryck i studsen med båda händer.`,
+          tips: `Tips! Påminn barnen om att rädda varandra så att de utöver att inte bli kullade också blir medvetna om att hjälpa andra. Annars glöms detta enkelt bort. Coachtips - Repetition, alla övningar som innehåller dribbling behöver repetition om tekniken så att vi tjatar in den, t.ex. studsa på sidan av kroppen, handled, samma tryck i studsen med båda händer.`,
         },
         {
           name: `Passa, dribbla och skjuta`,

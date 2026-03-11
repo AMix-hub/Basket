@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "../context/AuthContext";
 
 const yearLinks = [
   { href: "/ar1", label: "År 1", sub: "≤7 år" },
@@ -13,10 +14,18 @@ const mainLinks = [
   { href: "/taktik", label: "Taktiktavla" },
   { href: "/kalender", label: "Kalender" },
   { href: "/statistik", label: "Statistik" },
+  { href: "/videor", label: "Videor" },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.push("/");
+  };
 
   return (
     <nav
@@ -86,6 +95,43 @@ export default function Navbar() {
                 </Link>
               );
             })}
+          </div>
+
+          {/* Auth section */}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {user ? (
+              <>
+                <span className="text-xs text-slate-400 hidden sm:block whitespace-nowrap">
+                  {user.role === "admin"
+                    ? "🏛"
+                    : user.role === "coach"
+                    ? "🎽"
+                    : "👋"}{" "}
+                  {user.name}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 text-xs font-semibold bg-slate-700 hover:bg-slate-600 rounded-full text-slate-300 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  Logga ut
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-300 hover:text-white transition-colors whitespace-nowrap"
+                >
+                  Logga in
+                </Link>
+                <Link
+                  href="/registrera"
+                  className="px-3 py-1.5 text-xs font-semibold bg-orange-500 hover:bg-orange-600 rounded-full text-white transition-colors whitespace-nowrap"
+                >
+                  Registrera
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

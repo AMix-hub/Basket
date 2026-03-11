@@ -18,7 +18,7 @@ interface Shot {
   timestamp: string;
 }
 
-type ViewMode = "log" | "stats";
+type ViewMode = "log" | "stats" | "närvaro";
 
 /* ─── Court dimensions ────────────────────────────────────────── */
 const CW = 400; // court width
@@ -92,6 +92,25 @@ function getZone(xPct: number, yPct: number): string {
 /* ─── Storage keys ──────────────────────────────────────────── */
 const PLAYERS_KEY = "basketball_players";
 const SHOTS_KEY = "basketball_shots";
+const SESSIONS_KEY = "basketball_calendar_sessions";
+const ATTENDANCE_KEY = "basketball_attendance";
+
+/* ─── Attendance types ──────────────────────────────────────── */
+interface TrainingSession {
+  id: string;
+  date: string;
+  title: string;
+  type: "träning" | "match";
+  time: string;
+}
+
+type AttendanceStatus = "present" | "absent" | "sick";
+
+interface AttendanceRecord {
+  sessionId: string;
+  playerId: string;
+  status: AttendanceStatus;
+}
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function StatistikPage() {

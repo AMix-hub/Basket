@@ -91,6 +91,40 @@ function ArrowMarker() {
   );
 }
 
+/* ─── Animation helpers ──────────────────────────────────────── */
+/** Easing: ease-in-out */
+function easeInOut(t: number): number {
+  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+}
+
+/** Given arrows and players, find nearest player per arrow (within threshold) */
+function buildArrowPlayerMap(
+  arrows: Arrow[],
+  players: Player[]
+): Map<string, string> {
+  const map = new Map<string, string>();
+  const used = new Set<string>();
+  for (const arrow of arrows) {
+    let minDist = 55; // max snap distance in SVG units
+    let nearest: Player | null = null;
+    for (const p of players) {
+      if (used.has(p.id)) continue;
+      const dx = p.x - arrow.x1;
+      const dy = p.y - arrow.y1;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = p;
+      }
+    }
+    if (nearest) {
+      map.set(arrow.id, nearest.id);
+      used.add(nearest.id);
+    }
+  }
+  return map;
+}
+
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function TaktikPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -103,6 +137,13 @@ export default function TaktikPage() {
   const [tacticName, setTacticName] = useState("");
   const [showPanel, setShowPanel] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  /* Animation state */
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animPos, setAnimPos] = useState<Map<string, { x: number; y: number }>>(
+    new Map()
+  );
+  const animFrameRef = useRef<number>(0);
 
   useEffect(() => {
     const saved = localStorage.getItem("basketball_tactics");
@@ -125,6 +166,7 @@ export default function TaktikPage() {
   );
 
   const handleSVGPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (isAnimating) return;
     const coords = getSVGCoords(e.clientX, e.clientY);
     if (tool === "addO" || tool === "addX") {
       setPlayers((prev) => [
@@ -143,6 +185,7 @@ export default function TaktikPage() {
   };
 
   const handleSVGPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (isAnimating) return;
     if (tool === "arrow" && drawStart) {
       const coords = getSVGCoords(e.clientX, e.clientY);
       setCursorPos(coords);
@@ -158,6 +201,7 @@ export default function TaktikPage() {
   };
 
   const handleSVGPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (isAnimating) return;
     if (tool === "arrow" && drawStart) {
       const coords = getSVGCoords(e.clientX, e.clientY);
       const dx = coords.x - drawStart.x;
@@ -181,6 +225,7 @@ export default function TaktikPage() {
   };
 
   const handlePlayerPointerDown = (e: React.PointerEvent, id: string) => {
+    if (isAnimating) return;
     if (tool === "select") {
       e.stopPropagation();
       setDraggingId(id);
@@ -192,10 +237,61 @@ export default function TaktikPage() {
   };
 
   const handleArrowClick = (id: string) => {
+    if (isAnimating) return;
     if (tool === "erase") {
       setArrows((prev) => prev.filter((a) => a.id !== id));
     }
   };
+
+  /* ─── Play animation ─────────────────────────────────────── */
+  const playAnimation = () => {
+    if (isAnimating || arrows.length === 0) return;
+    cancelAnimationFrame(animFrameRef.current);
+
+    const arrowPlayerMap = buildArrowPlayerMap(arrows, players);
+    if (arrowPlayerMap.size === 0) return;
+
+    const DURATION = 1600; // ms
+    const startTime = performance.now();
+
+    const tick = (now: number) => {
+      const raw = Math.min((now - startTime) / DURATION, 1);
+      const t = easeInOut(raw);
+
+      const newPos = new Map<string, { x: number; y: number }>();
+      for (const [arrowId, playerId] of arrowPlayerMap) {
+        const arrow = arrows.find((a) => a.id === arrowId);
+        if (!arrow) continue;
+        newPos.set(playerId, {
+          x: arrow.x1 + (arrow.x2 - arrow.x1) * t,
+          y: arrow.y1 + (arrow.y2 - arrow.y1) * t,
+        });
+      }
+      setAnimPos(newPos);
+
+      if (raw < 1) {
+        animFrameRef.current = requestAnimationFrame(tick);
+      } else {
+        // Settle players at arrow endpoints
+        setPlayers((prev) =>
+          prev.map((p) => {
+            const pos = newPos.get(p.id);
+            return pos ? { ...p, x: pos.x, y: pos.y } : p;
+          })
+        );
+        setAnimPos(new Map());
+        setIsAnimating(false);
+      }
+    };
+
+    setIsAnimating(true);
+    animFrameRef.current = requestAnimationFrame(tick);
+  };
+
+  /* Cleanup RAF on unmount */
+  useEffect(() => {
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, []);
 
   const saveTactic = () => {
     if (!tacticName.trim()) return;
@@ -215,6 +311,7 @@ export default function TaktikPage() {
   const loadTactic = (t: Tactic) => {
     setPlayers(t.players);
     setArrows(t.arrows);
+    setAnimPos(new Map());
     setShowPanel(false);
   };
 
@@ -225,6 +322,9 @@ export default function TaktikPage() {
   };
 
   const clearBoard = () => {
+    cancelAnimationFrame(animFrameRef.current);
+    setIsAnimating(false);
+    setAnimPos(new Map());
     setPlayers([]);
     setArrows([]);
   };
@@ -238,11 +338,15 @@ export default function TaktikPage() {
   ];
 
   const cursorClass =
-    tool === "addO" || tool === "addX" || tool === "arrow"
+    isAnimating
+      ? "cursor-default"
+      : tool === "addO" || tool === "addX" || tool === "arrow"
       ? "cursor-crosshair"
       : tool === "erase"
       ? "cursor-pointer"
       : "cursor-default";
+
+  const canPlay = !isAnimating && arrows.length > 0 && players.length > 0;
 
   return (
     <div>
@@ -255,7 +359,7 @@ export default function TaktikPage() {
           </h1>
         </div>
         <p className="text-slate-500 text-sm">
-          Placera spelare, rita rörelsepillar och spara dina taktiker.
+          Placera spelare, rita rörelsepillar och animera övningen med Play-knappen.
         </p>
       </div>
 
@@ -264,19 +368,40 @@ export default function TaktikPage() {
         {toolConfig.map(({ id, label, color }) => (
           <button
             key={id}
-            onClick={() => setTool(id)}
+            onClick={() => !isAnimating && setTool(id)}
+            disabled={isAnimating}
             className={`px-3 py-2 rounded-xl text-sm font-semibold text-white transition-all ${color} ${
-              tool === id
+              tool === id && !isAnimating
                 ? "ring-2 ring-offset-2 ring-orange-400 scale-105"
                 : "opacity-75 hover:opacity-100"
-            }`}
+            } disabled:opacity-40`}
           >
             {label}
           </button>
         ))}
+
+        {/* Play / Stop animation button */}
+        <button
+          onClick={isAnimating ? clearBoard : playAnimation}
+          disabled={!canPlay && !isAnimating}
+          title={
+            arrows.length === 0
+              ? "Rita pilar för att aktivera animationen"
+              : "Animera spelare längs pilarna"
+          }
+          className={`px-3 py-2 rounded-xl text-sm font-semibold text-white transition-all ${
+            isAnimating
+              ? "bg-red-500 hover:bg-red-600"
+              : "bg-green-600 hover:bg-green-700 disabled:opacity-40"
+          }`}
+        >
+          {isAnimating ? "⏹ Stopp" : "▶ Spela upp"}
+        </button>
+
         <button
           onClick={clearBoard}
-          className="px-3 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors ml-auto"
+          disabled={isAnimating}
+          className="px-3 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors ml-auto disabled:opacity-40"
         >
           🗑 Rensa
         </button>
@@ -287,6 +412,18 @@ export default function TaktikPage() {
           💾 Taktiker ({tactics.length})
         </button>
       </div>
+
+      {/* Animation hint */}
+      {arrows.length > 0 && players.length > 0 && !isAnimating && (
+        <div className="mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-medium">
+          💡 Tryck på <strong>▶ Spela upp</strong> för att animera spelarna längs pilarna.
+        </div>
+      )}
+      {isAnimating && (
+        <div className="mb-3 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700 font-medium animate-pulse">
+          🎬 Animerar spelare…
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Court */}
@@ -316,7 +453,7 @@ export default function TaktikPage() {
                   strokeWidth={2.5}
                   markerEnd="url(#arrowhead)"
                   strokeLinecap="round"
-                  className={tool === "erase" ? "cursor-pointer" : ""}
+                  className={tool === "erase" && !isAnimating ? "cursor-pointer" : ""}
                   onClick={() => handleArrowClick(a.id)}
                 />
               ))}
@@ -336,31 +473,36 @@ export default function TaktikPage() {
               )}
 
               {/* Players */}
-              {players.map((p) => (
-                <g
-                  key={p.id}
-                  transform={`translate(${p.x},${p.y})`}
-                  onPointerDown={(e) => handlePlayerPointerDown(e, p.id)}
-                  className="cursor-grab active:cursor-grabbing"
-                  style={{ touchAction: "none" }}
-                >
-                  <circle
-                    r={18}
-                    fill={p.type === "O" ? "#16a34a" : "#dc2626"}
-                    stroke="white"
-                    strokeWidth={2}
-                  />
-                  <text
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fill="white"
-                    fontSize={16}
-                    fontWeight="bold"
+              {players.map((p) => {
+                const pos = animPos.get(p.id);
+                const cx = pos ? pos.x : p.x;
+                const cy = pos ? pos.y : p.y;
+                return (
+                  <g
+                    key={p.id}
+                    transform={`translate(${cx},${cy})`}
+                    onPointerDown={(e) => handlePlayerPointerDown(e, p.id)}
+                    className={isAnimating ? "" : "cursor-grab active:cursor-grabbing"}
+                    style={{ touchAction: "none" }}
                   >
-                    {p.type}
-                  </text>
-                </g>
-              ))}
+                    <circle
+                      r={18}
+                      fill={p.type === "O" ? "#16a34a" : "#dc2626"}
+                      stroke="white"
+                      strokeWidth={2}
+                    />
+                    <text
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill="white"
+                      fontSize={16}
+                      fontWeight="bold"
+                    >
+                      {p.type}
+                    </text>
+                  </g>
+                );
+              })}
             </svg>
           </div>
 

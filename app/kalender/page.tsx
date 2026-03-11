@@ -195,6 +195,73 @@ export default function KalenderPage() {
     sick: { label: "Sjuk", bg: "bg-amber-100", text: "text-amber-700" },
   };
 
+  /* ── Drill suggestions based on present player count ── */
+  interface DrillSuggestion {
+    title: string;
+    description: string;
+    minPlayers: number;
+    maxPlayers: number;
+    badge: string;
+    color: string;
+  }
+
+  const ALL_DRILLS: DrillSuggestion[] = [
+    {
+      title: "1v1 – En mot en",
+      description: "Perfekt med få spelare. Fokus på dribbling, avslut och försvarsfotarbete.",
+      minPlayers: 2,
+      maxPlayers: 5,
+      badge: "1v1",
+      color: "bg-blue-50 border-blue-200 text-blue-800",
+    },
+    {
+      title: "2v2 – Passning & rörelse",
+      description: "Träna pass, skärningar och samspel med en partner.",
+      minPlayers: 4,
+      maxPlayers: 7,
+      badge: "2v2",
+      color: "bg-purple-50 border-purple-200 text-purple-800",
+    },
+    {
+      title: "3v3 – Drill halvplan",
+      description: "Bra för ett litet lag. Fokus på triangelspel och snabba beslut.",
+      minPlayers: 6,
+      maxPlayers: 9,
+      badge: "3v3",
+      color: "bg-emerald-50 border-emerald-200 text-emerald-800",
+    },
+    {
+      title: "4v4 – Lagövning",
+      description: "Mer komplexa mönster. Bra för att träna press och rotation.",
+      minPlayers: 8,
+      maxPlayers: 11,
+      badge: "4v4",
+      color: "bg-amber-50 border-amber-200 text-amber-800",
+    },
+    {
+      title: "5v5 – Fulltaligt matchspel",
+      description: "Hela laget på planen. Kör set-plays och taktiska övningar.",
+      minPlayers: 10,
+      maxPlayers: 99,
+      badge: "5v5",
+      color: "bg-orange-50 border-orange-200 text-orange-800",
+    },
+    {
+      title: "Stationssträning",
+      description: "Dela in i stationer för dribbling, skott och passning. Passar alla gruppar.",
+      minPlayers: 4,
+      maxPlayers: 99,
+      badge: "Stationer",
+      color: "bg-slate-50 border-slate-200 text-slate-800",
+    },
+  ];
+
+  const getDrillSuggestions = (presentCount: number): DrillSuggestion[] => {
+    return ALL_DRILLS.filter(
+      (d) => presentCount >= d.minPlayers && presentCount <= d.maxPlayers
+    );
+  };
+
   const sessionsOnDate = (date: string) => sessions.filter((s) => s.date === date);
 
   return (
@@ -475,6 +542,46 @@ export default function KalenderPage() {
               Lägg till spelare i spelarlistan för att registrera närvaro.
             </div>
           )}
+
+          {/* Drill suggestions based on attendance */}
+          {selectedSession && (() => {
+            const summary = attendanceSummary(selectedSession.id);
+            const presentCount = summary.present;
+            if (presentCount === 0) return null;
+            const suggestions = getDrillSuggestions(presentCount);
+            if (suggestions.length === 0) return null;
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">💡</span>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">
+                      Övningsförslag
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Baserat på {presentCount} nearvarande spelare
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {suggestions.map((drill) => (
+                    <div
+                      key={drill.title}
+                      className={`p-3 rounded-xl border ${drill.color}`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold px-2 py-0.5 bg-white/70 rounded-full">
+                          {drill.badge}
+                        </span>
+                        <span className="text-sm font-semibold">{drill.title}</span>
+                      </div>
+                      <p className="text-xs opacity-80">{drill.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Player panel */}
           {showPlayerPanel && (
