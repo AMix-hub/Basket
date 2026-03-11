@@ -216,10 +216,11 @@ DECLARE
   v_invite_code TEXT;
 BEGIN
   -- Generera en 6-tecken inbjudningskod för admins (server-side, garanterat unik)
+  -- Använder gen_random_uuid() som är inbyggt i PostgreSQL 13+ (kräver ej pgcrypto)
   IF COALESCE(NEW.raw_user_meta_data->>'role', 'player') = 'admin' THEN
     v_invite_code := upper(
       substring(
-        encode(gen_random_bytes(4), 'hex')
+        replace(gen_random_uuid()::text, '-', '')
         FROM 1 FOR 6
       )
     );
@@ -237,7 +238,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
