@@ -394,7 +394,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coachId:           userId,
         adminId:           invitingAdminId,
         clubName:          invitingAdminClubName ?? "",
-        memberIds:         [userId],
+        memberIds:         [userId, invitingAdminId],
         inviteCode:        generateCode(),
         parentInviteCode:  generateCode(),
         playerInviteCode:  generateCode(),
@@ -403,6 +403,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await setDoc(doc(db, "team_members", `${newTeamId}_${userId}`), {
         teamId: newTeamId,
         userId,
+        joinedAt: new Date().toISOString(),
+      });
+      await setDoc(doc(db, "team_members", `${newTeamId}_${invitingAdminId}`), {
+        teamId: newTeamId,
+        userId: invitingAdminId,
         joinedAt: new Date().toISOString(),
       });
     }
