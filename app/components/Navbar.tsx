@@ -34,7 +34,7 @@ export default function Navbar() {
     user?.role === "parent"
       ? [{ href: "/familj", label: "👪 Min sida" }]
       : user?.role === "admin"
-      ? [{ href: "/admin", label: "🏛 Admin" }]
+      ? [{ href: "/admin", label: "🏛 Admin" }, { href: "/dev", label: "🛠 Utveckling" }]
       : user?.role === "coach" || user?.role === "assistant" || user?.role === "player"
       ? [{ href: "/lag", label: "🏀 Laget" }]
       : [];
