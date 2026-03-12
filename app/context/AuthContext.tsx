@@ -92,6 +92,11 @@ interface AuthContextType {
    * Admin creates a new team. Returns null on success, or a Swedish error string.
    */
   createTeam: (teamName: string, ageGroup: string) => Promise<string | null>;
+  /**
+   * Requests push-notification permission and registers an FCM token for the
+   * current user.  Call this when the user explicitly clicks "Aktivera notiser".
+   */
+  requestPushPermission: () => Promise<void>;
 }
 
 /* ─── Firestore document shapes ──────────────────────────── */
@@ -652,6 +657,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getMyTeam,
         getAllTeams,
         createTeam,
+        requestPushPermission: () => {
+          if (!user) return Promise.resolve();
+          return registerPushToken(user.id);
+        },
       }}
     >
       {children}
