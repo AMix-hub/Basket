@@ -31,11 +31,11 @@ export default function Navbar() {
 
   /* Extra links shown based on role */
   const roleLinks =
-    user?.role === "parent"
+    user?.roles.includes("parent")
       ? [{ href: "/familj", label: "👪 Min sida" }]
-      : user?.role === "admin"
+      : user?.roles.includes("admin")
       ? [{ href: "/admin", label: "🏛 Admin" }, { href: "/dev", label: "🛠 Utveckling" }]
-      : user?.role === "coach" || user?.role === "assistant" || user?.role === "player"
+      : user?.roles.some((r) => ["coach", "assistant", "player"].includes(r))
       ? [{ href: "/lag", label: "🏀 Laget" }]
       : [];
 
@@ -168,13 +168,13 @@ export default function Navbar() {
             {user ? (
               <>
                 <span className="text-xs text-slate-400 hidden sm:block whitespace-nowrap">
-                  {user.role === "admin"
+                  {user.roles.includes("admin")
                     ? "🏛"
-                    : user.role === "coach"
+                    : user.roles.includes("coach")
                     ? "🎽"
-                    : user.role === "parent"
+                    : user.roles.includes("parent")
                     ? "👪"
-                    : user.role === "player"
+                    : user.roles.includes("player")
                     ? "🏃"
                     : "👋"}{" "}
                   {user.name}

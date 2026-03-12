@@ -31,7 +31,7 @@ interface TeamRow {
 interface ProfileRow {
   id: string;
   name: string;
-  role: string;
+  roles: string[];
   child_name: string | null;
 }
 
@@ -39,7 +39,7 @@ interface TeamWithMembers extends TeamRow {
   members: ProfileRow[];
 }
 
-const NON_COACH_ROLES: UserRole[] = ["assistant", "parent", "player"];
+const ALL_ROLES: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -97,11 +97,15 @@ export default function AdminPage() {
       const profileSnaps = await Promise.all(profilePromises);
       profileSnaps.forEach((s) => {
         if (s.exists()) {
+          const d = s.data();
           profileMap[s.id] = {
             id: s.id,
-            name: s.data().name as string,
-            role: s.data().role as string,
-            child_name: (s.data().childName as string | null) ?? null,
+            name: d.name as string,
+            roles:
+              d.roles && (d.roles as string[]).length > 0
+                ? (d.roles as string[])
+                : [d.role as string],
+            child_name: (d.childName as string | null) ?? null,
           };
         }
       });
@@ -119,7 +123,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.role !== "admin") return;
+    if (!user?.roles.includes("admin")) return;
     loadTeams(user.id);
   }, [user, loadTeams]);
 
@@ -157,16 +161,31 @@ export default function AdminPage() {
     }
   };
 
-  const changeRole = async (member: ProfileRow, newRole: UserRole) => {
+  const toggleRole = async (member: ProfileRow, role: UserRole, checked: boolean) => {
+    const current = member.roles as UserRole[];
+    let newRoles: UserRole[];
+    if (checked) {
+      newRoles = [...new Set([...current, role])];
+    } else {
+      newRoles = current.filter((r) => r !== role);
+      if (newRoles.length === 0) return; // must keep at least one role
+    }
+    // Determine primary role for backward-compat `role` field
+    const priority: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
+    const primary = priority.find((r) => newRoles.includes(r)) ?? newRoles[0];
+
     setChangingRole(member.id);
     try {
-      await updateDoc(doc(db, "profiles", member.id), { role: newRole });
+      await updateDoc(doc(db, "profiles", member.id), {
+        roles: newRoles,
+        role: primary,
+      });
       setTeams((prev) =>
         prev
           ? prev.map((t) => ({
               ...t,
               members: t.members.map((m) =>
-                m.id === member.id ? { ...m, role: newRole } : m
+                m.id === member.id ? { ...m, roles: newRoles } : m
               ),
             }))
           : prev
@@ -197,7 +216,7 @@ export default function AdminPage() {
     );
   }
 
-  if (user.role !== "admin") {
+  if (!user.roles.includes("admin")) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
@@ -284,9 +303,6 @@ export default function AdminPage() {
         ) : (
           <ul className="space-y-6">
             {(teams ?? []).map((team) => {
-              const coach    = team.members.find((m) => m.id === team.coach_id);
-              const nonCoach = team.members.filter((m) => m.id !== team.coach_id);
-
               return (
                 <li
                   key={team.id}
@@ -309,58 +325,58 @@ export default function AdminPage() {
                   {team.members.length === 0 ? (
                     <p className="text-xs text-slate-400">Inga medlemmar ännu.</p>
                   ) : (
-                    <ul className="space-y-2 mb-4">
-                      {coach && (
-                        <li className="flex items-center gap-2 text-sm">
-                          <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">
-                            🎽 Coach
-                          </span>
-                          <span className="text-slate-800 flex-1">{coach.name}</span>
-                          <button
-                            disabled={removing === coach.id}
-                            onClick={() => removeMember(team, coach)}
-                            className="px-2 py-0.5 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {removing === coach.id ? "…" : "Ta bort"}
-                          </button>
-                        </li>
-                      )}
-                      {nonCoach.map((m) => (
-                        <li key={m.id} className="flex items-center gap-2 text-sm flex-wrap">
-                          <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">
-                            {roleLabel[m.role as keyof typeof roleLabel] ?? m.role}
-                          </span>
-                          <span className="text-slate-700 flex-1 min-w-0">
-                            {m.name}
-                            {m.role === "parent" && m.child_name && (
-                              <span className="text-xs text-slate-400 ml-1">
-                                (förälder till {m.child_name})
-                              </span>
-                            )}
-                          </span>
-                          {/* Role change dropdown */}
-                          {NON_COACH_ROLES.includes(m.role as UserRole) && (
-                            <select
-                              disabled={changingRole === m.id}
-                              value={m.role}
-                              onChange={(e) => changeRole(m, e.target.value as UserRole)}
-                              className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 text-slate-600 bg-white hover:border-slate-400 transition-colors disabled:opacity-50"
-                              aria-label={`Ändra roll för ${m.name}`}
+                    <ul className="space-y-3 mb-4">
+                      {team.members.map((m) => (
+                        <li key={m.id} className="text-sm">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="font-medium text-slate-800 flex-1 min-w-0">
+                              {m.name}
+                              {m.roles.includes("parent") && m.child_name && (
+                                <span className="text-xs text-slate-400 ml-1">
+                                  (förälder till {m.child_name})
+                                </span>
+                              )}
+                            </span>
+                            <button
+                              disabled={removing === m.id}
+                              onClick={() => removeMember(team, m)}
+                              className="px-2 py-0.5 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 shrink-0"
                             >
-                              {NON_COACH_ROLES.map((r) => (
-                                <option key={r} value={r}>
-                                  {roleLabel[r]}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                          <button
-                            disabled={removing === m.id}
-                            onClick={() => removeMember(team, m)}
-                            className="px-2 py-0.5 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                              {removing === m.id ? "…" : "Ta bort"}
+                            </button>
+                          </div>
+                          {/* Role checkboxes – multiple roles allowed */}
+                          <div
+                            className="flex flex-wrap gap-x-3 gap-y-1 pl-0.5"
+                            aria-label={`Roller för ${m.name}`}
                           >
-                            {removing === m.id ? "…" : "Ta bort"}
-                          </button>
+                            {ALL_ROLES.map((r) => {
+                              const isChecked = m.roles.includes(r);
+                              const isLast = isChecked && m.roles.length === 1;
+                              return (
+                                <label
+                                  key={r}
+                                  title={isLast ? "Minst en roll krävs" : undefined}
+                                  className={`flex items-center gap-1 text-xs cursor-pointer select-none ${
+                                    changingRole === m.id ? "opacity-50 pointer-events-none" : ""
+                                  } ${isLast ? "opacity-60" : ""}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={changingRole === m.id || isLast}
+                                    onChange={(e) =>
+                                      toggleRole(m, r, e.target.checked)
+                                    }
+                                    className="accent-orange-500 w-3.5 h-3.5 cursor-pointer"
+                                  />
+                                  <span className="text-slate-600">
+                                    {roleLabel[r]}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
                         </li>
                       ))}
                     </ul>

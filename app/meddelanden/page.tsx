@@ -81,7 +81,10 @@ export default function MeddelandenPage() {
               id: s.id,
               name: p.name as string,
               email: "",
-              role: p.role as string,
+              roles:
+                p.roles && (p.roles as string[]).length > 0
+                  ? (p.roles as string[])
+                  : [p.role as string],
               teamId: team.id,
               childName: p.childName as string | undefined,
               createdAt: "",
@@ -265,7 +268,7 @@ export default function MeddelandenPage() {
 
           {teamMembers.map((m) => {
             const count = unreadDM(m.id);
-            const icon  = m.role === "coach" ? "🎽" : m.role === "parent" ? "👪" : m.role === "admin" ? "🏛" : "👋";
+            const icon  = m.roles.includes("coach") ? "🎽" : m.roles.includes("parent") ? "👪" : m.roles.includes("admin") ? "🏛" : "👋";
             return (
               <button
                 key={m.id}
