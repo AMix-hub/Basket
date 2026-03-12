@@ -9,6 +9,7 @@ import {
   addDoc,
   deleteDoc,
   doc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 import { useAuth } from "../context/AuthContext";
@@ -201,16 +202,22 @@ export default function KalenderPage() {
       const dates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
       if (dates.length === 0) return;
       const groupId = crypto.randomUUID();
-      for (const date of dates) {
-        await addDoc(collection(db, "sessions"), {
-          teamId: team.id,
-          date,
-          title: newTitle.trim(),
-          type: newType,
-          time: newTime,
-          createdBy: user.id,
-          recurringGroupId: groupId,
+      // Firestore batches support up to 500 operations; chunk if needed
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < dates.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        dates.slice(i, i + BATCH_SIZE).forEach((date) => {
+          batch.set(doc(collection(db, "sessions")), {
+            teamId: team.id,
+            date,
+            title: newTitle.trim(),
+            type: newType,
+            time: newTime,
+            createdBy: user.id,
+            recurringGroupId: groupId,
+          });
         });
+        await batch.commit();
       }
     } else {
       if (!selectedDate) return;
