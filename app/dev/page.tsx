@@ -42,7 +42,7 @@ export default function DevPage() {
   const [filter, setFilter] = useState<DevItemCategory | "all">("all");
 
   useEffect(() => {
-    if (user?.role !== "admin") return;
+    if (!user?.roles.includes("admin")) return;
 
     const q = query(collection(db, "dev_items"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
@@ -119,7 +119,7 @@ export default function DevPage() {
     );
   }
 
-  if (user.role !== "admin") {
+  if (!user.roles.includes("admin")) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">

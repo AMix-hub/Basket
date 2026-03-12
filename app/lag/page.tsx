@@ -17,7 +17,7 @@ import { db } from "../../lib/firebaseClient";
 interface ProfileRow {
   id: string;
   name: string;
-  role: string;
+  roles: string[];
   child_name: string | null;
 }
 
@@ -49,12 +49,18 @@ export default function LagPage() {
       setMembers(
         profileSnaps
           .filter((s) => s.exists())
-          .map((s) => ({
-            id: s.id,
-            name: s.data()!.name as string,
-            role: s.data()!.role as string,
-            child_name: (s.data()!.childName as string | null) ?? null,
-          }))
+          .map((s) => {
+            const d = s.data()!;
+            return {
+              id: s.id,
+              name: d.name as string,
+              roles:
+                d.roles && (d.roles as string[]).length > 0
+                  ? (d.roles as string[])
+                  : [d.role as string],
+              child_name: (d.childName as string | null) ?? null,
+            };
+          })
       );
     })();
   }, [team]);
@@ -74,7 +80,7 @@ export default function LagPage() {
     setJoinError("");
     const ok = await joinTeam(
       joinCode.trim().toUpperCase(),
-      user?.role === "parent" ? joinChildName.trim() : undefined
+      user?.roles.includes("parent") ? joinChildName.trim() : undefined
     );
     if (ok) {
       setJoinSuccess(true);
@@ -142,7 +148,7 @@ export default function LagPage() {
                 className="w-full max-w-xs px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
               />
             </div>
-            {user.role === "parent" && (
+            {user.roles.includes("parent") && (
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">
                   Barnets namn
@@ -196,7 +202,7 @@ export default function LagPage() {
           </div>
 
           {/* Invite codes (coach only) */}
-          {user.role === "coach" && (
+          {user.roles.includes("coach") && (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
               <h2 className="font-bold text-slate-900 mb-4">Inbjudningskoder</h2>
               <p className="text-slate-500 text-sm mb-4">
@@ -250,14 +256,16 @@ export default function LagPage() {
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm text-slate-800">{m.name}</p>
-                      {m.role === "parent" && m.child_name && (
+                      {m.roles.includes("parent") && m.child_name && (
                         <p className="text-xs text-slate-400 mt-0.5">
                           Förälder till {m.child_name}
                         </p>
                       )}
                     </div>
                     <span className="text-xs font-semibold text-slate-500 shrink-0">
-                      {roleLabel[m.role as keyof typeof roleLabel] ?? m.role}
+                      {m.roles
+                        .map((r) => roleLabel[r as keyof typeof roleLabel] ?? r)
+                        .join(", ")}
                     </span>
                   </li>
                 ))}

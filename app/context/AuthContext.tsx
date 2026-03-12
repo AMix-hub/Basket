@@ -36,7 +36,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  /** All roles assigned to this user (at least one). */
+  roles: UserRole[];
   /** ID of the team this user belongs to (null if not in a team) */
   teamId: string | null;
   childName?: string;        // parent: child's name in the player list
@@ -91,7 +92,10 @@ interface AuthContextType {
 
 interface DbProfile {
   name: string;
+  /** Legacy single-role field; kept for backward compat with Firestore queries. */
   role: string;
+  /** Multi-role array; preferred over `role` when present. */
+  roles?: string[];
   clubName: string | null;
   coachInviteCode: string | null;
   childName: string | null;
@@ -113,11 +117,16 @@ interface DbTeam {
 /* ─── Converters ─────────────────────────────────────────── */
 
 function toUser(id: string, p: DbProfile, email: string): User {
+  // Prefer the `roles` array; fall back to wrapping the legacy `role` string.
+  const roles: UserRole[] =
+    p.roles && p.roles.length > 0
+      ? (p.roles as UserRole[])
+      : [p.role as UserRole];
   return {
     id,
     name: p.name,
     email,
-    role: p.role as UserRole,
+    roles,
     teamId: null, // resolved separately via team_members
     childName: p.childName ?? undefined,
     coachInviteCode: p.coachInviteCode ?? undefined,
@@ -221,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const fallbackProfile: DbProfile = {
           name: "Okänd",
           role: "player",
+          roles: ["player"],
           clubName: null,
           coachInviteCode: null,
           childName: null,
@@ -365,6 +375,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const newProfile: DbProfile = {
       name: name || "Okänd",
       role,
+      roles: [role],
       clubName:        role === "admin"  ? (clubName  ?? null) : null,
       childName:       role === "parent" ? (childName ?? null) : null,
       coachInviteCode: role === "admin"  ? generateCode()      : null,

@@ -31,7 +31,7 @@ interface TeamRow {
 interface ProfileRow {
   id: string;
   name: string;
-  role: string;
+  roles: string[];
   child_name: string | null;
 }
 
@@ -97,11 +97,15 @@ export default function AdminPage() {
       const profileSnaps = await Promise.all(profilePromises);
       profileSnaps.forEach((s) => {
         if (s.exists()) {
+          const d = s.data();
           profileMap[s.id] = {
             id: s.id,
-            name: s.data().name as string,
-            role: s.data().role as string,
-            child_name: (s.data().childName as string | null) ?? null,
+            name: d.name as string,
+            roles:
+              d.roles && (d.roles as string[]).length > 0
+                ? (d.roles as string[])
+                : [d.role as string],
+            child_name: (d.childName as string | null) ?? null,
           };
         }
       });
@@ -119,7 +123,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.role !== "admin") return;
+    if (!user?.roles.includes("admin")) return;
     loadTeams(user.id);
   }, [user, loadTeams]);
 
@@ -157,16 +161,31 @@ export default function AdminPage() {
     }
   };
 
-  const changeRole = async (member: ProfileRow, newRole: UserRole) => {
+  const toggleRole = async (member: ProfileRow, role: UserRole, checked: boolean) => {
+    const current = member.roles as UserRole[];
+    let newRoles: UserRole[];
+    if (checked) {
+      newRoles = [...new Set([...current, role])];
+    } else {
+      newRoles = current.filter((r) => r !== role);
+      if (newRoles.length === 0) return; // must keep at least one role
+    }
+    // Determine primary role for backward-compat `role` field
+    const priority: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
+    const primary = priority.find((r) => newRoles.includes(r)) ?? newRoles[0];
+
     setChangingRole(member.id);
     try {
-      await updateDoc(doc(db, "profiles", member.id), { role: newRole });
+      await updateDoc(doc(db, "profiles", member.id), {
+        roles: newRoles,
+        role: primary,
+      });
       setTeams((prev) =>
         prev
           ? prev.map((t) => ({
               ...t,
               members: t.members.map((m) =>
-                m.id === member.id ? { ...m, role: newRole } : m
+                m.id === member.id ? { ...m, roles: newRoles } : m
               ),
             }))
           : prev
@@ -197,7 +216,7 @@ export default function AdminPage() {
     );
   }
 
-  if (user.role !== "admin") {
+  if (!user.roles.includes("admin")) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
@@ -312,7 +331,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className="font-medium text-slate-800 flex-1 min-w-0">
                               {m.name}
-                              {m.role === "parent" && m.child_name && (
+                              {m.roles.includes("parent") && m.child_name && (
                                 <span className="text-xs text-slate-400 ml-1">
                                   (förälder till {m.child_name})
                                 </span>
@@ -326,33 +345,37 @@ export default function AdminPage() {
                               {removing === m.id ? "…" : "Ta bort"}
                             </button>
                           </div>
-                          {/* Role radio buttons */}
+                          {/* Role checkboxes – multiple roles allowed */}
                           <div
                             className="flex flex-wrap gap-x-3 gap-y-1 pl-0.5"
-                            role="radiogroup"
-                            aria-label={`Roll för ${m.name}`}
+                            aria-label={`Roller för ${m.name}`}
                           >
-                            {ALL_ROLES.map((r) => (
-                              <label
-                                key={r}
-                                className={`flex items-center gap-1 text-xs cursor-pointer select-none ${
-                                  changingRole === m.id ? "opacity-50 pointer-events-none" : ""
-                                }`}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`role-${m.id}`}
-                                  value={r}
-                                  checked={m.role === r}
-                                  onChange={() => changeRole(m, r)}
-                                  disabled={changingRole === m.id}
-                                  className="accent-orange-500 w-3.5 h-3.5 cursor-pointer"
-                                />
-                                <span className="text-slate-600">
-                                  {roleLabel[r]}
-                                </span>
-                              </label>
-                            ))}
+                            {ALL_ROLES.map((r) => {
+                              const isChecked = m.roles.includes(r);
+                              const isLast = isChecked && m.roles.length === 1;
+                              return (
+                                <label
+                                  key={r}
+                                  title={isLast ? "Minst en roll krävs" : undefined}
+                                  className={`flex items-center gap-1 text-xs cursor-pointer select-none ${
+                                    changingRole === m.id ? "opacity-50 pointer-events-none" : ""
+                                  } ${isLast ? "opacity-60" : ""}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={changingRole === m.id || isLast}
+                                    onChange={(e) =>
+                                      toggleRole(m, r, e.target.checked)
+                                    }
+                                    className="accent-orange-500 w-3.5 h-3.5 cursor-pointer"
+                                  />
+                                  <span className="text-slate-600">
+                                    {roleLabel[r]}
+                                  </span>
+                                </label>
+                              );
+                            })}
                           </div>
                         </li>
                       ))}

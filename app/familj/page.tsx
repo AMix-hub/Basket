@@ -146,7 +146,7 @@ export default function FamiljPage() {
   }
 
   /* ─── Wrong role ─── */
-  if (user.role !== "parent") {
+  if (!user.roles.includes("parent")) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
@@ -156,7 +156,7 @@ export default function FamiljPage() {
           </h1>
           <p className="text-slate-500 text-sm">
             Den här sidan är avsedd för föräldrar. Ditt konto har rollen{" "}
-            <strong>{user.role}</strong>.
+            <strong>{user.roles.join(", ")}</strong>.
           </p>
         </div>
       </div>
