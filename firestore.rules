@@ -28,6 +28,10 @@ service cloud.firestore {
       return userRole() in ['coach', 'assistant', 'admin'];
     }
 
+    function getTeamData(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)).data;
+    }
+
     // ─── profiles ────────────────────────────────────────────────
     // Public read (needed for invite-code validation before sign-up).
     // Each user manages only their own row.
@@ -53,10 +57,18 @@ service cloud.firestore {
 
     // ─── team_members ─────────────────────────────────────────────
     // Authenticated users can read all memberships.
-    // Users can only add themselves.
+    // Users can add themselves, or a coach can add the admin of a team they coach.
     match /team_members/{docId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid
+        ||
+        // Coach creating a team can add the team's admin as a member
+        (
+          request.resource.data.userId == getTeamData(request.resource.data.teamId).adminId
+          && getTeamData(request.resource.data.teamId).coachId == request.auth.uid
+        )
+      );
       allow delete: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
         isTeamMember(resource.data.teamId)
