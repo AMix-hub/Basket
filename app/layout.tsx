@@ -8,6 +8,15 @@ export const metadata: Metadata = {
   title: "Basket Träningsplanering",
   description:
     "Träningsplanering för en hel säsong – för coacher med barn 7–9 år",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Basket",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({

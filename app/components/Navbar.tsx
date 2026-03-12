@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useUnreadCount } from "../hooks/useUnreadCount";
+import { roleEmoji } from "../../lib/roleLabels";
 
 const yearLinks = [
   { href: "/ar1", label: "År 1", sub: "≤7 år" },
@@ -168,16 +169,13 @@ export default function Navbar() {
             {user ? (
               <>
                 <span className="text-xs text-slate-400 hidden sm:block whitespace-nowrap">
-                  {user.roles.includes("admin")
-                    ? "🏛"
-                    : user.roles.includes("coach")
-                    ? "🎽"
-                    : user.roles.includes("parent")
-                    ? "👪"
-                    : user.roles.includes("player")
-                    ? "🏃"
-                    : "👋"}{" "}
-                  {user.name}
+                  {roleEmoji(user.roles)}{" "}
+                  <Link
+                    href="/profil"
+                    className="hover:text-white transition-colors"
+                  >
+                    {user.name}
+                  </Link>
                 </span>
                 <button
                   onClick={handleLogout}
