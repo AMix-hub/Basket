@@ -19,6 +19,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  arrayUnion,
   collection,
   query,
   where,
@@ -251,6 +252,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       if (!membershipSnap.empty) {
         teamId = membershipSnap.docs[0].data().teamId as string;
+      }
+
+      /* For admins: auto-enroll in all teams they administer (self-healing).
+       * This covers teams created before this feature, or when the admin was
+       * already logged in at the time the coach registered and created a team. */
+      const isAdminUser =
+        (profileData.roles ?? []).includes("admin") ||
+        profileData.role === "admin";
+      if (isAdminUser) {
+        const [adminTeamsSnap, existingMembershipsSnap] = await Promise.all([
+          getDocs(query(collection(db, "teams"), where("adminId", "==", authId))),
+          getDocs(query(collection(db, "team_members"), where("userId", "==", authId))),
+        ]);
+        const memberTeamIds = new Set(
+          existingMembershipsSnap.docs.map((d) => d.data().teamId as string)
+        );
+        for (const teamDoc of adminTeamsSnap.docs) {
+          if (!memberTeamIds.has(teamDoc.id)) {
+            await setDoc(doc(db, "team_members", `${teamDoc.id}_${authId}`), {
+              teamId: teamDoc.id,
+              userId: authId,
+              joinedAt: new Date().toISOString(),
+            });
+            /* Atomically add admin to memberIds if not already present */
+            await updateDoc(doc(db, "teams", teamDoc.id), {
+              memberIds: arrayUnion(authId),
+            });
+          }
+          if (!teamId) {
+            teamId = teamDoc.id;
+          }
+        }
       }
 
       const u: User = {
