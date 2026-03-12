@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
+import type { UserRole } from "../context/AuthContext";
 import {
   collection,
   query,
@@ -11,6 +12,9 @@ import {
   getDocs,
   doc,
   getDoc,
+  deleteDoc,
+  updateDoc,
+  arrayRemove,
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 
@@ -19,6 +23,9 @@ interface TeamRow {
   name: string;
   age_group: string;
   coach_id: string | null;
+  invite_code: string;
+  parent_invite_code: string;
+  player_invite_code: string;
 }
 
 interface ProfileRow {
@@ -32,89 +39,142 @@ interface TeamWithMembers extends TeamRow {
   members: ProfileRow[];
 }
 
+const NON_COACH_ROLES: UserRole[] = ["assistant", "parent", "player"];
+
 export default function AdminPage() {
   const { user } = useAuth();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   // null = not yet loaded (loading state derived from value)
   const [teams, setTeams] = useState<TeamWithMembers[] | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null); // userId being removed
+  const [changingRole, setChangingRole] = useState<string | null>(null); // userId having role changed
+
+  const loadTeams = useCallback(async (adminId: string) => {
+    /* Fetch all teams belonging to this admin */
+    const teamSnap = await getDocs(
+      query(collection(db, "teams"), where("adminId", "==", adminId))
+    );
+
+    if (teamSnap.empty) {
+      setTeams([]);
+      return;
+    }
+
+    const teamRows = teamSnap.docs.map((d) => ({
+      id: d.id,
+      name: d.data().name as string,
+      age_group: d.data().ageGroup as string,
+      coach_id: (d.data().coachId as string | null) ?? null,
+      invite_code: (d.data().inviteCode as string) ?? "",
+      parent_invite_code: (d.data().parentInviteCode as string) ?? "",
+      player_invite_code: (d.data().playerInviteCode as string) ?? "",
+    }));
+
+    /* Fetch members for each team via team_members collection
+     * Firestore supports up to 10 items in an "in" query, so we batch. */
+    const teamIds = teamRows.map((t) => t.id);
+
+    const allMemberRows: { teamId: string; userId: string }[] = [];
+    // Process teamIds in chunks of 10 (Firestore "in" query limit)
+    for (let i = 0; i < teamIds.length; i += 10) {
+      const chunk = teamIds.slice(i, i + 10);
+      const memberSnap = await getDocs(
+        query(collection(db, "team_members"), where("teamId", "in", chunk))
+      );
+      memberSnap.docs.forEach((d) => {
+        allMemberRows.push({
+          teamId: d.data().teamId as string,
+          userId: d.data().userId as string,
+        });
+      });
+    }
+
+    const userIds = [...new Set(allMemberRows.map((m) => m.userId))];
+
+    const profileMap: Record<string, ProfileRow> = {};
+    if (userIds.length > 0) {
+      const profilePromises = userIds.map((id) => getDoc(doc(db, "profiles", id)));
+      const profileSnaps = await Promise.all(profilePromises);
+      profileSnaps.forEach((s) => {
+        if (s.exists()) {
+          profileMap[s.id] = {
+            id: s.id,
+            name: s.data().name as string,
+            role: s.data().role as string,
+            child_name: (s.data().childName as string | null) ?? null,
+          };
+        }
+      });
+    }
+
+    const enriched: TeamWithMembers[] = teamRows.map((t) => ({
+      ...t,
+      members: allMemberRows
+        .filter((m) => m.teamId === t.id)
+        .map((m) => profileMap[m.userId])
+        .filter(Boolean),
+    }));
+
+    setTeams(enriched);
+  }, []);
 
   useEffect(() => {
     if (user?.role !== "admin") return;
+    loadTeams(user.id);
+  }, [user, loadTeams]);
 
-    (async () => {
-      /* Fetch all teams belonging to this admin */
-      const teamSnap = await getDocs(
-        query(collection(db, "teams"), where("adminId", "==", user.id))
-      );
-
-      if (teamSnap.empty) {
-        setTeams([]);
-        return;
-      }
-
-      const teamRows = teamSnap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name as string,
-        age_group: d.data().ageGroup as string,
-        coach_id: (d.data().coachId as string | null) ?? null,
-      }));
-
-      /* Fetch members for each team via team_members collection
-       * Firestore supports up to 10 items in an "in" query, so we batch. */
-      const teamIds = teamRows.map((t) => t.id);
-
-      const allMemberRows: { teamId: string; userId: string }[] = [];
-      // Process teamIds in chunks of 10 (Firestore "in" query limit)
-      for (let i = 0; i < teamIds.length; i += 10) {
-        const chunk = teamIds.slice(i, i + 10);
-        const memberSnap = await getDocs(
-          query(collection(db, "team_members"), where("teamId", "in", chunk))
-        );
-        memberSnap.docs.forEach((d) => {
-          allMemberRows.push({
-            teamId: d.data().teamId as string,
-            userId: d.data().userId as string,
-          });
-        });
-      }
-
-      const userIds = [...new Set(allMemberRows.map((m) => m.userId))];
-
-      const profileMap: Record<string, ProfileRow> = {};
-      if (userIds.length > 0) {
-        const profilePromises = userIds.map((id) => getDoc(doc(db, "profiles", id)));
-        const profileSnaps = await Promise.all(profilePromises);
-        profileSnaps.forEach((s) => {
-          if (s.exists()) {
-            profileMap[s.id] = {
-              id: s.id,
-              name: s.data().name as string,
-              role: s.data().role as string,
-              child_name: (s.data().childName as string | null) ?? null,
-            };
-          }
-        });
-      }
-
-      const enriched: TeamWithMembers[] = teamRows.map((t) => ({
-        ...t,
-        members: allMemberRows
-          .filter((m) => m.teamId === t.id)
-          .map((m) => profileMap[m.userId])
-          .filter(Boolean),
-      }));
-
-      setTeams(enriched);
-    })();
-  }, [user]);
-
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
     } catch {
       // ignore
+    }
+  };
+
+  const removeMember = async (team: TeamWithMembers, member: ProfileRow) => {
+    if (!confirm(`Är du säker på att du vill ta bort ${member.name} från ${team.name}?`)) return;
+    setRemoving(member.id);
+    try {
+      await deleteDoc(doc(db, "team_members", `${team.id}_${member.id}`)); // compound key: {teamId}_{userId}
+      await updateDoc(doc(db, "teams", team.id), {
+        memberIds: arrayRemove(member.id),
+      });
+      setTeams((prev) =>
+        prev
+          ? prev.map((t) =>
+              t.id === team.id
+                ? { ...t, members: t.members.filter((m) => m.id !== member.id) }
+                : t
+            )
+          : prev
+      );
+    } catch {
+      alert("Det gick inte att ta bort medlemmen. Försök igen.");
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  const changeRole = async (member: ProfileRow, newRole: UserRole) => {
+    setChangingRole(member.id);
+    try {
+      await updateDoc(doc(db, "profiles", member.id), { role: newRole });
+      setTeams((prev) =>
+        prev
+          ? prev.map((t) => ({
+              ...t,
+              members: t.members.map((m) =>
+                m.id === member.id ? { ...m, role: newRole } : m
+              ),
+            }))
+          : prev
+      );
+    } catch {
+      alert("Det gick inte att ändra rollen. Försök igen.");
+    } finally {
+      setChangingRole(null);
     }
   };
 
@@ -161,7 +221,7 @@ export default function AdminPage() {
           </h1>
         </div>
         <p className="text-slate-500 text-sm">
-          Bjud in coacher och följ alla lag i din förening.
+          Hantera behöriga, bjud in coacher och följ alla lag i din förening.
         </p>
       </div>
 
@@ -191,14 +251,14 @@ export default function AdminPage() {
               </p>
             </div>
             <button
-              onClick={() => copyToClipboard(user.coachInviteCode!)}
+              onClick={() => copyToClipboard(user.coachInviteCode!, "coach")}
               className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
-                copied
+                copied === "coach"
                   ? "bg-emerald-500 text-white"
                   : "bg-blue-200 text-blue-700 hover:bg-blue-300"
               }`}
             >
-              {copied ? "✓ Kopierad!" : "📋 Kopiera"}
+              {copied === "coach" ? "✓ Kopierad!" : "📋 Kopiera"}
             </button>
           </div>
         ) : (
@@ -222,9 +282,9 @@ export default function AdminPage() {
             komma igång.
           </p>
         ) : (
-          <ul className="space-y-4">
+          <ul className="space-y-6">
             {(teams ?? []).map((team) => {
-              const coach   = team.members.find((m) => m.id === team.coach_id);
+              const coach    = team.members.find((m) => m.id === team.coach_id);
               const nonCoach = team.members.filter((m) => m.id !== team.coach_id);
 
               return (
@@ -232,6 +292,7 @@ export default function AdminPage() {
                   key={team.id}
                   className="border border-slate-100 rounded-xl p-4"
                 >
+                  {/* Team header */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
                       <p className="font-bold text-slate-900">{team.name}</p>
@@ -244,33 +305,105 @@ export default function AdminPage() {
                     <span className="text-2xl shrink-0">🏀</span>
                   </div>
 
+                  {/* Members list */}
                   {team.members.length === 0 ? (
                     <p className="text-xs text-slate-400">Inga medlemmar ännu.</p>
                   ) : (
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-2 mb-4">
                       {coach && (
                         <li className="flex items-center gap-2 text-sm">
-                          <span className="text-xs font-semibold text-slate-500 w-24 shrink-0">
+                          <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">
                             🎽 Coach
                           </span>
-                          <span className="text-slate-800">{coach.name}</span>
+                          <span className="text-slate-800 flex-1">{coach.name}</span>
+                          <button
+                            disabled={removing === coach.id}
+                            onClick={() => removeMember(team, coach)}
+                            className="px-2 py-0.5 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {removing === coach.id ? "…" : "Ta bort"}
+                          </button>
                         </li>
                       )}
                       {nonCoach.map((m) => (
-                        <li key={m.id} className="flex items-center gap-2 text-sm">
-                          <span className="text-xs font-semibold text-slate-500 w-24 shrink-0">
+                        <li key={m.id} className="flex items-center gap-2 text-sm flex-wrap">
+                          <span className="text-xs font-semibold text-slate-500 w-28 shrink-0">
                             {roleLabel[m.role as keyof typeof roleLabel] ?? m.role}
                           </span>
-                          <span className="text-slate-700">{m.name}</span>
-                          {m.role === "parent" && m.child_name && (
-                            <span className="text-xs text-slate-400 ml-1">
-                              (förälder till {m.child_name})
-                            </span>
+                          <span className="text-slate-700 flex-1 min-w-0">
+                            {m.name}
+                            {m.role === "parent" && m.child_name && (
+                              <span className="text-xs text-slate-400 ml-1">
+                                (förälder till {m.child_name})
+                              </span>
+                            )}
+                          </span>
+                          {/* Role change dropdown */}
+                          {NON_COACH_ROLES.includes(m.role as UserRole) && (
+                            <select
+                              disabled={changingRole === m.id}
+                              value={m.role}
+                              onChange={(e) => changeRole(m, e.target.value as UserRole)}
+                              className="text-xs border border-slate-200 rounded-lg px-2 py-0.5 text-slate-600 bg-white hover:border-slate-400 transition-colors disabled:opacity-50"
+                              aria-label={`Ändra roll för ${m.name}`}
+                            >
+                              {NON_COACH_ROLES.map((r) => (
+                                <option key={r} value={r}>
+                                  {roleLabel[r]}
+                                </option>
+                              ))}
+                            </select>
                           )}
+                          <button
+                            disabled={removing === m.id}
+                            onClick={() => removeMember(team, m)}
+                            className="px-2 py-0.5 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {removing === m.id ? "…" : "Ta bort"}
+                          </button>
                         </li>
                       ))}
                     </ul>
                   )}
+
+                  {/* Team invite codes */}
+                  <details className="group mt-3 pt-3 border-t border-slate-100">
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors list-none flex items-center gap-1">
+                      <span className="chevron inline-block transition-transform group-open:rotate-90">▶</span>
+                      Inbjudningskoder för laget
+                    </summary>
+                    <div className="mt-3 space-y-2">
+                      {[
+                        { label: "👋 Assistent", code: team.invite_code, key: `${team.id}-assistant` },
+                        { label: "👪 Förälder", code: team.parent_invite_code, key: `${team.id}-parent` },
+                        { label: "🏃 Spelare", code: team.player_invite_code, key: `${team.id}-player` },
+                      ].map(({ label, code, key }) => (
+                        <div key={key} className="flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2">
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-slate-500">{label}</p>
+                            <p className="font-mono font-bold text-slate-800 tracking-widest text-sm">{code}</p>
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard(code, key)}
+                            className={`px-2 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                              copied === key
+                                ? "bg-emerald-500 text-white"
+                                : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                            }`}
+                          >
+                            {copied === key ? "✓" : "📋"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Dela dessa koder med nya medlemmar. De registrerar sig via{" "}
+                      <Link href="/anslut" className="text-orange-600 hover:underline">
+                        Gå med i ett lag
+                      </Link>
+                      .
+                    </p>
+                  </details>
 
                   <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100">
                     {team.members.length}{" "}
