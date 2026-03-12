@@ -52,6 +52,8 @@ export default function MeddelandenPage() {
   const [messages, setMessages]       = useState<Message[]>([]);
   const [selected, setSelected]       = useState<"team" | string>("team");
   const [draft, setDraft]             = useState("");
+  const [sendError, setSendError]     = useState<string | null>(null);
+  const [queryError, setQueryError]   = useState<string | null>(null);
   const bottomRef                     = useRef<HTMLDivElement>(null);
 
   /* ── Load team members ── */
@@ -104,23 +106,31 @@ export default function MeddelandenPage() {
       orderBy("sentAt", "asc")
     );
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setMessages(
-        snap.docs.map((d) => {
-          const m = d.data();
-          return {
-            id:          d.id,
-            teamId:      m.teamId as string,
-            senderId:    m.senderId as string,
-            senderName:  m.senderName as string,
-            recipientId: (m.recipientId as string | null) ?? null,
-            text:        m.text as string,
-            sentAt:      m.sentAt as string,
-            readBy:      (m.readBy as string[]) ?? [],
-          } as Message;
-        })
-      );
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        setQueryError(null);
+        setMessages(
+          snap.docs.map((d) => {
+            const m = d.data();
+            return {
+              id:          d.id,
+              teamId:      m.teamId as string,
+              senderId:    m.senderId as string,
+              senderName:  m.senderName as string,
+              recipientId: (m.recipientId as string | null) ?? null,
+              text:        m.text as string,
+              sentAt:      m.sentAt as string,
+              readBy:      (m.readBy as string[]) ?? [],
+            } as Message;
+          })
+        );
+      },
+      (err) => {
+        console.error("Fel vid hämtning av meddelanden:", err);
+        setQueryError("Kunde inte hämta meddelanden. Försök igen.");
+      }
+    );
 
     return () => unsubscribe();
   }, [team]);
@@ -181,8 +191,14 @@ export default function MeddelandenPage() {
       sentAt:      new Date().toISOString(),
       readBy:      [user.id],
     };
-    await addDoc(collection(db, "messages"), msg);
-    setDraft("");
+    try {
+      await addDoc(collection(db, "messages"), msg);
+      setDraft("");
+      setSendError(null);
+    } catch (err) {
+      console.error("Fel vid skickande av meddelande:", err);
+      setSendError("Meddelandet kunde inte skickas. Försök igen.");
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -304,6 +320,12 @@ export default function MeddelandenPage() {
             )}
           </div>
 
+          {queryError && (
+            <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
+              {queryError}
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {threadMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
@@ -337,6 +359,11 @@ export default function MeddelandenPage() {
           </div>
 
           <div className="px-4 py-3 border-t border-slate-100 shrink-0">
+            {sendError && (
+              <div className="mb-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600">
+                {sendError}
+              </div>
+            )}
             <div className="flex gap-2 items-end">
               <textarea
                 ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = `${Math.min(el.scrollHeight, 112)}px`; } }}
