@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getMessaging, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY            ?? "",
@@ -43,3 +44,18 @@ const app = getApps().length === 0
 
 export const auth = getAuth(app);
 export const db   = getFirestore(app);
+
+/**
+ * Firebase Cloud Messaging — only available in browser environments that
+ * support the Push API.  Returns null in SSR / build time / unsupported browsers.
+ *
+ * Usage:
+ *   const m = await getClientMessaging();
+ *   if (m) { ... }
+ */
+export async function getClientMessaging() {
+  if (typeof window === "undefined") return null;
+  const supported = await isSupported().catch(() => false);
+  if (!supported) return null;
+  return getMessaging(app);
+}

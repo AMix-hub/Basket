@@ -202,8 +202,9 @@ export default function KalenderPage() {
       const dates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
       if (dates.length === 0) return;
       const groupId = crypto.randomUUID();
-      // Firestore batches support up to 500 operations; chunk if needed
+      // Firestore batches support up to 500 operations; commit all in parallel
       const BATCH_SIZE = 500;
+      const batchPromises: Promise<void>[] = [];
       for (let i = 0; i < dates.length; i += BATCH_SIZE) {
         const batch = writeBatch(db);
         dates.slice(i, i + BATCH_SIZE).forEach((date) => {
@@ -217,8 +218,9 @@ export default function KalenderPage() {
             recurringGroupId: groupId,
           });
         });
-        await batch.commit();
+        batchPromises.push(batch.commit());
       }
+      await Promise.all(batchPromises);
     } else {
       if (!selectedDate) return;
       await addDoc(collection(db, "sessions"), {
@@ -271,6 +273,22 @@ export default function KalenderPage() {
           text: `⚠️ ${cancellingSession.title} (${dateLabel} ${cancellingSession.time}) är inställt. Anledning: ${cancelReason.trim()}`,
           sentAt: new Date().toISOString(),
           readBy: [user.id],
+        });
+
+        // Send push notification + email to all team members via API route.
+        // This is fire-and-forget (non-blocking) — UI doesn't wait for it.
+        fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teamId: team.id,
+            sessionTitle: cancellingSession.title,
+            sessionDate: cancellingSession.date,
+            sessionTime: cancellingSession.time,
+            reason: cancelReason.trim(),
+          }),
+        }).catch((err) => {
+          console.warn("[notify] Push/email notification failed:", err);
         });
       }
     } finally {

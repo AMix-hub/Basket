@@ -134,5 +134,14 @@ service cloud.firestore {
     match /coach_notes/{userId} {
       allow read, write: if isSignedIn() && isOwner(userId);
     }
+
+    // ─── mail ─────────────────────────────────────────────────────
+    // Written by the server (API route via Admin SDK) when a session is
+    // cancelled.  The Firebase Trigger Email extension reads and sends them.
+    // Client code should never write directly to this collection.
+    match /mail/{docId} {
+      allow read: if false;
+      allow write: if false;
+    }
   }
 }
