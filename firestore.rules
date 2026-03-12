@@ -88,16 +88,22 @@ service cloud.firestore {
     // ─── players ─────────────────────────────────────────────────
     match /players/{playerId} {
       allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
-      allow write: if isSignedIn() &&
+      allow create, update: if isSignedIn() &&
         isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+      allow delete: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
         isCoachOrAbove();
     }
 
     // ─── sessions ────────────────────────────────────────────────
     match /sessions/{sessionId} {
       allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
-      allow write: if isSignedIn() &&
+      allow create, update: if isSignedIn() &&
         isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+      allow delete: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
         isCoachOrAbove();
     }
 

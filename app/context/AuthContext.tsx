@@ -87,6 +87,10 @@ interface AuthContextType {
   joinTeam: (inviteCode: string, childName?: string) => Promise<boolean>;
   getMyTeam: () => Team | null;
   getAllTeams: () => Promise<Team[]>;
+  /**
+   * Admin creates a new team. Returns null on success, or a Swedish error string.
+   */
+  createTeam: (teamName: string, ageGroup: string) => Promise<string | null>;
 }
 
 /* ─── Firestore document shapes ──────────────────────────── */
@@ -537,6 +541,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return snap.docs.map((d) => toTeam(d.id, d.data() as DbTeam));
   };
 
+  /* ── createTeam (admin creates a new team) ── */
+  const createTeam = async (
+    teamName: string,
+    ageGroup: string
+  ): Promise<string | null> => {
+    if (!user) return "Du måste vara inloggad för att skapa lag.";
+    if (!user.roles.includes("admin")) return "Endast admins kan skapa lag.";
+    try {
+      const newTeamId = crypto.randomUUID();
+      const newTeam: DbTeam = {
+        name: teamName,
+        ageGroup,
+        coachId: null,
+        adminId: user.id,
+        clubName: user.clubName ?? "",
+        memberIds: [user.id],
+        inviteCode: generateCode(),
+        parentInviteCode: generateCode(),
+        playerInviteCode: generateCode(),
+      };
+      await setDoc(doc(db, "teams", newTeamId), newTeam);
+      await setDoc(doc(db, "team_members", `${newTeamId}_${user.id}`), {
+        teamId: newTeamId,
+        userId: user.id,
+        joinedAt: new Date().toISOString(),
+      });
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return translateFirebaseError(msg);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -548,6 +585,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         joinTeam,
         getMyTeam,
         getAllTeams,
+        createTeam,
       }}
     >
       {children}

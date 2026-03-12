@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
+import { useAuth } from "../context/AuthContext";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Player {
@@ -92,11 +95,12 @@ function getZone(xPct: number, yPct: number): string {
 /* ─── Storage keys ──────────────────────────────────────────── */
 const PLAYERS_KEY = "basketball_players";
 const SHOTS_KEY = "basketball_shots";
-const SESSIONS_KEY = "basketball_calendar_sessions";
 const ATTENDANCE_KEY = "basketball_attendance";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function StatistikPage() {
+  const { getMyTeam } = useAuth();
+  const team = getMyTeam();
   const [players, setPlayers] = useState<Player[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -107,14 +111,10 @@ export default function StatistikPage() {
   const [newPlayerNumber, setNewPlayerNumber] = useState("");
   const [showPlayerForm, setShowPlayerForm] = useState(false);
 
-  /* Attendance data (read-only from kalender storage) */
-  const [calSessions] = useState<
+  /* Sessions from Firestore (read-only for attendance view) */
+  const [calSessions, setCalSessions] = useState<
     { id: string; date: string; title: string; type: string }[]
-  >(() => {
-    if (typeof window === "undefined") return [];
-    const cs = localStorage.getItem(SESSIONS_KEY);
-    return cs ? JSON.parse(cs) : [];
-  });
+  >([]);
   const [calAttendance] = useState<
     { sessionId: string; playerId: string; status: string }[]
   >(() => {
@@ -122,6 +122,26 @@ export default function StatistikPage() {
     const ca = localStorage.getItem(ATTENDANCE_KEY);
     return ca ? JSON.parse(ca) : [];
   });
+
+  // Subscribe to Firestore sessions for the current team
+  useEffect(() => {
+    if (!team) {
+      setCalSessions([]);
+      return;
+    }
+    const q = query(collection(db, "sessions"), where("teamId", "==", team.id));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setCalSessions(
+        snap.docs.map((d) => ({
+          id: d.id,
+          date: d.data().date as string,
+          title: d.data().title as string,
+          type: d.data().type as string,
+        }))
+      );
+    });
+    return () => unsubscribe();
+  }, [team]);
 
   const svgRef = useRef<SVGSVGElement>(null);
 
