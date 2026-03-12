@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
 import { useAuth } from "../context/AuthContext";
 
 /* ─── Types mirrored from kalender/page.tsx ─────────────────── */
@@ -27,8 +29,7 @@ interface Player {
   number: number;
 }
 
-/* ─── Storage keys ──────────────────────────────────────────── */
-const SESSIONS_KEY = "basketball_calendar_sessions";
+/* ─── Storage keys (players & attendance stay local) ────────── */
 const ATTENDANCE_KEY = "basketball_attendance";
 const PLAYERS_KEY = "basketball_players";
 
@@ -50,11 +51,7 @@ export default function FamiljPage() {
   const { user, getMyTeam } = useAuth();
   const team = getMyTeam();
 
-  const [sessions, setSessions] = useState<TrainingSession[]>(() => {
-    if (typeof window === "undefined") return [];
-    const s = localStorage.getItem(SESSIONS_KEY);
-    return s ? (JSON.parse(s) as TrainingSession[]) : [];
-  });
+  const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>(() => {
     if (typeof window === "undefined") return [];
     const a = localStorage.getItem(ATTENDANCE_KEY);
@@ -67,7 +64,27 @@ export default function FamiljPage() {
   });
 
   // Suppress unused-setter warnings – setters kept for future use
-  void setSessions; void setAttendance; void setPlayers;
+  void setAttendance; void setPlayers;
+
+  // Subscribe to Firestore sessions for this team
+  useEffect(() => {
+    if (!team) {
+      setSessions([]);
+      return;
+    }
+    const q = query(collection(db, "sessions"), where("teamId", "==", team.id));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const loaded: TrainingSession[] = snap.docs.map((d) => ({
+        id: d.id,
+        date: d.data().date as string,
+        title: d.data().title as string,
+        type: d.data().type as "träning" | "match",
+        time: d.data().time as string,
+      }));
+      setSessions(loaded);
+    });
+    return () => unsubscribe();
+  }, [team]);
 
   /* ── Match child name to player ── */
   const childName = user?.childName ?? "";

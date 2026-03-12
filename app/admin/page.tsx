@@ -42,12 +42,18 @@ interface TeamWithMembers extends TeamRow {
 const ALL_ROLES: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const { user, createTeam } = useAuth();
   const [copied, setCopied] = useState<string | null>(null);
   // null = not yet loaded (loading state derived from value)
   const [teams, setTeams] = useState<TeamWithMembers[] | null>(null);
   const [removing, setRemoving] = useState<string | null>(null); // userId being removed
   const [changingRole, setChangingRole] = useState<string | null>(null); // userId having role changed
+
+  // Create team form state
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newAgeGroup, setNewAgeGroup] = useState("≤7 år");
+  const [creatingTeam, setCreatingTeam] = useState(false);
+  const [createTeamError, setCreateTeamError] = useState<string | null>(null);
 
   const loadTeams = useCallback(async (adminId: string) => {
     /* Fetch all teams belonging to this admin */
@@ -197,6 +203,23 @@ export default function AdminPage() {
     }
   };
 
+  const handleCreateTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTeamName.trim()) return;
+    setCreatingTeam(true);
+    setCreateTeamError(null);
+    const err = await createTeam(newTeamName.trim(), newAgeGroup);
+    if (err) {
+      setCreateTeamError(err);
+    } else {
+      setNewTeamName("");
+      setNewAgeGroup("≤7 år");
+      // Reload teams list
+      if (user) loadTeams(user.id);
+    }
+    setCreatingTeam(false);
+  };
+
   if (!user) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
@@ -287,6 +310,47 @@ export default function AdminPage() {
         )}
       </div>
 
+      {/* Create new team */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
+        <h2 className="font-bold text-slate-900 mb-1">Skapa nytt lag</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Som admin kan du skapa lag direkt. Bjud sedan in en coach med coach-inbjudningskoden ovan, eller dela lagkoderna nedan med spelare och föräldrar.
+        </p>
+        <form onSubmit={handleCreateTeam} className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              placeholder="Lagets namn, t.ex. Röda Laget U9"
+              required
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            <select
+              value={newAgeGroup}
+              onChange={(e) => setNewAgeGroup(e.target.value)}
+              className="px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+            >
+              <option value="≤7 år">≤7 år (År 1)</option>
+              <option value="8 år">8 år (År 2)</option>
+              <option value="9 år">9 år (År 3)</option>
+            </select>
+          </div>
+          {createTeamError && (
+            <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+              {createTeamError}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={creatingTeam || !newTeamName.trim()}
+            className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors"
+          >
+            {creatingTeam ? "Skapar…" : "+ Skapa lag"}
+          </button>
+        </form>
+      </div>
+
       {/* All teams in this club */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
         <h2 className="font-bold text-slate-900 mb-4">
@@ -297,8 +361,7 @@ export default function AdminPage() {
           <p className="text-slate-400 text-sm">Laddar lag…</p>
         ) : (teams ?? []).length === 0 ? (
           <p className="text-slate-400 text-sm">
-            Inga lag registrerade ännu. Bjud in en coach med koden ovan för att
-            komma igång.
+            Inga lag registrerade ännu. Skapa ett lag ovan eller bjud in en coach med koden ovan för att komma igång.
           </p>
         ) : (
           <ul className="space-y-6">

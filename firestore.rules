@@ -88,16 +88,22 @@ service cloud.firestore {
     // ─── players ─────────────────────────────────────────────────
     match /players/{playerId} {
       allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
-      allow write: if isSignedIn() &&
+      allow create, update: if isSignedIn() &&
         isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+      allow delete: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
         isCoachOrAbove();
     }
 
     // ─── sessions ────────────────────────────────────────────────
     match /sessions/{sessionId} {
       allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
-      allow write: if isSignedIn() &&
+      allow create, update: if isSignedIn() &&
         isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+      allow delete: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
         isCoachOrAbove();
     }
 
@@ -127,6 +133,15 @@ service cloud.firestore {
     // Each user can only access their own notes.
     match /coach_notes/{userId} {
       allow read, write: if isSignedIn() && isOwner(userId);
+    }
+
+    // ─── mail ─────────────────────────────────────────────────────
+    // Written by the server (API route via Admin SDK) when a session is
+    // cancelled.  The Firebase Trigger Email extension reads and sends them.
+    // Client code should never write directly to this collection.
+    match /mail/{docId} {
+      allow read: if false;
+      allow write: if false;
     }
   }
 }

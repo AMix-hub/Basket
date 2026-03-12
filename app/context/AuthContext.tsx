@@ -27,7 +27,8 @@ import {
   getDocs,
   limit,
 } from "firebase/firestore";
-import { auth, db } from "../../lib/firebaseClient";
+import { auth, db, getClientMessaging } from "../../lib/firebaseClient";
+import { getToken } from "firebase/messaging";
 
 /* ─── Types ──────────────────────────────────────────────── */
 
@@ -87,6 +88,10 @@ interface AuthContextType {
   joinTeam: (inviteCode: string, childName?: string) => Promise<boolean>;
   getMyTeam: () => Team | null;
   getAllTeams: () => Promise<Team[]>;
+  /**
+   * Admin creates a new team. Returns null on success, or a Swedish error string.
+   */
+  createTeam: (teamName: string, ageGroup: string) => Promise<string | null>;
 }
 
 /* ─── Firestore document shapes ──────────────────────────── */
@@ -101,6 +106,10 @@ interface DbProfile {
   coachInviteCode: string | null;
   childName: string | null;
   createdAt: string;
+  /** Email stored for push/email notification delivery. */
+  email?: string;
+  /** FCM token for device push notifications (updated on every login). */
+  fcmToken?: string | null;
 }
 
 interface DbTeam {
@@ -305,13 +314,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  /* ── registerPushToken – request notification permission and store FCM token ── */
+  const registerPushToken = useCallback(async (userId: string) => {
+    if (typeof window === "undefined") return;
+    // Only request permission if not already granted/denied
+    if (Notification.permission === "denied") return;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") return;
+
+      const messaging = await getClientMessaging();
+      if (!messaging) return;
+
+      // Register the service worker and pass it the Firebase config so it
+      // can initialise FCM for background messages.
+      const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+      if (!vapidKey) {
+        console.warn(
+          "[FCM] NEXT_PUBLIC_FIREBASE_VAPID_KEY is not set. " +
+          "Push notifications require a VAPID key from Firebase Console → " +
+          "Project Settings → Cloud Messaging → Web Push certificates."
+        );
+        return;
+      }
+
+      let swReg: ServiceWorkerRegistration | undefined;
+      try {
+        await navigator.serviceWorker.register(
+          "/firebase-messaging-sw.js",
+          { scope: "/" }
+        );
+        // Wait until the service worker is fully active, then send the
+        // Firebase config so it can handle background push messages.
+        swReg = await navigator.serviceWorker.ready;
+        const config = {
+          apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+          authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+          projectId:         process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          storageBucket:     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+          appId:             process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+        };
+        // swReg.active is guaranteed non-null after ready resolves
+        swReg.active!.postMessage({ type: "INIT_FCM", config });
+      } catch {
+        // Service worker registration failed (e.g. non-HTTPS origin) – skip
+        return;
+      }
+
+      const token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: swReg });
+      if (!token) return;
+
+      // Persist token in the user's profile so the server can look it up later
+      await updateDoc(doc(db, "profiles", userId), { fcmToken: token });
+    } catch {
+      // Non-fatal – push notifications are a best-effort feature
+    }
+  }, []);
+
   /* ── Initialise session on mount ── */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        loadProfile(firebaseUser.uid, firebaseUser.email ?? "").finally(() =>
-          setLoading(false)
-        );
+        loadProfile(firebaseUser.uid, firebaseUser.email ?? "")
+          .then((u) => {
+            if (u) registerPushToken(u.id);
+          })
+          .finally(() => setLoading(false));
       } else {
         setUser(null);
         setCurrentTeam(null);
@@ -319,7 +388,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
     return () => unsubscribe();
-  }, [loadProfile]);
+  }, [loadProfile, registerPushToken]);
 
   /* ── login ── */
   const login = async (email: string, password: string): Promise<string | null> => {
@@ -409,6 +478,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: name || "Okänd",
       role,
       roles: [role],
+      email,
       clubName:        role === "admin"  ? (clubName  ?? null) : null,
       childName:       role === "parent" ? (childName ?? null) : null,
       coachInviteCode: role === "admin"  ? generateCode()      : null,
@@ -537,6 +607,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return snap.docs.map((d) => toTeam(d.id, d.data() as DbTeam));
   };
 
+  /* ── createTeam (admin creates a new team) ── */
+  const createTeam = async (
+    teamName: string,
+    ageGroup: string
+  ): Promise<string | null> => {
+    if (!user) return "Du måste vara inloggad för att skapa lag.";
+    if (!user.roles.includes("admin")) return "Endast admins kan skapa lag.";
+    try {
+      const newTeamId = crypto.randomUUID();
+      const newTeam: DbTeam = {
+        name: teamName,
+        ageGroup,
+        coachId: null,
+        adminId: user.id,
+        clubName: user.clubName ?? "",
+        memberIds: [user.id],
+        inviteCode: generateCode(),
+        parentInviteCode: generateCode(),
+        playerInviteCode: generateCode(),
+      };
+      await setDoc(doc(db, "teams", newTeamId), newTeam);
+      await setDoc(doc(db, "team_members", `${newTeamId}_${user.id}`), {
+        teamId: newTeamId,
+        userId: user.id,
+        joinedAt: new Date().toISOString(),
+      });
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return translateFirebaseError(msg);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -548,6 +651,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         joinTeam,
         getMyTeam,
         getAllTeams,
+        createTeam,
       }}
     >
       {children}
