@@ -7,7 +7,6 @@ import {
   collection,
   query,
   where,
-  orderBy,
   onSnapshot,
   addDoc,
   updateDoc,
@@ -102,8 +101,7 @@ export default function MeddelandenPage() {
 
     const q = query(
       collection(db, "messages"),
-      where("teamId", "==", team.id),
-      orderBy("sentAt", "asc")
+      where("teamId", "==", team.id)
     );
 
     const unsubscribe = onSnapshot(
@@ -111,19 +109,21 @@ export default function MeddelandenPage() {
       (snap) => {
         setQueryError(null);
         setMessages(
-          snap.docs.map((d) => {
-            const m = d.data();
-            return {
-              id:          d.id,
-              teamId:      m.teamId as string,
-              senderId:    m.senderId as string,
-              senderName:  m.senderName as string,
-              recipientId: (m.recipientId as string | null) ?? null,
-              text:        m.text as string,
-              sentAt:      m.sentAt as string,
-              readBy:      (m.readBy as string[]) ?? [],
-            } as Message;
-          })
+          snap.docs
+            .map((d) => {
+              const m = d.data();
+              return {
+                id:          d.id,
+                teamId:      m.teamId as string,
+                senderId:    m.senderId as string,
+                senderName:  m.senderName as string,
+                recipientId: (m.recipientId as string | null) ?? null,
+                text:        m.text as string,
+                sentAt:      m.sentAt as string,
+                readBy:      (m.readBy as string[]) ?? [],
+              } as Message;
+            })
+            .sort((a, b) => (a.sentAt < b.sentAt ? -1 : a.sentAt > b.sentAt ? 1 : 0))
         );
       },
       (err) => {
