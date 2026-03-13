@@ -143,5 +143,43 @@ service cloud.firestore {
       allow read: if false;
       allow write: if false;
     }
+
+    // ─── halls ────────────────────────────────────────────────────
+    // Admins manage halls for their association. All signed-in users can read
+    // (needed for calendar hall selection by coaches).
+    match /halls/{hallId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.adminId == request.auth.uid &&
+        userRole() == 'admin';
+      allow update: if isSignedIn() &&
+        resource.data.adminId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        resource.data.adminId == request.auth.uid;
+    }
+
+    // ─── training_free_periods ────────────────────────────────────
+    // Admins create/manage training-free periods (holidays).
+    // All signed-in users can read (needed for calendar display and
+    // recurring session generation).
+    match /training_free_periods/{periodId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.adminId == request.auth.uid &&
+        userRole() == 'admin';
+      allow update: if isSignedIn() &&
+        resource.data.adminId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        resource.data.adminId == request.auth.uid;
+    }
+
+    // ─── session_notes ────────────────────────────────────────────
+    // Coach/admin notes on training plan sessions (sub-activities, comments).
+    // Readable by all team members; writable by coach+.
+    match /session_notes/{noteId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isCoachOrAbove();
+      allow delete: if isSignedIn() && isCoachOrAbove();
+    }
   }
 }
