@@ -10,6 +10,7 @@ import {
   query,
   where,
   doc,
+  getDocs,
   onSnapshot,
   setDoc,
   writeBatch,
@@ -76,7 +77,7 @@ const WEEKDAY_OPTIONS = [
 ];
 
 export default function SeasonPage({ plan }: Props) {
-  const { user, getMyTeam, getAllTeams } = useAuth();
+  const { user, getMyTeam } = useAuth();
   const defaultTeam = getMyTeam();
   const team = defaultTeam;
 
@@ -125,20 +126,30 @@ export default function SeasonPage({ plan }: Props) {
 
   useEffect(() => {
     if (!user) return;
-    const fetchTeams = async () => {
-      if (user.roles.includes("admin")) {
-        const teams = await getAllTeams();
-        const adminTeams = teams.filter((t) => t.adminId === user.id);
+    const isAdmin = user.roles.includes("admin");
+    if (isAdmin) {
+      // Query admin's teams directly using already-imported Firestore functions
+      getDocs(query(collection(db, "teams"), where("adminId", "==", user.id))).then((snap) => {
+        const adminTeams = snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          ageGroup: d.data().ageGroup as string,
+          coachId: (d.data().coachId as string) ?? "",
+          adminId: d.data().adminId as string,
+          clubName: (d.data().clubName as string) ?? "",
+          memberIds: (d.data().memberIds as string[]) ?? [],
+          inviteCode: (d.data().inviteCode as string) ?? "",
+          parentInviteCode: (d.data().parentInviteCode as string) ?? "",
+          playerInviteCode: (d.data().playerInviteCode as string) ?? "",
+        }));
         setAllTeams(adminTeams);
         if (adminTeams.length > 0) setSchedTeam((prev) => prev || adminTeams[0].id);
-      } else if (team) {
-        setAllTeams([team]);
-        setSchedTeam((prev) => prev || team.id);
-      }
-    };
-    fetchTeams();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, team?.id]);
+      });
+    } else if (team) {
+      setAllTeams([team]);
+      setSchedTeam((prev) => prev || team.id);
+    }
+  }, [user?.id, user?.roles, team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;
@@ -155,8 +166,7 @@ export default function SeasonPage({ plan }: Props) {
       );
     });
     return () => unsub();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, team?.adminId]);
+  }, [user?.id, user?.roles, team?.adminId]);
 
   const getNoteDocId = (sessionNumber: number) =>
     `${team?.id}_${plan.year}_${sessionNumber}`;
