@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -40,6 +40,8 @@ export default function DevPage() {
   const [newCategory, setNewCategory] = useState<DevItemCategory>("idea");
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState<DevItemCategory | "all">("all");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
@@ -61,6 +63,13 @@ export default function DevPage() {
     return () => unsub();
   }, [user]);
 
+  useEffect(() => {
+    if (showAddForm) {
+      // Wait for modal to render before focusing the input
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [showAddForm]);
+
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newText.trim()) return;
@@ -73,6 +82,7 @@ export default function DevPage() {
         createdAt: new Date().toISOString(),
       });
       setNewText("");
+      setShowAddForm(false);
     } catch {
       alert("Det gick inte att lägga till. Försök igen.");
     } finally {
@@ -137,55 +147,9 @@ export default function DevPage() {
   const done    = filtered.filter((i) => i.done);
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="text-3xl">🛠</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Utvecklingssida
-          </h1>
-        </div>
-        <p className="text-slate-500 text-sm">
-          En tillfällig sida för att samla idéer, ändringar och uppgifter under sidans utveckling.
-        </p>
-      </div>
-
-      {/* Add new item */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
-        <h2 className="font-bold text-slate-900 mb-4">Lägg till</h2>
-        <form onSubmit={addItem} className="flex flex-col sm:flex-row gap-3">
-          <select
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value as DevItemCategory)}
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
-          >
-            {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
-              <option key={cat} value={cat}>
-                {categoryConfig[cat].emoji} {categoryConfig[cat].label}
-              </option>
-            ))}
-          </select>
-          <input
-            type="text"
-            value={newText}
-            onChange={(e) => setNewText(e.target.value)}
-            placeholder="Beskriv idén, ändringen eller uppgiften…"
-            className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
-            required
-          />
-          <button
-            type="submit"
-            disabled={adding || !newText.trim()}
-            className="px-5 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 shrink-0"
-          >
-            {adding ? "Lägger till…" : "+ Lägg till"}
-          </button>
-        </form>
-      </div>
-
+    <div className="pb-24">
       {/* Filter tabs */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-5 flex-wrap">
         {(["all", ...Object.keys(categoryConfig)] as (DevItemCategory | "all")[]).map((cat) => (
           <button
             key={cat}
@@ -204,59 +168,116 @@ export default function DevPage() {
       </div>
 
       {/* Items */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-        {loading ? (
-          <p className="text-slate-400 text-sm">Laddar…</p>
-        ) : items.length === 0 ? (
-          <p className="text-slate-400 text-sm">
-            Inga poster ännu. Lägg till en idé eller uppgift ovan!
-          </p>
-        ) : (
-          <div className="space-y-6">
-            {/* Pending items */}
-            {pending.length > 0 && (
-              <div>
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                  Att göra ({pending.length})
-                </h3>
-                <ul className="space-y-2">
-                  {pending.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      onToggle={() => toggleDone(item)}
-                      onDelete={() => removeItem(item)}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
+      {loading ? (
+        <p className="text-slate-400 text-sm">Laddar…</p>
+      ) : items.length === 0 ? (
+        <p className="text-slate-400 text-sm">
+          Inga poster ännu. Tryck på knappen nedan för att lägga till en idé eller uppgift!
+        </p>
+      ) : (
+        <div className="space-y-6">
+          {/* Pending items */}
+          {pending.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3">
+                ATT GÖRA ({pending.length})
+              </h3>
+              <ul className="space-y-2">
+                {pending.map((item) => (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    onToggle={() => toggleDone(item)}
+                    onDelete={() => removeItem(item)}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
 
-            {/* Done items */}
-            {done.length > 0 && (
-              <div>
-                <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
-                  Klart ({done.length})
-                </h3>
-                <ul className="space-y-2">
-                  {done.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      onToggle={() => toggleDone(item)}
-                      onDelete={() => removeItem(item)}
-                    />
-                  ))}
-                </ul>
-              </div>
-            )}
+          {/* Done items */}
+          {done.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3">
+                KLART ({done.length})
+              </h3>
+              <ul className="space-y-2">
+                {done.map((item) => (
+                  <ItemRow
+                    key={item.id}
+                    item={item}
+                    onToggle={() => toggleDone(item)}
+                    onDelete={() => removeItem(item)}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
 
-            {filtered.length === 0 && (
-              <p className="text-slate-400 text-sm">Inga poster i den här kategorin.</p>
-            )}
+          {filtered.length === 0 && (
+            <p className="text-slate-400 text-sm">Inga poster i den här kategorin.</p>
+          )}
+        </div>
+      )}
+
+      {/* Add item modal overlay */}
+      {showAddForm && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 flex items-end sm:items-center justify-center"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAddForm(false); }}
+        >
+          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-xl p-6">
+            <h2 className="font-bold text-slate-900 mb-4">Lägg till</h2>
+            <form onSubmit={addItem} className="flex flex-col gap-3">
+              <select
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value as DevItemCategory)}
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors"
+              >
+                {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {categoryConfig[cat].emoji} {categoryConfig[cat].label}
+                  </option>
+                ))}
+              </select>
+              <input
+                ref={inputRef}
+                type="text"
+                value={newText}
+                onChange={(e) => setNewText(e.target.value)}
+                placeholder="Beskriv idén, ändringen eller uppgiften…"
+                className="border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
+                required
+              />
+              <div className="flex gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="flex-1 px-4 py-2 text-sm font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button
+                  type="submit"
+                  disabled={adding || !newText.trim()}
+                  className="flex-1 px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50"
+                >
+                  {adding ? "Lägger till…" : "Lägg till"}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Floating action button */}
+      <button
+        onClick={() => setShowAddForm(true)}
+        aria-label="Lägg till ny post"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-orange-500 hover:bg-orange-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-colors z-30"
+      >
+        📋
+      </button>
     </div>
   );
 }
@@ -273,7 +294,7 @@ function ItemRow({
   const cat = categoryConfig[item.category];
 
   return (
-    <li className="flex items-start gap-3">
+    <li className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
       <button
         onClick={onToggle}
         aria-label={item.done ? "Markera som inte klart" : "Markera som klart"}
@@ -289,7 +310,7 @@ function ItemRow({
         <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-800"}`}>
           {item.text}
         </p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
           <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
             {cat.emoji} {cat.label}
           </span>
