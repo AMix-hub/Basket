@@ -15,6 +15,8 @@ import {
   deleteDoc,
   updateDoc,
   arrayRemove,
+  addDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 
@@ -39,6 +41,19 @@ interface TeamWithMembers extends TeamRow {
   members: ProfileRow[];
 }
 
+interface Hall {
+  id: string;
+  name: string;
+  address?: string;
+}
+
+interface TrainingFreePeriod {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
 const ALL_ROLES: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
 
 export default function AdminPage() {
@@ -48,6 +63,19 @@ export default function AdminPage() {
   const [teams, setTeams] = useState<TeamWithMembers[] | null>(null);
   const [removing, setRemoving] = useState<string | null>(null); // userId being removed
   const [changingRole, setChangingRole] = useState<string | null>(null); // userId having role changed
+
+  // Halls state
+  const [halls, setHalls] = useState<Hall[]>([]);
+  const [newHallName, setNewHallName] = useState("");
+  const [newHallAddress, setNewHallAddress] = useState("");
+  const [addingHall, setAddingHall] = useState(false);
+
+  // Training-free periods state
+  const [freePeriods, setFreePeriods] = useState<TrainingFreePeriod[]>([]);
+  const [newPeriodName, setNewPeriodName] = useState("");
+  const [newPeriodStart, setNewPeriodStart] = useState("");
+  const [newPeriodEnd, setNewPeriodEnd] = useState("");
+  const [addingPeriod, setAddingPeriod] = useState(false);
 
   // Create team form state
   const [newTeamName, setNewTeamName] = useState("");
@@ -132,6 +160,103 @@ export default function AdminPage() {
     if (!user?.roles.includes("admin")) return;
     loadTeams(user.id);
   }, [user, loadTeams]);
+
+  // Load halls for this admin
+  useEffect(() => {
+    if (!user?.roles.includes("admin")) return;
+    const q = query(collection(db, "halls"), where("adminId", "==", user.id));
+    const unsub = onSnapshot(q, (snap) => {
+      setHalls(
+        snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          address: (d.data().address as string | undefined) ?? undefined,
+        }))
+      );
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Load training-free periods for this admin
+  useEffect(() => {
+    if (!user?.roles.includes("admin")) return;
+    const q = query(collection(db, "training_free_periods"), where("adminId", "==", user.id));
+    const unsub = onSnapshot(q, (snap) => {
+      setFreePeriods(
+        snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          startDate: d.data().startDate as string,
+          endDate: d.data().endDate as string,
+        }))
+      );
+    });
+    return () => unsub();
+  }, [user]);
+
+  const handleAddHall = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHallName.trim() || !user) return;
+    setAddingHall(true);
+    try {
+      await addDoc(collection(db, "halls"), {
+        name: newHallName.trim(),
+        address: newHallAddress.trim() || null,
+        adminId: user.id,
+        createdAt: new Date().toISOString(),
+      });
+      setNewHallName("");
+      setNewHallAddress("");
+    } catch {
+      alert("Kunde inte lägga till hall. Försök igen.");
+    } finally {
+      setAddingHall(false);
+    }
+  };
+
+  const handleDeleteHall = async (hallId: string) => {
+    if (!confirm("Är du säker på att du vill ta bort denna hall?")) return;
+    try {
+      await deleteDoc(doc(db, "halls", hallId));
+    } catch {
+      alert("Kunde inte ta bort hall. Försök igen.");
+    }
+  };
+
+  const handleAddFreePeriod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPeriodName.trim() || !newPeriodStart || !newPeriodEnd || !user) return;
+    if (newPeriodEnd < newPeriodStart) {
+      alert("Slutdatum måste vara efter startdatum.");
+      return;
+    }
+    setAddingPeriod(true);
+    try {
+      await addDoc(collection(db, "training_free_periods"), {
+        name: newPeriodName.trim(),
+        startDate: newPeriodStart,
+        endDate: newPeriodEnd,
+        adminId: user.id,
+        createdAt: new Date().toISOString(),
+      });
+      setNewPeriodName("");
+      setNewPeriodStart("");
+      setNewPeriodEnd("");
+    } catch {
+      alert("Kunde inte lägga till träningsfri period. Försök igen.");
+    } finally {
+      setAddingPeriod(false);
+    }
+  };
+
+  const handleDeleteFreePeriod = async (periodId: string) => {
+    if (!confirm("Är du säker på att du vill ta bort denna period?")) return;
+    try {
+      await deleteDoc(doc(db, "training_free_periods", periodId));
+    } catch {
+      alert("Kunde inte ta bort period. Försök igen.");
+    }
+  };
 
   const copyToClipboard = async (text: string, key: string) => {
     try {
@@ -491,6 +616,144 @@ export default function AdminPage() {
                 </li>
               );
             })}
+          </ul>
+        )}
+      </div>
+
+      {/* Hall management */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
+        <h2 className="font-bold text-slate-900 mb-1">🏟 Hallar</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Lägg till träningshallar som coacher kan välja när de schemalägger träningar.
+        </p>
+
+        <form onSubmit={handleAddHall} className="space-y-2 mb-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newHallName}
+              onChange={(e) => setNewHallName(e.target.value)}
+              placeholder="Hallens namn, t.ex. Kristineberg Arena"
+              required
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newHallAddress}
+              onChange={(e) => setNewHallAddress(e.target.value)}
+              placeholder="Adress (valfritt)"
+              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            <button
+              type="submit"
+              disabled={addingHall || !newHallName.trim()}
+              className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors shrink-0"
+            >
+              {addingHall ? "…" : "+ Lägg till"}
+            </button>
+          </div>
+        </form>
+
+        {halls.length === 0 ? (
+          <p className="text-slate-400 text-sm">Inga hallar tillagda ännu.</p>
+        ) : (
+          <ul className="space-y-2">
+            {halls.map((hall) => (
+              <li key={hall.id} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-800">{hall.name}</p>
+                  {hall.address && (
+                    <p className="text-xs text-slate-400">{hall.address}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDeleteHall(hall.id)}
+                  className="text-xs text-red-500 hover:text-red-700 font-semibold shrink-0"
+                >
+                  Ta bort
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Training-free periods */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
+        <h2 className="font-bold text-slate-900 mb-1">🚫 Träningsfria perioder</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Lägg till perioder då det inte är träning (t.ex. höstlov, jullov). Träningar skapas inte
+          automatiskt på dessa datum när du schemalägger återkommande pass.
+        </p>
+
+        <form onSubmit={handleAddFreePeriod} className="space-y-2 mb-4">
+          <input
+            type="text"
+            value={newPeriodName}
+            onChange={(e) => setNewPeriodName(e.target.value)}
+            placeholder="Periodens namn, t.ex. Jullov"
+            required
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+          />
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-xs text-slate-500 block mb-0.5">Startdatum</label>
+              <input
+                type="date"
+                value={newPeriodStart}
+                onChange={(e) => setNewPeriodStart(e.target.value)}
+                required
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-slate-500 block mb-0.5">Slutdatum</label>
+              <input
+                type="date"
+                value={newPeriodEnd}
+                min={newPeriodStart}
+                onChange={(e) => setNewPeriodEnd(e.target.value)}
+                required
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={addingPeriod || !newPeriodName.trim() || !newPeriodStart || !newPeriodEnd}
+            className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors"
+          >
+            {addingPeriod ? "…" : "+ Lägg till period"}
+          </button>
+        </form>
+
+        {freePeriods.length === 0 ? (
+          <p className="text-slate-400 text-sm">Inga träningsfria perioder tillagda ännu.</p>
+        ) : (
+          <ul className="space-y-2">
+            {freePeriods
+              .slice()
+              .sort((a, b) => a.startDate.localeCompare(b.startDate))
+              .map((period) => (
+                <li key={period.id} className="flex items-center gap-3 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-purple-900">{period.name}</p>
+                    <p className="text-xs text-purple-500">
+                      {new Date(period.startDate + "T12:00:00").toLocaleDateString("sv-SE", { day: "numeric", month: "long" })}
+                      {" – "}
+                      {new Date(period.endDate + "T12:00:00").toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteFreePeriod(period.id)}
+                    className="text-xs text-red-500 hover:text-red-700 font-semibold shrink-0"
+                  >
+                    Ta bort
+                  </button>
+                </li>
+              ))}
           </ul>
         )}
       </div>

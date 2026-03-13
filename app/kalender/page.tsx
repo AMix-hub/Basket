@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   collection,
   query,
@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 import { useAuth } from "../context/AuthContext";
+import type { Team } from "../context/AuthContext";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Player {
@@ -27,7 +28,24 @@ interface TrainingSession {
   title: string;
   type: "träning" | "match";
   time: string; // HH:MM
+  endTime?: string; // HH:MM
+  hallId?: string;
+  hallName?: string;
   recurringGroupId?: string;
+}
+
+interface Hall {
+  id: string;
+  name: string;
+  adminId: string;
+}
+
+interface TrainingFreePeriod {
+  id: string;
+  name: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  adminId: string;
 }
 
 type AttendanceStatus = "present" | "absent" | "sick";
@@ -36,6 +54,11 @@ interface Attendance {
   sessionId: string;
   playerId: string;
   status: AttendanceStatus;
+}
+
+/** Returns true if `date` falls within any training-free period. */
+function isInFreePeriod(date: string, periods: TrainingFreePeriod[]): boolean {
+  return periods.some((p) => date >= p.startDate && date <= p.endDate);
 }
 
 /* ─── Helpers ────────────────────────────────────────────────── */
@@ -96,8 +119,15 @@ const ATTENDANCE_KEY = "basketball_attendance";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function KalenderPage() {
-  const { user, getMyTeam } = useAuth();
-  const team = getMyTeam();
+  const { user, getMyTeam, getAllTeams } = useAuth();
+  const defaultTeam = getMyTeam();
+
+  // For admins with multiple teams, allow selecting which team to view/add to
+  const [allTeams, setAllTeams] = useState<Team[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  // Resolved team: the currently-selected team (or the default team)
+  const team = allTeams.find((t) => t.id === selectedTeamId) ?? defaultTeam;
+
   const canEdit =
     user?.roles.some((r) => r === "coach" || r === "admin" || r === "assistant") ?? false;
 
@@ -108,6 +138,8 @@ export default function KalenderPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [halls, setHalls] = useState<Hall[]>([]);
+  const [freePeriods, setFreePeriods] = useState<TrainingFreePeriod[]>([]);
 
   // Modal state
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -117,6 +149,8 @@ export default function KalenderPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState<"träning" | "match">("träning");
   const [newTime, setNewTime] = useState("17:00");
+  const [newEndTime, setNewEndTime] = useState("18:30");
+  const [newHallId, setNewHallId] = useState("");
 
   // Recurring session fields
   const [isRecurring, setIsRecurring] = useState(false);
@@ -142,6 +176,51 @@ export default function KalenderPage() {
     if (a) setAttendance(JSON.parse(a));
   }, []);
 
+  // For admins: load all teams so they can switch between teams in the calendar
+  const loadAllTeams = useCallback(async () => {
+    if (!user?.roles.includes("admin")) return;
+    const fetched = await getAllTeams();
+    const adminTeams = fetched.filter((t) => t.adminId === user.id);
+    setAllTeams(adminTeams);
+    setSelectedTeamId((prev) => prev ?? (adminTeams.length > 0 ? adminTeams[0].id : null));
+  }, [user, getAllTeams]);
+
+  useEffect(() => {
+    loadAllTeams();
+  }, [loadAllTeams]);
+
+  // Load halls belonging to the admin of this team (or current user if admin)
+  useEffect(() => {
+    if (!user) return;
+    const adminId = user.roles.includes("admin") ? user.id : team?.adminId;
+    if (!adminId) return;
+    const q = query(collection(db, "halls"), where("adminId", "==", adminId));
+    const unsub = onSnapshot(q, (snap) => {
+      setHalls(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string, adminId: d.data().adminId as string })));
+    });
+    return () => unsub();
+  }, [user, team]);
+
+  // Load training-free periods for the admin of this team
+  useEffect(() => {
+    if (!user) return;
+    const adminId = user.roles.includes("admin") ? user.id : team?.adminId;
+    if (!adminId) return;
+    const q = query(collection(db, "training_free_periods"), where("adminId", "==", adminId));
+    const unsub = onSnapshot(q, (snap) => {
+      setFreePeriods(
+        snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          startDate: d.data().startDate as string,
+          endDate: d.data().endDate as string,
+          adminId: d.data().adminId as string,
+        }))
+      );
+    });
+    return () => unsub();
+  }, [user, team]);
+
   // Subscribe to Firestore sessions for this team
   useEffect(() => {
     if (!team) {
@@ -156,6 +235,9 @@ export default function KalenderPage() {
         title: d.data().title as string,
         type: d.data().type as "träning" | "match",
         time: d.data().time as string,
+        endTime: (d.data().endTime as string | undefined) ?? undefined,
+        hallId: (d.data().hallId as string | undefined) ?? undefined,
+        hallName: (d.data().hallName as string | undefined) ?? undefined,
         recurringGroupId:
           (d.data().recurringGroupId as string | undefined) ?? undefined,
       }));
@@ -197,9 +279,16 @@ export default function KalenderPage() {
   const addSession = async () => {
     if (!newTitle.trim() || !team || !user) return;
 
+    const selectedHall = halls.find((h) => h.id === newHallId);
+    const hallFields = selectedHall
+      ? { hallId: selectedHall.id, hallName: selectedHall.name }
+      : {};
+
     if (isRecurring) {
       if (!recurStartDate || !recurEndDate || recurEndDate < recurStartDate) return;
-      const dates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
+      const allDates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
+      // Skip training-free periods
+      const dates = allDates.filter((d) => !isInFreePeriod(d, freePeriods));
       if (dates.length === 0) return;
       const groupId = crypto.randomUUID();
       // Firestore batches support up to 500 operations; commit all in parallel
@@ -214,6 +303,8 @@ export default function KalenderPage() {
             title: newTitle.trim(),
             type: newType,
             time: newTime,
+            endTime: newEndTime || null,
+            ...hallFields,
             createdBy: user.id,
             recurringGroupId: groupId,
           });
@@ -229,6 +320,8 @@ export default function KalenderPage() {
         title: newTitle.trim(),
         type: newType,
         time: newTime,
+        endTime: newEndTime || null,
+        ...hallFields,
         createdBy: user.id,
       });
     }
@@ -236,6 +329,8 @@ export default function KalenderPage() {
     setNewTitle("");
     setNewType("träning");
     setNewTime("17:00");
+    setNewEndTime("18:30");
+    setNewHallId("");
     setIsRecurring(false);
   };
 
@@ -247,6 +342,7 @@ export default function KalenderPage() {
 
   const confirmDelete = async () => {
     if (!cancellingSession || !team || !user) return;
+    if (!cancelReason.trim()) return; // reason is mandatory
     setCancelBusy(true);
     try {
       await deleteDoc(doc(db, "sessions", cancellingSession.id));
@@ -256,41 +352,39 @@ export default function KalenderPage() {
       saveAttendance(updatedAtt);
       if (selectedSession?.id === cancellingSession.id) setSelectedSession(null);
 
-      // Post cancellation message to team chat if reason given
-      if (cancelReason.trim()) {
-        const dateLabel = new Date(
-          cancellingSession.date + "T12:00:00"
-        ).toLocaleDateString("sv-SE", {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-        });
-        await addDoc(collection(db, "messages"), {
-          teamId: team.id,
-          senderId: user.id,
-          senderName: user.name,
-          recipientId: null,
-          text: `⚠️ ${cancellingSession.title} (${dateLabel} ${cancellingSession.time}) är inställt. Anledning: ${cancelReason.trim()}`,
-          sentAt: new Date().toISOString(),
-          readBy: [user.id],
-        });
+      // Post cancellation message to team chat (reason is always required now)
+      const dateLabel = new Date(
+        cancellingSession.date + "T12:00:00"
+      ).toLocaleDateString("sv-SE", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      });
+      await addDoc(collection(db, "messages"), {
+        teamId: team.id,
+        senderId: user.id,
+        senderName: user.name,
+        recipientId: null,
+        text: `⚠️ ${cancellingSession.title} (${dateLabel} ${cancellingSession.time}) är inställt. Anledning: ${cancelReason.trim()}`,
+        sentAt: new Date().toISOString(),
+        readBy: [user.id],
+      });
 
-        // Send push notification + email to all team members via API route.
-        // This is fire-and-forget (non-blocking) — UI doesn't wait for it.
-        fetch("/api/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            teamId: team.id,
-            sessionTitle: cancellingSession.title,
-            sessionDate: cancellingSession.date,
-            sessionTime: cancellingSession.time,
-            reason: cancelReason.trim(),
-          }),
-        }).catch((err) => {
-          console.warn("[notify] Push/email notification failed:", err);
-        });
-      }
+      // Send push notification + email to all team members via API route.
+      // This is fire-and-forget (non-blocking) — UI doesn't wait for it.
+      fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamId: team.id,
+          sessionTitle: cancellingSession.title,
+          sessionDate: cancellingSession.date,
+          sessionTime: cancellingSession.time,
+          reason: cancelReason.trim(),
+        }),
+      }).catch((err) => {
+        console.warn("[notify] Push/email notification failed:", err);
+      });
     } finally {
       setCancelBusy(false);
       setCancellingSession(null);
@@ -456,15 +550,17 @@ export default function KalenderPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
             <h3 className="font-bold text-slate-900 mb-1">Ställ in pass</h3>
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-slate-500 mb-1">
               Vill du ställa in{" "}
-              <strong>{cancellingSession.title}</strong>? Skriv en anledning så
-              meddelas laget via chatten.
+              <strong>{cancellingSession.title}</strong>?
+            </p>
+            <p className="text-xs text-red-600 font-medium mb-3">
+              * Anledning är obligatorisk – laget meddelas via chatten.
             </p>
             <textarea
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Anledning (valfritt)..."
+              placeholder="Ange anledning till inställningen..."
               rows={3}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none mb-4"
             />
@@ -479,7 +575,7 @@ export default function KalenderPage() {
                 Avbryt
               </button>
               <button
-                disabled={cancelBusy}
+                disabled={cancelBusy || !cancelReason.trim()}
                 onClick={confirmDelete}
                 className="flex-1 py-2 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
@@ -502,6 +598,29 @@ export default function KalenderPage() {
           <p className="text-slate-500 text-sm">
             Schemalägg träningar och matcher. Registrera närvaro för varje pass.
           </p>
+          {/* Team selector for admins with multiple teams */}
+          {user?.roles.includes("admin") && allTeams.length > 1 && (
+            <div className="mt-3">
+              <label className="text-xs font-semibold text-slate-500 block mb-1">
+                Visa lag:
+              </label>
+              <select
+                value={selectedTeamId ?? ""}
+                onChange={(e) => {
+                  setSelectedTeamId(e.target.value);
+                  setSelectedSession(null);
+                  setSelectedDate(null);
+                }}
+                className="px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              >
+                {allTeams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.ageGroup})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <button
           onClick={() => setShowPlayerPanel((s) => !s)}
@@ -565,6 +684,7 @@ export default function KalenderPage() {
               const isToday = ymd === toYMD(today);
               const daySessions = sessionsOnDate(ymd);
               const isSelected = selectedDate === ymd;
+              const isFreePeriod = isInFreePeriod(ymd, freePeriods);
 
               return (
                 <button
@@ -573,15 +693,25 @@ export default function KalenderPage() {
                     setSelectedDate(ymd);
                     setSelectedSession(null);
                   }}
+                  title={
+                    isFreePeriod
+                      ? freePeriods.find((p) => ymd >= p.startDate && ymd <= p.endDate)?.name
+                      : undefined
+                  }
                   className={`aspect-square rounded-xl flex flex-col items-center pt-1.5 pb-1 px-0.5 text-xs transition-all relative ${
                     isSelected
                       ? "bg-orange-500 text-white shadow-md"
+                      : isFreePeriod
+                      ? "bg-purple-100 text-purple-600 border border-purple-200"
                       : isToday
                       ? "bg-orange-100 text-orange-700 font-bold"
                       : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-100"
                   }`}
                 >
                   <span className="font-semibold">{date.getDate()}</span>
+                  {isFreePeriod && !daySessions.length && (
+                    <span className="text-purple-400 text-[8px] leading-none mt-0.5">🚫</span>
+                  )}
                   {daySessions.length > 0 && (
                     <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
                       {daySessions.map((s) => (
@@ -604,7 +734,7 @@ export default function KalenderPage() {
           </div>
 
           {/* Legend */}
-          <div className="flex gap-4 mt-3 text-xs text-slate-500">
+          <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-500">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
               Träning
@@ -613,6 +743,12 @@ export default function KalenderPage() {
               <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
               Match
             </div>
+            {freePeriods.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-300 inline-block" />
+                Träningsfri period
+              </div>
+            )}
           </div>
         </div>
 
@@ -634,6 +770,13 @@ export default function KalenderPage() {
               </h3>
 
               {/* Sessions on this date */}
+              {/* Training-free period notice */}
+              {isInFreePeriod(selectedDate, freePeriods) && (
+                <div className="mb-3 px-3 py-2 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-700 font-medium">
+                  🚫 Träningsfri period:{" "}
+                  {freePeriods.find((p) => selectedDate >= p.startDate && selectedDate <= p.endDate)?.name}
+                </div>
+              )}
               {sessionsOnDate(selectedDate).map((s) => {
                 const summary = attendanceSummary(s.id);
                 return (
@@ -651,7 +794,7 @@ export default function KalenderPage() {
                     }
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                             s.type === "match"
@@ -661,7 +804,14 @@ export default function KalenderPage() {
                         >
                           {s.type === "match" ? "Match" : "Träning"}
                         </span>
-                        <span className="text-xs text-slate-500">{s.time}</span>
+                        <span className="text-xs text-slate-500">
+                          {s.time}{s.endTime ? `–${s.endTime}` : ""}
+                        </span>
+                        {s.hallName && (
+                          <span className="text-xs text-blue-600 font-medium">
+                            🏟 {s.hallName}
+                          </span>
+                        )}
                         {s.recurringGroupId && (
                           <span
                             className="text-xs text-blue-500"
@@ -720,13 +870,41 @@ export default function KalenderPage() {
                       <option value="träning">Träning</option>
                       <option value="match">Match</option>
                     </select>
-                    <input
-                      type="time"
-                      value={newTime}
-                      onChange={(e) => setNewTime(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                    />
                   </div>
+                  {/* Start and end time */}
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-slate-500 block mb-0.5">Starttid</label>
+                      <input
+                        type="time"
+                        value={newTime}
+                        onChange={(e) => setNewTime(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-slate-500 block mb-0.5">Sluttid</label>
+                      <input
+                        type="time"
+                        value={newEndTime}
+                        onChange={(e) => setNewEndTime(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                    </div>
+                  </div>
+                  {/* Hall selector */}
+                  {halls.length > 0 && (
+                    <select
+                      value={newHallId}
+                      onChange={(e) => setNewHallId(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                    >
+                      <option value="">🏟 Välj hall (valfritt)</option>
+                      {halls.map((h) => (
+                        <option key={h.id} value={h.id}>{h.name}</option>
+                      ))}
+                    </select>
+                  )}
 
                   {/* Recurring toggle */}
                   <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -792,18 +970,21 @@ export default function KalenderPage() {
                       </div>
                       {recurStartDate &&
                         recurEndDate &&
-                        recurEndDate >= recurStartDate && (
-                          <p className="text-xs text-blue-600">
-                            {
-                              getRecurringDates(
-                                recurStartDate,
-                                recurEndDate,
-                                recurWeekday
-                              ).length
-                            }{" "}
-                            pass kommer att skapas
-                          </p>
-                        )}
+                        recurEndDate >= recurStartDate && (() => {
+                          const allDates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
+                          const filtered = allDates.filter((d) => !isInFreePeriod(d, freePeriods));
+                          const skipped = allDates.length - filtered.length;
+                          return (
+                            <div className="text-xs text-blue-600 space-y-0.5">
+                              <p>{filtered.length} pass kommer att skapas</p>
+                              {skipped > 0 && (
+                                <p className="text-purple-600">
+                                  🚫 {skipped} datum hoppas över (träningsfria perioder)
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </div>
                   )}
 
