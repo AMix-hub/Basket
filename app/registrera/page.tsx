@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
+import { SPORTS } from "../../lib/sports";
+import type { SportId } from "../../lib/sports";
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -13,6 +15,7 @@ export default function RegisterPage() {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [clubName, setClubName] = useState("");
+  const [sport, setSport]       = useState<SportId>("basket");
   const [error, setError]       = useState("");
   const [busy, setBusy]         = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -40,12 +43,13 @@ export default function RegisterPage() {
       undefined,
       undefined,
       undefined,
-      clubName.trim()
+      clubName.trim(),
+      sport
     );
     setBusy(false);
 
     if (result === null) {
-      router.push("/");
+      router.push(`/${sport}`);
     } else if (result === "CONFIRM_EMAIL") {
       setEmailSent(true);
     } else {
@@ -150,6 +154,30 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* Sport selector */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Sport
+              </label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {SPORTS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSport(s.id)}
+                    className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all flex items-center gap-2 ${
+                      sport === s.id
+                        ? "bg-orange-500 text-white border-orange-500"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:border-orange-300"
+                    }`}
+                  >
+                    <span>{s.emoji}</span>
+                    <span>{s.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {error && (
               <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
                 {error}
@@ -194,3 +222,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+

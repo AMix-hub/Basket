@@ -5,12 +5,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useUnreadCount } from "../hooks/useUnreadCount";
 import { roleEmoji } from "../../lib/roleLabels";
+import { getSport } from "../../lib/sports";
 
-const yearLinks = [
+const basketYearLinks = [
   { href: "/ar1", label: "År 1", sub: "≤7 år" },
   { href: "/ar2", label: "År 2", sub: "8 år" },
   { href: "/ar3", label: "År 3", sub: "9 år" },
 ];
+
+function getSportYearLinks(sportId: string) {
+  if (sportId === "basket") return basketYearLinks;
+  return [
+    { href: `/${sportId}/ar1`, label: "År 1", sub: "≤7 år" },
+    { href: `/${sportId}/ar2`, label: "År 2", sub: "8 år" },
+    { href: `/${sportId}/ar3`, label: "År 3", sub: "9 år" },
+  ];
+}
 
 const mainLinks = [
   { href: "/taktik", label: "Taktiktavla" },
@@ -25,6 +35,11 @@ export default function Navbar() {
   const { user, loading, logout } = useAuth();
   const unread = useUnreadCount();
 
+  const sportId = user?.sport ?? "basket";
+  const sport = getSport(sportId);
+  const yearLinks = getSportYearLinks(sportId);
+  const sportHome = sportId === "basket" ? "/basket" : `/${sportId}`;
+
   const handleLogout = async () => {
     await logout();
     router.push("/");
@@ -37,7 +52,7 @@ export default function Navbar() {
       : user?.roles.includes("admin")
       ? [{ href: "/admin", label: "🏛 Admin" }, { href: "/dev", label: "🛠 Utveckling" }]
       : user?.roles.some((r) => ["coach", "assistant", "player"].includes(r))
-      ? [{ href: "/lag", label: "🏀 Laget" }]
+      ? [{ href: "/lag", label: `${sport.emoji} Laget` }]
       : [];
 
   return (
@@ -49,11 +64,11 @@ export default function Navbar() {
         <div className="flex items-center gap-2 overflow-x-auto py-2.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* Logo */}
           <Link
-            href="/"
+            href={user ? sportHome : "/"}
             className="flex items-center gap-2 py-1 text-white hover:text-orange-400 transition-colors shrink-0 mr-2"
           >
-            <span className="text-2xl leading-none">🏀</span>
-            <span className="text-lg font-bold tracking-tight">Basket</span>
+            <span className="text-2xl leading-none">{sport.emoji}</span>
+            <span className="text-lg font-bold tracking-tight">{sport.name}</span>
           </Link>
 
           <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />

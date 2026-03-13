@@ -29,6 +29,7 @@ import {
 } from "firebase/firestore";
 import { auth, db, getClientMessaging } from "../../lib/firebaseClient";
 import { getToken } from "firebase/messaging";
+import type { SportId } from "../../lib/sports";
 
 /* ─── Types ──────────────────────────────────────────────── */
 
@@ -45,6 +46,8 @@ export interface User {
   childName?: string;        // parent: child's name in the player list
   coachInviteCode?: string;  // admin:  code coaches use to register
   clubName?: string;         // admin:  association / club name
+  /** Sport this user / club is associated with (defaults to "basket"). */
+  sport?: SportId;
   createdAt: string;
 }
 
@@ -55,6 +58,7 @@ export interface Team {
   coachId: string;
   adminId: string;
   clubName: string;
+  sport: SportId;
   memberIds: string[];
   inviteCode: string;        // assistants
   parentInviteCode: string;  // parents
@@ -83,7 +87,8 @@ interface AuthContextType {
     ageGroup?: string,
     inviteCode?: string,
     childName?: string,
-    clubName?: string
+    clubName?: string,
+    sport?: SportId
   ) => Promise<string | null>;
   joinTeam: (inviteCode: string, childName?: string) => Promise<boolean>;
   getMyTeam: () => Team | null;
@@ -111,6 +116,8 @@ interface DbProfile {
   coachInviteCode: string | null;
   childName: string | null;
   createdAt: string;
+  /** Sport this user is associated with (defaults to "basket"). */
+  sport?: string;
   /** Email stored for push/email notification delivery. */
   email?: string;
   /** FCM token for device push notifications (updated on every login). */
@@ -123,6 +130,7 @@ interface DbTeam {
   coachId: string | null;
   adminId: string;
   clubName: string;
+  sport?: string;
   memberIds: string[];
   inviteCode: string;
   parentInviteCode: string;
@@ -146,6 +154,7 @@ function toUser(id: string, p: DbProfile, email: string): User {
     childName: p.childName ?? undefined,
     coachInviteCode: p.coachInviteCode ?? undefined,
     clubName: p.clubName ?? undefined,
+    sport: (p.sport as SportId | undefined) ?? "basket",
     createdAt: p.createdAt,
   };
 }
@@ -158,6 +167,7 @@ function toTeam(id: string, t: DbTeam): Team {
     coachId: t.coachId ?? "",
     adminId: t.adminId,
     clubName: t.clubName,
+    sport: (t.sport as SportId | undefined) ?? "basket",
     memberIds: t.memberIds ?? [],
     inviteCode: t.inviteCode,
     parentInviteCode: t.parentInviteCode,
@@ -416,7 +426,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ageGroup?: string,
     inviteCode?: string,
     childName?: string,
-    clubName?: string
+    clubName?: string,
+    sport?: SportId
   ): Promise<string | null> => {
     try {
 
@@ -487,6 +498,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clubName:        role === "admin"  ? (clubName  ?? null) : null,
       childName:       role === "parent" ? (childName ?? null) : null,
       coachInviteCode: role === "admin"  ? generateCode()      : null,
+      sport:           sport ?? "basket",
       createdAt:       new Date().toISOString(),
     };
     await setDoc(doc(db, "profiles", userId), newProfile);
@@ -502,6 +514,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coachId:           userId,
         adminId:           invitingAdminId,
         clubName:          invitingAdminClubName ?? "",
+        sport:             sport ?? "basket",
         memberIds:         [userId, invitingAdminId],
         inviteCode:        generateCode(),
         parentInviteCode:  generateCode(),
@@ -627,6 +640,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coachId: null,
         adminId: user.id,
         clubName: user.clubName ?? "",
+        sport: user.sport ?? "basket",
         memberIds: [user.id],
         inviteCode: generateCode(),
         parentInviteCode: generateCode(),
