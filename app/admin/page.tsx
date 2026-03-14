@@ -57,6 +57,9 @@ interface TrainingFreePeriod {
 
 const ALL_ROLES: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
 
+const BYTES_PER_KB = 1024;
+const BYTES_PER_MB = 1024 * 1024;
+
 export default function AdminPage() {
   const { user, createTeam, updateClubLogo, updateClubLogoUrl } = useAuth();
   const [copied, setCopied] = useState<string | null>(null);
@@ -90,6 +93,8 @@ export default function AdminPage() {
   const [logoSuccess, setLogoSuccess] = useState(false);
   const [logoUrlInput, setLogoUrlInput] = useState("");
   const [logoUrlSaving, setLogoUrlSaving] = useState(false);
+  const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
 
   const loadTeams = useCallback(async (adminId: string) => {
     /* Fetch all teams belonging to this admin */
@@ -336,13 +341,32 @@ export default function AdminPage() {
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const clearLogoPreview = () => {
+    setSelectedLogoFile(null);
+    setLogoPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
+  const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    clearLogoPreview();
+    setSelectedLogoFile(file);
+    setLogoPreviewUrl(URL.createObjectURL(file));
+    setLogoError(null);
+    setLogoSuccess(false);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  const handleLogoUpload = async () => {
+    if (!selectedLogoFile) return;
     setLogoUploading(true);
     setLogoError(null);
     setLogoSuccess(false);
-    const err = await updateClubLogo(file);
+    const err = await updateClubLogo(selectedLogoFile);
     if (err) {
       setLogoError(err);
     } else {
@@ -350,8 +374,12 @@ export default function AdminPage() {
       setTimeout(() => setLogoSuccess(false), 3000);
     }
     setLogoUploading(false);
-    // Reset file input
-    e.target.value = "";
+    clearLogoPreview();
+  };
+
+  const handleLogoCancelSelect = () => {
+    clearLogoPreview();
+    setLogoError(null);
   };
 
   const handleLogoUrlSave = async (e: React.FormEvent) => {
@@ -468,13 +496,13 @@ export default function AdminPage() {
                   : "bg-orange-500 hover:bg-orange-600 text-white"
               }`}
             >
-              {logoUploading ? "Laddar upp…" : "📷 Välj bild"}
+              📷 Välj bild
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/gif,image/webp"
                 className="hidden"
                 disabled={logoUploading}
-                onChange={handleLogoUpload}
+                onChange={handleLogoFileSelect}
               />
             </label>
             <p className="text-xs text-slate-400">
@@ -482,6 +510,56 @@ export default function AdminPage() {
             </p>
           </div>
         </div>
+
+        {/* Selected file preview – shown after file is chosen, before upload */}
+        {selectedLogoFile && (
+          <div className="mb-4 flex items-center gap-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex-wrap">
+            {logoPreviewUrl && (
+              <Image
+                src={logoPreviewUrl}
+                alt="Förhandsvisning"
+                width={56}
+                height={56}
+                unoptimized
+                className="rounded-lg object-cover border border-slate-200 shrink-0"
+              />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-slate-800 truncate">
+                {selectedLogoFile.name}
+              </p>
+              <p className="text-xs text-slate-500">
+                {selectedLogoFile.size < BYTES_PER_MB
+                  ? `${(selectedLogoFile.size / BYTES_PER_KB).toFixed(1)} KB`
+                  : `${(selectedLogoFile.size / BYTES_PER_MB).toFixed(1)} MB`}
+                {" · "}
+                {selectedLogoFile.type}
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={handleLogoUpload}
+                disabled={logoUploading}
+                className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+                  logoUploading
+                    ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    : "bg-orange-500 hover:bg-orange-600 text-white"
+                }`}
+              >
+                {logoUploading ? "Laddar upp…" : "⬆ Ladda upp"}
+              </button>
+              <button
+                type="button"
+                onClick={handleLogoCancelSelect}
+                disabled={logoUploading}
+                className="px-3 py-2 text-sm font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Link logo via URL */}
         <div className="border-t border-slate-100 pt-4">
