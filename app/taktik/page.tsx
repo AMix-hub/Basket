@@ -84,6 +84,8 @@ const R_TP3_X = 630;
 
 const ANIM_MS = 1200;
 const HOME_NAMES = ["PG", "SG", "SF", "PF", "C"];
+const MIN_SHAPE_DIST = 5;
+const MIN_LINE_DIST  = 10;
 
 const TACTICAL_ROLES = [
   "Ball Handler",
@@ -516,7 +518,7 @@ export default function TaktikPage() {
     if (drawStart && drawCursor) {
       const dx = drawCursor.x - drawStart.x;
       const dy = drawCursor.y - drawStart.y;
-      const minDist = ["circle", "rect", "zone"].includes(tool) ? 5 : 10;
+      const minDist = ["circle", "rect", "zone"].includes(tool) ? MIN_SHAPE_DIST : MIN_LINE_DIST;
       if (Math.sqrt(dx * dx + dy * dy) > minDist) {
         const color =
           tool === "arrow"  ? ARROW_COLOR
@@ -632,19 +634,20 @@ export default function TaktikPage() {
       if (suppressRef.current > 0) { suppressRef.current -= 1; return; }
       const live = snap.data();
       if (live.steps?.length) {
-        setSteps(live.steps as Step[]);
+        const liveSteps = live.steps as Step[];
+        setSteps(liveSteps);
         if (typeof live.currentStepIdx === "number") setCurrentStepIdx(live.currentStepIdx);
         if (typeof live.coachNotes === "string") setCoachNotes(live.coachNotes);
-        if (live.animationPlaying && live.animationStartTime && (live.steps as Step[]).length >= 2) {
+        if (live.animationPlaying && live.animationStartTime && liveSteps.length >= 2) {
           const elapsed = Date.now() - new Date(live.animationStartTime as string).getTime();
-          const total   = ((live.steps as Step[]).length - 1) * ANIM_MS;
+          const total   = (liveSteps.length - 1) * ANIM_MS;
           if (elapsed < total) {
-            const si          = Math.min(Math.floor(elapsed / ANIM_MS), (live.steps as Step[]).length - 2);
+            const si          = Math.min(Math.floor(elapsed / ANIM_MS), liveSteps.length - 2);
             const stepElapsed = elapsed - si * ANIM_MS;
             animStateRef.current = {
               isPlaying: true, stepIdx: si,
               stepStart: performance.now() - stepElapsed,
-              steps: live.steps as Step[],
+              steps: liveSteps,
             };
             setPlayStepIdx(si);
             setIsPlaying(true);
@@ -746,7 +749,7 @@ export default function TaktikPage() {
         if (!b) return;
         const a = document.createElement("a");
         a.href = URL.createObjectURL(b);
-        a.download = `${tacticName || "taktik"}-steg${currentStepIdx + 1}.png`;
+        a.download = `${(tacticName || "taktik").replace(/[^\w\s-]/g, "").trim()}-steg${currentStepIdx + 1}.png`;
         a.click();
         URL.revokeObjectURL(a.href);
       });

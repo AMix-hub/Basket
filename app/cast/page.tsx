@@ -8,7 +8,9 @@ import { db } from "@/lib/firebaseClient";
 /* ─── Types (mirrors taktik/page.tsx) ───────────────────────── */
 interface Player {
   id: string;
+  /** Legacy format (old tactic board) */
   type?: "O" | "X";
+  /** New format (current tactic board) — mutually exclusive with `type` */
   team?: "home" | "away" | "ball";
   number?: number;
   name?: string;
