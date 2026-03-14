@@ -1,18 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, user, loading } = useAuth();
   const router = useRouter();
 
-  const [email, setEmail]       = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError]       = useState("");
-  const [busy, setBusy]         = useState(false);
+  const [email, setEmail]           = useState("");
+  const [password, setPassword]     = useState("");
+  const [error, setError]           = useState("");
+  const [busy, setBusy]             = useState(false);
+  const [loginAttempted, setLoginAttempted] = useState(false);
+
+  // After a successful login the auth state updates asynchronously.
+  // Redirect once the user object is populated with their sport.
+  useEffect(() => {
+    if (loginAttempted && !loading && user) {
+      const sport = user.sport ?? "basket";
+      router.push(`/${sport}`);
+    }
+  }, [loginAttempted, loading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +31,7 @@ export default function LoginPage() {
     const err = await login(email.trim().toLowerCase(), password);
     setBusy(false);
     if (err === null) {
-      router.push("/");
+      setLoginAttempted(true);
     } else {
       setError(err);
     }
@@ -31,7 +41,7 @@ export default function LoginPage() {
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <span className="text-4xl">🏀</span>
+          <span className="text-4xl">🏆</span>
           <h1 className="text-2xl font-extrabold text-slate-900 mt-3">
             Logga in
           </h1>
@@ -77,10 +87,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || (loginAttempted && loading)}
               className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold text-sm rounded-xl transition-colors"
             >
-              {busy ? "Loggar in…" : "Logga in"}
+              {busy || (loginAttempted && loading) ? "Loggar in…" : "Logga in"}
             </button>
           </form>
 

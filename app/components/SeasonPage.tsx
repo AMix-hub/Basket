@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { SeasonPlan } from "../data/types";
 import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
@@ -16,6 +17,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
+import { SPORTS } from "../../lib/sports";
 
 interface Props {
   plan: SeasonPlan;
@@ -80,6 +82,14 @@ export default function SeasonPage({ plan }: Props) {
   const { user, getMyTeam } = useAuth();
   const defaultTeam = getMyTeam();
   const team = defaultTeam;
+  const pathname = usePathname();
+
+  // Determine the sport from the URL path (e.g. /fotboll/ar1 → fotboll)
+  const pathParts = pathname.split("/").filter(Boolean);
+  const sportSlug = pathParts.length >= 2 ? pathParts[0] : null;
+  const currentSport = SPORTS.find((s) => s.id === sportSlug) ?? null;
+  const backHref = currentSport ? `/${currentSport.id}` : "/basket";
+  const sportEmoji = currentSport?.emoji ?? "🏀";
 
   const canEdit =
     user?.roles.some((r) => r === "coach" || r === "admin" || r === "assistant") ?? false;
@@ -137,6 +147,7 @@ export default function SeasonPage({ plan }: Props) {
           coachId: (d.data().coachId as string) ?? "",
           adminId: d.data().adminId as string,
           clubName: (d.data().clubName as string) ?? "",
+          sport: ((d.data().sport as string) ?? "basket") as import("../../lib/sports").SportId,
           memberIds: (d.data().memberIds as string[]) ?? [],
           inviteCode: (d.data().inviteCode as string) ?? "",
           parentInviteCode: (d.data().parentInviteCode as string) ?? "",
@@ -413,7 +424,7 @@ export default function SeasonPage({ plan }: Props) {
       {/* Breadcrumb */}
       <div className="mb-6">
         <Link
-          href="/"
+          href={backHref}
           className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors"
         >
           <span>←</span> Alla säsonger
@@ -423,7 +434,7 @@ export default function SeasonPage({ plan }: Props) {
       {/* Header */}
       <div className="mb-10">
         <span className="inline-flex items-center gap-2 bg-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full mb-4 uppercase tracking-wide">
-          🏀 År {plan.year}
+          {sportEmoji} År {plan.year}
         </span>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
