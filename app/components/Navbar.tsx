@@ -36,8 +36,8 @@ function SportIQLogo() {
     <Image
       src="/sportiq-logo.png"
       alt="SportIQ"
-      width={28}
-      height={28}
+      width={40}
+      height={40}
       className="rounded-full object-cover"
     />
   );
@@ -93,8 +93,8 @@ export default function Navbar() {
                 <Image
                   src={clubLogoUrl}
                   alt="Klubblogga"
-                  width={28}
-                  height={28}
+                  width={40}
+                  height={40}
                   className="rounded-full object-cover"
                 />
               ) : (
