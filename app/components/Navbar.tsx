@@ -95,6 +95,7 @@ export default function Navbar() {
                   alt="Klubblogga"
                   width={50}
                   height={50}
+                  unoptimized
                   className="rounded-full object-cover"
                 />
               ) : (

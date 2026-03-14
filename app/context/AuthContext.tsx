@@ -107,6 +107,10 @@ interface AuthContextType {
    */
   updateClubLogo: (file: File) => Promise<string | null>;
   /**
+   * Admin sets the club logo to an external URL. Returns null on success, or a Swedish error string.
+   */
+  updateClubLogoUrl: (url: string) => Promise<string | null>;
+  /**
    * Requests push-notification permission and registers an FCM token for the
    * current user.  Call this when the user explicitly clicks "Aktivera notiser".
    */
@@ -678,10 +682,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateClubLogo = async (file: File): Promise<string | null> => {
     if (!user) return "Du måste vara inloggad.";
     if (!user.roles.includes("admin")) return "Endast admins kan ladda upp klubblogga.";
+
+    /* Validate file type */
+    if (!file.type.startsWith("image/")) {
+      return "Endast bildfiler (JPG, PNG, GIF, WebP) accepteras.";
+    }
+    /* Validate file size (max 2 MB) */
+    if (file.size > 2 * 1024 * 1024) {
+      return "Bilden är för stor. Max 2 MB tillåts.";
+    }
+
     try {
       const ext = file.name.split(".").pop() ?? "png";
       const storageRef = ref(storage, `clubLogos/${user.id}/logo.${ext}`);
-      await uploadBytes(storageRef, file);
+
+      /* Wrap upload in a 30-second timeout to avoid infinite spinner */
+      const uploadWithTimeout = Promise.race([
+        uploadBytes(storageRef, file),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Upload timeout after 30 s")), 30_000)
+        ),
+      ]);
+
+      await uploadWithTimeout;
       const url = await getDownloadURL(storageRef);
 
       /* Save to admin's profile */
@@ -704,7 +727,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return null;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("timeout")) return "Uppladdningen tog för lång tid. Kontrollera din internetanslutning.";
       return translateFirebaseError(msg) || "Kunde inte ladda upp loggan. Försök igen.";
+    }
+  };
+
+  /* ── updateClubLogoUrl (admin sets logo via external URL) ── */
+  const updateClubLogoUrl = async (url: string): Promise<string | null> => {
+    if (!user) return "Du måste vara inloggad.";
+    if (!user.roles.includes("admin")) return "Endast admins kan ändra klubblogga.";
+
+    const trimmed = url.trim();
+    if (!trimmed) return "Ange en giltig URL.";
+    if (!trimmed.startsWith("https://")) return "URL:en måste börja med https://.";
+    try {
+      new URL(trimmed);
+    } catch {
+      return "Ange en giltig URL (börja med https://).";
+    }
+
+    try {
+      /* Save URL to admin's profile */
+      await updateDoc(doc(db, "profiles", user.id), { clubLogoUrl: trimmed });
+
+      /* Propagate to all teams belonging to this admin */
+      const teamsSnap = await getDocs(
+        query(collection(db, "teams"), where("adminId", "==", user.id))
+      );
+      await Promise.all(
+        teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubLogoUrl: trimmed }))
+      );
+
+      /* Update local state */
+      setUser({ ...user, clubLogoUrl: trimmed });
+      if (currentTeam) {
+        setCurrentTeam({ ...currentTeam, clubLogoUrl: trimmed });
+      }
+
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return translateFirebaseError(msg) || "Kunde inte spara URL:en. Försök igen.";
     }
   };
 
@@ -721,6 +784,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getAllTeams,
         createTeam,
         updateClubLogo,
+        updateClubLogoUrl,
         requestPushPermission: () => {
           if (!user) return Promise.resolve();
           return registerPushToken(user.id);

@@ -58,7 +58,7 @@ interface TrainingFreePeriod {
 const ALL_ROLES: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
 
 export default function AdminPage() {
-  const { user, createTeam, updateClubLogo } = useAuth();
+  const { user, createTeam, updateClubLogo, updateClubLogoUrl } = useAuth();
   const [copied, setCopied] = useState<string | null>(null);
   // null = not yet loaded (loading state derived from value)
   const [teams, setTeams] = useState<TeamWithMembers[] | null>(null);
@@ -88,6 +88,8 @@ export default function AdminPage() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const [logoSuccess, setLogoSuccess] = useState(false);
+  const [logoUrlInput, setLogoUrlInput] = useState("");
+  const [logoUrlSaving, setLogoUrlSaving] = useState(false);
 
   const loadTeams = useCallback(async (adminId: string) => {
     /* Fetch all teams belonging to this admin */
@@ -352,6 +354,23 @@ export default function AdminPage() {
     e.target.value = "";
   };
 
+  const handleLogoUrlSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logoUrlInput.trim()) return;
+    setLogoUrlSaving(true);
+    setLogoError(null);
+    setLogoSuccess(false);
+    const err = await updateClubLogoUrl(logoUrlInput);
+    if (err) {
+      setLogoError(err);
+    } else {
+      setLogoSuccess(true);
+      setLogoUrlInput("");
+      setTimeout(() => setLogoSuccess(false), 3000);
+    }
+    setLogoUrlSaving(false);
+  };
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;
@@ -423,7 +442,7 @@ export default function AdminPage() {
           Ladda upp din förenings logga. Den visas i navigeringsmenyn för alla
           coacher, spelare och föräldrar i {user.clubName ?? "din förening"}.
         </p>
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-4 flex-wrap mb-4">
           {user.clubLogoUrl ? (
             <div className="flex items-center gap-3">
               <Image
@@ -431,6 +450,7 @@ export default function AdminPage() {
                 alt="Klubblogga"
                 width={64}
                 height={64}
+                unoptimized
                 className="rounded-xl object-cover border border-slate-200"
               />
               <span className="text-xs text-slate-500">Nuvarande logga</span>
@@ -440,23 +460,59 @@ export default function AdminPage() {
               🏛
             </div>
           )}
-          <label
-            className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
-              logoUploading
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-orange-500 hover:bg-orange-600 text-white"
-            }`}
-          >
-            {logoUploading ? "Laddar upp…" : "📷 Välj bild"}
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              disabled={logoUploading}
-              onChange={handleLogoUpload}
-            />
-          </label>
+          <div className="flex flex-col gap-1">
+            <label
+              className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+                logoUploading
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-orange-500 hover:bg-orange-600 text-white"
+              }`}
+            >
+              {logoUploading ? "Laddar upp…" : "📷 Välj bild"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                className="hidden"
+                disabled={logoUploading}
+                onChange={handleLogoUpload}
+              />
+            </label>
+            <p className="text-xs text-slate-400">
+              JPG, PNG, GIF eller WebP · max 2 MB
+            </p>
+          </div>
         </div>
+
+        {/* Link logo via URL */}
+        <div className="border-t border-slate-100 pt-4">
+          <p className="text-xs font-semibold text-slate-600 mb-2">
+            Eller länka till en webbadress
+          </p>
+          <form onSubmit={handleLogoUrlSave} className="flex items-center gap-2 flex-wrap">
+            <input
+              type="text"
+              inputMode="url"
+              pattern="https://.*"
+              placeholder="https://example.com/logo.png"
+              value={logoUrlInput}
+              onChange={(e) => setLogoUrlInput(e.target.value)}
+              className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300"
+              disabled={logoUrlSaving}
+            />
+            <button
+              type="submit"
+              disabled={logoUrlSaving || !logoUrlInput.trim()}
+              className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+                logoUrlSaving || !logoUrlInput.trim()
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-orange-500 hover:bg-orange-600 text-white"
+              }`}
+            >
+              {logoUrlSaving ? "Sparar…" : "Spara URL"}
+            </button>
+          </form>
+        </div>
+
         {logoError && (
           <p className="mt-3 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
             {logoError}
