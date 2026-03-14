@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
@@ -107,83 +107,80 @@ export default function AdminPage() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
-  const loadTeams = useCallback(async (adminId: string) => {
-    /* Fetch all teams belonging to this admin */
-    const teamSnap = await getDocs(
-      query(collection(db, "teams"), where("adminId", "==", adminId))
-    );
-
-    if (teamSnap.empty) {
-      setTeams([]);
-      return;
-    }
-
-    const teamRows = teamSnap.docs.map((d) => ({
-      id: d.id,
-      name: d.data().name as string,
-      age_group: d.data().ageGroup as string,
-      coach_id: (d.data().coachId as string | null) ?? null,
-      invite_code: (d.data().inviteCode as string) ?? "",
-      parent_invite_code: (d.data().parentInviteCode as string) ?? "",
-      player_invite_code: (d.data().playerInviteCode as string) ?? "",
-    }));
-
-    /* Fetch members for each team via team_members collection
-     * Firestore supports up to 10 items in an "in" query, so we batch. */
-    const teamIds = teamRows.map((t) => t.id);
-
-    const allMemberRows: { teamId: string; userId: string }[] = [];
-    // Process teamIds in chunks of 10 (Firestore "in" query limit)
-    for (let i = 0; i < teamIds.length; i += 10) {
-      const chunk = teamIds.slice(i, i + 10);
-      const memberSnap = await getDocs(
-        query(collection(db, "team_members"), where("teamId", "in", chunk))
-      );
-      memberSnap.docs.forEach((d) => {
-        allMemberRows.push({
-          teamId: d.data().teamId as string,
-          userId: d.data().userId as string,
-        });
-      });
-    }
-
-    const userIds = [...new Set(allMemberRows.map((m) => m.userId))];
-
-    const profileMap: Record<string, ProfileRow> = {};
-    if (userIds.length > 0) {
-      const profilePromises = userIds.map((id) => getDoc(doc(db, "profiles", id)));
-      const profileSnaps = await Promise.all(profilePromises);
-      profileSnaps.forEach((s) => {
-        if (s.exists()) {
-          const d = s.data();
-          profileMap[s.id] = {
-            id: s.id,
-            name: d.name as string,
-            roles:
-              d.roles && (d.roles as string[]).length > 0
-                ? (d.roles as string[])
-                : [d.role as string],
-            child_name: (d.childName as string | null) ?? null,
-          };
-        }
-      });
-    }
-
-    const enriched: TeamWithMembers[] = teamRows.map((t) => ({
-      ...t,
-      members: allMemberRows
-        .filter((m) => m.teamId === t.id)
-        .map((m) => profileMap[m.userId])
-        .filter(Boolean),
-    }));
-
-    setTeams(enriched);
-  }, []);
-
+  /* Real-time listener: any change to the admin's teams (create / update / delete)
+   * automatically refreshes the list, including the member + profile resolution. */
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
-    loadTeams(user.id);
-  }, [user, loadTeams]);
+
+    const q = query(collection(db, "teams"), where("adminId", "==", user.id));
+
+    const unsub = onSnapshot(q, async (teamSnap) => {
+      if (teamSnap.empty) {
+        setTeams([]);
+        return;
+      }
+
+      const teamRows = teamSnap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name as string,
+        age_group: d.data().ageGroup as string,
+        coach_id: (d.data().coachId as string | null) ?? null,
+        invite_code: (d.data().inviteCode as string) ?? "",
+        parent_invite_code: (d.data().parentInviteCode as string) ?? "",
+        player_invite_code: (d.data().playerInviteCode as string) ?? "",
+      }));
+
+      /* Fetch members for each team via team_members collection
+       * Firestore supports up to 10 items in an "in" query, so we batch. */
+      const teamIds = teamRows.map((t) => t.id);
+      const allMemberRows: { teamId: string; userId: string }[] = [];
+      for (let i = 0; i < teamIds.length; i += 10) {
+        const chunk = teamIds.slice(i, i + 10);
+        const memberSnap = await getDocs(
+          query(collection(db, "team_members"), where("teamId", "in", chunk))
+        );
+        memberSnap.docs.forEach((d) => {
+          allMemberRows.push({
+            teamId: d.data().teamId as string,
+            userId: d.data().userId as string,
+          });
+        });
+      }
+
+      const userIds = [...new Set(allMemberRows.map((m) => m.userId))];
+      const profileMap: Record<string, ProfileRow> = {};
+      if (userIds.length > 0) {
+        const profilePromises = userIds.map((id) => getDoc(doc(db, "profiles", id)));
+        const profileSnaps = await Promise.all(profilePromises);
+        profileSnaps.forEach((s) => {
+          if (s.exists()) {
+            const d = s.data();
+            profileMap[s.id] = {
+              id: s.id,
+              name: d.name as string,
+              roles:
+                d.roles && (d.roles as string[]).length > 0
+                  ? (d.roles as string[])
+                  : [d.role as string],
+              child_name: (d.childName as string | null) ?? null,
+            };
+          }
+        });
+      }
+
+      const enriched: TeamWithMembers[] = teamRows.map((t) => ({
+        ...t,
+        members: allMemberRows
+          .filter((m) => m.teamId === t.id)
+          .map((m) => profileMap[m.userId])
+          .filter(Boolean),
+      }));
+
+      setTeams(enriched);
+    });
+
+    return () => unsub();
+  }, [user]);
 
   // Load halls for this admin
   useEffect(() => {
@@ -402,8 +399,6 @@ export default function AdminPage() {
         setInviteName("");
         setInviteTeamId("");
         setInviteRole("player");
-        // Reload teams to show new member
-        if (user) loadTeams(user.id);
       }
     } catch {
       setInviteError("Nätverksfel. Kontrollera anslutningen och försök igen.");
@@ -481,8 +476,7 @@ export default function AdminPage() {
     } else {
       setNewTeamName("");
       setNewAgeGroup("≤7 år");
-      // Reload teams list
-      if (user) loadTeams(user.id);
+      // onSnapshot listener will automatically refresh the teams list
     }
     setCreatingTeam(false);
   };
@@ -1210,7 +1204,7 @@ export default function AdminPage() {
                                         await updateDoc(doc(db, "teams", t.id), {
                                           memberIds: arrayRemove(member.id),
                                         });
-                                        if (user) loadTeams(user.id);
+
                                       } catch {
                                         alert("Kunde inte ta bort. Försök igen.");
                                       }
@@ -1227,7 +1221,7 @@ export default function AdminPage() {
                                         await updateDoc(doc(db, "teams", t.id), {
                                           memberIds: arrayUnion(member.id),
                                         });
-                                        if (user) loadTeams(user.id);
+
                                       } catch {
                                         alert("Kunde inte lägga till. Försök igen.");
                                       }
