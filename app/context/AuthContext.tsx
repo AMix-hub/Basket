@@ -453,6 +453,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     /* 1 ─ Validate invite codes before touching auth ────────── */
     let invitingAdminId: string | null = null;
     let invitingAdminClubName: string | null = null;
+    let invitingAdminLogoUrl: string | undefined = undefined;
     let teamFromCode: { id: string; data: DbTeam } | null = null;
 
     if (role === "coach") {
@@ -472,6 +473,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const adminDoc = adminSnap.docs[0];
       invitingAdminId       = adminDoc.id;
       invitingAdminClubName = (adminDoc.data().clubName as string) ?? "";
+      invitingAdminLogoUrl  = (adminDoc.data().clubLogoUrl as string | undefined) ?? undefined;
     }
 
     if (role === "assistant") {
@@ -533,6 +535,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coachId:           userId,
         adminId:           invitingAdminId,
         clubName:          invitingAdminClubName ?? "",
+        clubLogoUrl:       invitingAdminLogoUrl,
         sport:             sport ?? "basket",
         memberIds:         [userId, invitingAdminId],
         inviteCode:        generateCode(),
@@ -659,6 +662,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coachId: null,
         adminId: user.id,
         clubName: user.clubName ?? "",
+        clubLogoUrl: user.clubLogoUrl,
         sport: user.sport ?? "basket",
         memberIds: [user.id],
         inviteCode: generateCode(),
