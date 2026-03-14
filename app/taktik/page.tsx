@@ -40,6 +40,7 @@ interface Drawing {
   y1: number;
   x2: number;
   y2: number;
+  points?: { x: number; y: number }[];
 }
 
 interface Step {
@@ -191,7 +192,7 @@ function BasketballCourt() {
       <circle cx={LBX} cy={MCY} r={11} {...lp} />
       <line x1={BX} y1={TP3_Y1} x2={L_TP3_X} y2={TP3_Y1} {...lp} />
       <line x1={BX} y1={TP3_Y2} x2={L_TP3_X} y2={TP3_Y2} {...lp} />
-      <path d={`M ${L_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 0 ${L_TP3_X} ${TP3_Y2}`} {...lp} />
+      <path d={`M ${L_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 1 ${L_TP3_X} ${TP3_Y2}`} {...lp} />
       {/* Right basket */}
       <rect x={BX + BW - PAINT_D} y={MCY - PAINT_H} width={PAINT_D} height={PAINT_H * 2}
         {...lp} fill="rgba(255,255,255,0.07)" />
@@ -204,7 +205,7 @@ function BasketballCourt() {
       <circle cx={RBX} cy={MCY} r={11} {...lp} />
       <line x1={BX + BW} y1={TP3_Y1} x2={R_TP3_X} y2={TP3_Y1} {...lp} />
       <line x1={BX + BW} y1={TP3_Y2} x2={R_TP3_X} y2={TP3_Y2} {...lp} />
-      <path d={`M ${R_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 1 ${R_TP3_X} ${TP3_Y2}`} {...lp} />
+      <path d={`M ${R_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 0 ${R_TP3_X} ${TP3_Y2}`} {...lp} />
     </g>
   );
 }
@@ -268,6 +269,20 @@ function PlayerMarker({
   );
 }
 
+/* ─── Freehand path helper ───────────────────────────────────────────────── */
+function pointsToPath(pts: { x: number; y: number }[]): string {
+  if (pts.length < 2) return "";
+  if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const mx = (pts[i].x + pts[i + 1].x) / 2;
+    const my = (pts[i].y + pts[i + 1].y) / 2;
+    d += ` Q ${pts[i].x} ${pts[i].y} ${mx} ${my}`;
+  }
+  d += ` L ${pts[pts.length - 1].x} ${pts[pts.length - 1].y}`;
+  return d;
+}
+
 /* ─── Drawing element ────────────────────────────────────────────────────── */
 function DrawingEl({
   d, erasable, onErase,
@@ -279,12 +294,26 @@ function DrawingEl({
   const ep = erasable ? { onClick: onErase, className: "cursor-pointer" } : {};
   switch (d.type) {
     case "arrow":
+      if (d.points && d.points.length >= 2) {
+        return (
+          <path d={pointsToPath(d.points)}
+            stroke={d.color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+            fill="none" markerEnd="url(#ah-y)" {...ep} />
+        );
+      }
       return (
         <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
           stroke={d.color} strokeWidth={2.5} strokeLinecap="round"
           markerEnd="url(#ah-y)" {...ep} />
       );
     case "dashed":
+      if (d.points && d.points.length >= 2) {
+        return (
+          <path d={pointsToPath(d.points)}
+            stroke={d.color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+            fill="none" strokeDasharray="9 5" markerEnd="url(#ah-g)" {...ep} />
+        );
+      }
       return (
         <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
           stroke={d.color} strokeWidth={2.5} strokeLinecap="round"
@@ -346,6 +375,10 @@ export default function TaktikPage() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
   const [drawCursor, setDrawCursor] = useState<{ x: number; y: number } | null>(null);
+  const freehandPointsRef = useRef<{ x: number; y: number }[]>([]);
+
+  const undoStackRef = useRef<Step[][]>([]);
+  const [canUndo, setCanUndo] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [playStepIdx, setPlayStepIdx] = useState(0);
@@ -425,6 +458,22 @@ export default function TaktikPage() {
     }, 150);
   }, [isOnline, user, myTeam]);
 
+  const pushUndo = useCallback(() => {
+    const snapshot = structuredClone(liveRef.current.steps) as Step[];
+    undoStackRef.current = [...undoStackRef.current.slice(-29), snapshot];
+    setCanUndo(true);
+  }, []);
+
+  const undo = useCallback(() => {
+    const stack = undoStackRef.current;
+    if (stack.length === 0) return;
+    const prev = stack[stack.length - 1];
+    undoStackRef.current = stack.slice(0, -1);
+    setCanUndo(stack.length > 1);
+    setSteps(prev);
+    pushLive();
+  }, [pushLive]);
+
   const getSVGCoords = useCallback((clientX: number, clientY: number) => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
@@ -484,6 +533,8 @@ export default function TaktikPage() {
   };
 
   const clearBoard = () => {
+    undoStackRef.current = [];
+    setCanUndo(false);
     setSteps([makeStep("Steg 1")]);
     setCurrentStepIdx(0);
     setCoachNotes("");
@@ -497,6 +548,9 @@ export default function TaktikPage() {
     if (["arrow", "dashed", "circle", "rect", "zone"].includes(tool)) {
       setDrawStart(coords);
       setDrawCursor(coords);
+      if (tool === "arrow" || tool === "dashed") {
+        freehandPointsRef.current = [coords];
+      }
       e.currentTarget.setPointerCapture(e.pointerId);
     } else if (tool === "select") {
       setSelectedPlayerId(null);
@@ -506,7 +560,16 @@ export default function TaktikPage() {
   const handleSVGPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     if (isPlaying) return;
     const coords = getSVGCoords(e.clientX, e.clientY);
-    if (drawStart) setDrawCursor(coords);
+    if (drawStart) {
+      if ((tool === "arrow" || tool === "dashed") && freehandPointsRef.current.length > 0) {
+        const last = freehandPointsRef.current[freehandPointsRef.current.length - 1];
+        const dist = Math.sqrt((coords.x - last.x) ** 2 + (coords.y - last.y) ** 2);
+        if (dist > 4) {
+          freehandPointsRef.current = [...freehandPointsRef.current, coords];
+        }
+      }
+      setDrawCursor(coords);
+    }
     if (tool === "select" && dragId) {
       movePlayer(dragId, coords.x, coords.y);
       pushLive();
@@ -516,22 +579,37 @@ export default function TaktikPage() {
   const handleSVGPointerUp = () => {
     if (isPlaying) return;
     if (drawStart && drawCursor) {
-      const dx = drawCursor.x - drawStart.x;
-      const dy = drawCursor.y - drawStart.y;
-      const minDist = ["circle", "rect", "zone"].includes(tool) ? MIN_SHAPE_DIST : MIN_LINE_DIST;
-      if (Math.sqrt(dx * dx + dy * dy) > minDist) {
-        const color =
-          tool === "arrow"  ? ARROW_COLOR
-          : tool === "dashed" ? DASHED_COLOR
-          : tool === "zone"   ? zoneColor
-          : SHAPE_COLOR;
+      const isFreehandTool = tool === "arrow" || tool === "dashed";
+      const fpts = freehandPointsRef.current;
+      if (isFreehandTool && fpts.length >= 2) {
+        const color = tool === "arrow" ? ARROW_COLOR : DASHED_COLOR;
+        pushUndo();
         addDrawing({
           id: crypto.randomUUID(), type: tool as DrawingType, color,
-          x1: drawStart.x, y1: drawStart.y, x2: drawCursor.x, y2: drawCursor.y,
+          x1: fpts[0].x, y1: fpts[0].y, x2: fpts[fpts.length - 1].x, y2: fpts[fpts.length - 1].y,
+          points: [...fpts],
         });
         pushLive();
+      } else {
+        const dx = drawCursor.x - drawStart.x;
+        const dy = drawCursor.y - drawStart.y;
+        const minDist = ["circle", "rect", "zone"].includes(tool) ? MIN_SHAPE_DIST : MIN_LINE_DIST;
+        if (Math.sqrt(dx * dx + dy * dy) > minDist) {
+          const color =
+            tool === "arrow"  ? ARROW_COLOR
+            : tool === "dashed" ? DASHED_COLOR
+            : tool === "zone"   ? zoneColor
+            : SHAPE_COLOR;
+          pushUndo();
+          addDrawing({
+            id: crypto.randomUUID(), type: tool as DrawingType, color,
+            x1: drawStart.x, y1: drawStart.y, x2: drawCursor.x, y2: drawCursor.y,
+          });
+          pushLive();
+        }
       }
     }
+    freehandPointsRef.current = [];
     setDrawStart(null);
     setDrawCursor(null);
     setDragId(null);
@@ -541,10 +619,12 @@ export default function TaktikPage() {
     if (isPlaying) return;
     e.stopPropagation();
     if (tool === "select") {
+      pushUndo();
       setDragId(id);
       setSelectedPlayerId(id);
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
     } else if (tool === "erase") {
+      pushUndo();
       removePlayer(id);
       pushLive();
     }
@@ -552,6 +632,7 @@ export default function TaktikPage() {
 
   const handleDrawingClick = (id: string) => {
     if (isPlaying || tool !== "erase") return;
+    pushUndo();
     removeDrawing(id);
     pushLive();
   };
@@ -616,6 +697,17 @@ export default function TaktikPage() {
   }, [isPlaying]);
 
   useEffect(() => () => cancelAnimationFrame(animRafRef.current), []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !isPlaying) {
+        e.preventDefault();
+        undo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, isPlaying]);
 
   useEffect(() => {
     if (!isOnline) {
@@ -707,6 +799,8 @@ export default function TaktikPage() {
   };
 
   const loadTactic = (t: TacticDoc) => {
+    undoStackRef.current = [];
+    setCanUndo(false);
     const loadedSteps = t.steps?.length ? t.steps : [makeStep("Steg 1")];
     setSteps(loadedSteps);
     setCurrentStepIdx(0);
@@ -853,7 +947,11 @@ export default function TaktikPage() {
             ))}
           </div>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <button onClick={undo} disabled={!canUndo || isPlaying} title="Ångra (Ctrl+Z)"
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40">
+            ↩ Ångra
+          </button>
           <button onClick={clearBoard} disabled={isPlaying}
             className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40">
             🗑 Ny tavla
@@ -886,10 +984,19 @@ export default function TaktikPage() {
               ))}
               {drawStart && drawCursor && (() => {
                 const pc = tool === "arrow" ? ARROW_COLOR : tool === "dashed" ? DASHED_COLOR : tool === "zone" ? zoneColor : SHAPE_COLOR;
-                if (tool === "arrow")
+                const fpts = freehandPointsRef.current;
+                if (tool === "arrow") {
+                  if (fpts.length >= 2) {
+                    return <path d={pointsToPath(fpts)} stroke={pc} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" markerEnd="url(#ah-y)" opacity={0.7} />;
+                  }
                   return <line x1={drawStart.x} y1={drawStart.y} x2={drawCursor.x} y2={drawCursor.y} stroke={pc} strokeWidth={2} strokeDasharray="6 3" markerEnd="url(#ah-y)" opacity={0.7} />;
-                if (tool === "dashed")
+                }
+                if (tool === "dashed") {
+                  if (fpts.length >= 2) {
+                    return <path d={pointsToPath(fpts)} stroke={pc} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="9 5" markerEnd="url(#ah-g)" opacity={0.7} />;
+                  }
                   return <line x1={drawStart.x} y1={drawStart.y} x2={drawCursor.x} y2={drawCursor.y} stroke={pc} strokeWidth={2} strokeDasharray="9 5" markerEnd="url(#ah-g)" opacity={0.7} />;
+                }
                 if (tool === "circle") {
                   const r = Math.sqrt((drawCursor.x - drawStart.x) ** 2 + (drawCursor.y - drawStart.y) ** 2);
                   return <circle cx={drawStart.x} cy={drawStart.y} r={r} stroke={pc} strokeWidth={2} fill="none" opacity={0.7} />;
