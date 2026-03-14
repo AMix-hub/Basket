@@ -1,4 +1,4 @@
-export type SportId = "basket" | "fotboll" | "ishockey" | "innebandy" | "tennis";
+export type SportId = "basket" | "fotboll" | "ishockey" | "innebandy" | "handboll";
 
 export interface SportConfig {
   id: SportId;
@@ -53,11 +53,11 @@ export const SPORTS: SportConfig[] = [
     accentTo: "to-purple-800",
   },
   {
-    id: "tennis",
-    name: "Tennis",
-    emoji: "🎾",
+    id: "handboll",
+    name: "Handboll",
+    emoji: "🤾",
     description:
-      "Genomtänkt träningsplan för tenniscoacher med progressiv teknikutveckling för juniorer.",
+      "Komplett träningsplanering för handbollscoacher med fokus på kast, passningar och lagspel för ungdomar.",
     color: "yellow",
     accentFrom: "from-yellow-500",
     accentTo: "to-yellow-600",

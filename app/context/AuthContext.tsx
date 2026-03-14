@@ -27,7 +27,8 @@ import {
   getDocs,
   limit,
 } from "firebase/firestore";
-import { auth, db, getClientMessaging } from "../../lib/firebaseClient";
+import { auth, db, storage, getClientMessaging } from "../../lib/firebaseClient";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getToken } from "firebase/messaging";
 import type { SportId } from "../../lib/sports";
 
@@ -46,6 +47,8 @@ export interface User {
   childName?: string;        // parent: child's name in the player list
   coachInviteCode?: string;  // admin:  code coaches use to register
   clubName?: string;         // admin:  association / club name
+  /** URL to the club's logo image (set by admin). */
+  clubLogoUrl?: string;
   /** Sport this user / club is associated with (defaults to "basket"). */
   sport?: SportId;
   createdAt: string;
@@ -58,6 +61,8 @@ export interface Team {
   coachId: string;
   adminId: string;
   clubName: string;
+  /** URL to the club's logo image (set by admin). */
+  clubLogoUrl?: string;
   sport: SportId;
   memberIds: string[];
   inviteCode: string;        // assistants
@@ -98,6 +103,10 @@ interface AuthContextType {
    */
   createTeam: (teamName: string, ageGroup: string) => Promise<string | null>;
   /**
+   * Admin uploads a club logo image. Returns null on success, or a Swedish error string.
+   */
+  updateClubLogo: (file: File) => Promise<string | null>;
+  /**
    * Requests push-notification permission and registers an FCM token for the
    * current user.  Call this when the user explicitly clicks "Aktivera notiser".
    */
@@ -118,6 +127,8 @@ interface DbProfile {
   createdAt: string;
   /** Sport this user is associated with (defaults to "basket"). */
   sport?: string;
+  /** URL to the club's logo image (admin only). */
+  clubLogoUrl?: string;
   /** Email stored for push/email notification delivery. */
   email?: string;
   /** FCM token for device push notifications (updated on every login). */
@@ -130,6 +141,8 @@ interface DbTeam {
   coachId: string | null;
   adminId: string;
   clubName: string;
+  /** URL to the club's logo image (propagated from admin profile). */
+  clubLogoUrl?: string;
   sport?: string;
   memberIds: string[];
   inviteCode: string;
@@ -154,6 +167,7 @@ function toUser(id: string, p: DbProfile, email: string): User {
     childName: p.childName ?? undefined,
     coachInviteCode: p.coachInviteCode ?? undefined,
     clubName: p.clubName ?? undefined,
+    clubLogoUrl: p.clubLogoUrl ?? undefined,
     sport: (p.sport as SportId | undefined) ?? "basket",
     createdAt: p.createdAt,
   };
@@ -167,6 +181,7 @@ function toTeam(id: string, t: DbTeam): Team {
     coachId: t.coachId ?? "",
     adminId: t.adminId,
     clubName: t.clubName,
+    clubLogoUrl: t.clubLogoUrl ?? undefined,
     sport: (t.sport as SportId | undefined) ?? "basket",
     memberIds: t.memberIds ?? [],
     inviteCode: t.inviteCode,
@@ -659,6 +674,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /* ── updateClubLogo (admin uploads a club logo image) ── */
+  const updateClubLogo = async (file: File): Promise<string | null> => {
+    if (!user) return "Du måste vara inloggad.";
+    if (!user.roles.includes("admin")) return "Endast admins kan ladda upp klubblogga.";
+    try {
+      const ext = file.name.split(".").pop() ?? "png";
+      const storageRef = ref(storage, `clubLogos/${user.id}/logo.${ext}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+
+      /* Save to admin's profile */
+      await updateDoc(doc(db, "profiles", user.id), { clubLogoUrl: url });
+
+      /* Propagate to all teams belonging to this admin */
+      const teamsSnap = await getDocs(
+        query(collection(db, "teams"), where("adminId", "==", user.id))
+      );
+      await Promise.all(
+        teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubLogoUrl: url }))
+      );
+
+      /* Update local state */
+      setUser({ ...user, clubLogoUrl: url });
+      if (currentTeam) {
+        setCurrentTeam({ ...currentTeam, clubLogoUrl: url });
+      }
+
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return translateFirebaseError(msg) || "Kunde inte ladda upp loggan. Försök igen.";
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -671,6 +720,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         getMyTeam,
         getAllTeams,
         createTeam,
+        updateClubLogo,
         requestPushPermission: () => {
           if (!user) return Promise.resolve();
           return registerPushToken(user.id);
