@@ -513,7 +513,7 @@ export default function TaktikPage() {
     }
   };
 
-  const handleSVGPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
+  const handleSVGPointerUp = () => {
     if (isPlaying) return;
     if (drawStart && drawCursor) {
       const dx = drawCursor.x - drawStart.x;
@@ -1021,7 +1021,7 @@ export default function TaktikPage() {
                 {rightTab === "notes" && (
                   <div>
                     <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">📝 Tränarinstruktioner</h3>
-                    <textarea value={coachNotes} onChange={e => { setCoachNotes(e.target.value); pushLive(); }}
+                    <textarea value={coachNotes} onChange={e => setCoachNotes(e.target.value)} onBlur={() => pushLive()}
                       placeholder={"Skriv taktiska instruktioner här…\nEx: Kör Give-and-Go på höger sida.\n#4 sätter skärm vid frisparkslinjen."}
                       rows={10} className="w-full text-xs px-2.5 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none leading-relaxed" />
                     <p className="text-xs text-slate-400 mt-1">Sparas med taktiken.</p>

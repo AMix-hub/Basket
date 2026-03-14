@@ -319,7 +319,8 @@ function CastBoard() {
                 stroke={d.color} strokeWidth={3} strokeLinecap="round" strokeDasharray="12 6" markerEnd="url(#cast-ah-g)" />;
             }
             if (d.type === "circle") {
-              const r = Math.sqrt((d.x2 - d.x1) ** 2 + (d.y2 - d.y1) ** 2) * sx;
+              const avgScale = (sx + sy) / 2;
+              const r = Math.sqrt((d.x2 - d.x1) ** 2 + (d.y2 - d.y1) ** 2) * avgScale;
               return <circle key={d.id} cx={d.x1*sx} cy={d.y1*sy} r={r} stroke={d.color} strokeWidth={2.5} fill="none" />;
             }
             if (d.type === "rect") {
