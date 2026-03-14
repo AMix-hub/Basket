@@ -16,473 +16,664 @@ import {
 import { db } from "@/lib/firebaseClient";
 import { useCast } from "@/app/hooks/useCast";
 
-/* ─── Types ─────────────────────────────────────────────────── */
+/* ─── Types ─────────────────────────────────────────────────────────────── */
+
+type PlayerTeam = "home" | "away" | "ball";
+
 interface Player {
   id: string;
-  type: "O" | "X";
+  team: PlayerTeam;
+  number?: number;
+  name?: string;
+  role?: string;
   x: number;
   y: number;
 }
 
-interface Arrow {
+type DrawingType = "arrow" | "dashed" | "circle" | "rect" | "zone";
+
+interface Drawing {
   id: string;
+  type: DrawingType;
+  color: string;
   x1: number;
   y1: number;
   x2: number;
   y2: number;
 }
 
-interface Tactic {
+interface Step {
+  id: string;
+  label: string;
+  players: Player[];
+  drawings: Drawing[];
+}
+
+interface TacticDoc {
   id: string;
   name: string;
-  players: Player[];
-  arrows: Arrow[];
+  teamId: string;
+  steps: Step[];
+  coachNotes: string;
   createdAt: string;
 }
 
-interface LiveState {
-  teamId: string;
-  players: Player[];
-  arrows: Arrow[];
-  animationPlaying: boolean;
-  animationStartTime: string | null;
-  updatedBy: string | null;
+type Tool = "select" | "arrow" | "dashed" | "circle" | "rect" | "zone" | "erase";
+
+/* ─── Court constants ────────────────────────────────────────────────────── */
+
+const CW = 760;
+const CH = 460;
+const BX = 20, BY = 20, BW = 720, BH = 420;
+const MCX = BX + BW / 2;
+const MCY = BY + BH / 2;
+const LBX = 60;
+const RBX = 700;
+const PAINT_D = 155;
+const PAINT_H = 74;
+const L_FT_X = BX + PAINT_D;
+const R_FT_X = BX + BW - PAINT_D;
+const FT_R = 55;
+const TP3_Y1 = 63;
+const TP3_Y2 = 397;
+const TP3_R = 181;
+const L_TP3_X = 130;
+const R_TP3_X = 630;
+
+/* ─── App constants ──────────────────────────────────────────────────────── */
+
+const ANIM_MS = 1200;
+const HOME_NAMES = ["PG", "SG", "SF", "PF", "C"];
+const MIN_SHAPE_DIST = 5;
+const MIN_LINE_DIST  = 10;
+
+const TACTICAL_ROLES = [
+  "Ball Handler",
+  "P&R-skärmare",
+  "Cutter",
+  "Skjutare",
+  "Post-spelare",
+  "Off-Ball Screen",
+  "Flare Screen",
+  "Helpersida",
+  "Spjutstans",
+  "Hjälpförsvarare",
+];
+
+const ZONE_COLORS = [
+  { label: "Röd",  color: "rgba(239,68,68,0.35)" },
+  { label: "Blå",  color: "rgba(59,130,246,0.35)" },
+  { label: "Grön", color: "rgba(34,197,94,0.35)" },
+  { label: "Gul",  color: "rgba(234,179,8,0.35)" },
+  { label: "Lila", color: "rgba(168,85,247,0.35)" },
+];
+
+const ARROW_COLOR  = "#facc15";
+const DASHED_COLOR = "#a3e635";
+const SHAPE_COLOR  = "#f472b6";
+
+/* ─── Initial players ────────────────────────────────────────────────────── */
+
+function makeInitialPlayers(): Player[] {
+  const homePos = [
+    { x: 380, y: 195 },
+    { x: 255, y: 260 }, { x: 505, y: 260 },
+    { x: 210, y: 330 }, { x: 550, y: 330 },
+  ];
+  const awayPos = [
+    { x: 380, y: 215 },
+    { x: 272, y: 272 }, { x: 488, y: 272 },
+    { x: 225, y: 340 }, { x: 535, y: 340 },
+  ];
+  return [
+    ...homePos.map((p, i) => ({
+      id: `home-${i + 1}`, team: "home" as const,
+      number: i + 1, name: HOME_NAMES[i], x: p.x, y: p.y,
+    })),
+    ...awayPos.map((p, i) => ({
+      id: `away-${i + 1}`, team: "away" as const,
+      number: i + 1, x: p.x, y: p.y,
+    })),
+    { id: "ball-1", team: "ball" as const, x: 380, y: 184 },
+  ];
 }
 
-type Tool = "select" | "addO" | "addX" | "arrow" | "erase";
-
-const ANIMATION_DURATION = 1600; // ms
-
-/* ─── Connection-status badge ────────────────────────────────── */
-function SyncBadge({ status }: { status: "offline" | "connecting" | "live" }) {
-  const cfg = {
-    offline: { dot: "bg-slate-400", text: "Offline (lokal)" },
-    connecting: { dot: "bg-yellow-400 animate-pulse", text: "Ansluter…" },
-    live: { dot: "bg-green-400", text: "Realtid aktiv" },
-  }[status];
-
-  return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-      <span className={`w-2 h-2 rounded-full ${cfg.dot}`} aria-hidden="true" />
-      {cfg.text}
-    </span>
-  );
-}
-
-/* ─── Court dimensions ────────────────────────────────────────── */
-const W = 380;
-const H = 510;
-
-/* ─── Basketball court SVG ──────────────────────────────────── */
-function BasketballCourt() {
-  const lineProps = {
-    stroke: "rgba(255,255,255,0.85)",
-    strokeWidth: 2,
-    fill: "none",
+function makeStep(label: string, prev?: Step): Step {
+  return {
+    id: crypto.randomUUID(),
+    label,
+    players: prev ? prev.players.map(p => ({ ...p })) : makeInitialPlayers(),
+    drawings: [],
   };
-
-  const topThreePoint = `M 15 150 A 185 185 0 0 1 365 150`;
-  const botThreePoint = `M 365 360 A 185 185 0 0 1 15 360`;
-
-  return (
-    <g>
-      {/* Wood floor */}
-      <rect x={0} y={0} width={W} height={H} fill="#c87428" />
-      {/* Court boundary */}
-      <rect x={10} y={10} width={360} height={490} {...lineProps} />
-      {/* Half-court line */}
-      <line x1={10} y1={255} x2={370} y2={255} {...lineProps} />
-      {/* Center circle */}
-      <circle cx={190} cy={255} r={42} {...lineProps} />
-      <circle cx={190} cy={255} r={3} fill="rgba(255,255,255,0.85)" />
-
-      {/* ── TOP BASKET ── */}
-      <rect x={110} y={10} width={160} height={165} {...lineProps} fill="rgba(255,255,255,0.08)" />
-      <line x1={110} y1={175} x2={270} y2={175} {...lineProps} />
-      <path d={`M 110 175 A 80 80 0 0 0 270 175`} {...lineProps} />
-      <path d={`M 165 10 A 40 40 0 0 0 215 10`} {...lineProps} />
-      <line x1={155} y1={32} x2={225} y2={32} stroke="rgba(255,255,255,0.85)" strokeWidth={3} />
-      <circle cx={190} cy={45} r={14} {...lineProps} />
-      <path d={topThreePoint} {...lineProps} />
-      <line x1={15} y1={10} x2={15} y2={150} {...lineProps} />
-      <line x1={365} y1={10} x2={365} y2={150} {...lineProps} />
-
-      {/* ── BOTTOM BASKET (mirror) ── */}
-      <rect x={110} y={335} width={160} height={165} {...lineProps} fill="rgba(255,255,255,0.08)" />
-      <line x1={110} y1={335} x2={270} y2={335} {...lineProps} />
-      <path d={`M 110 335 A 80 80 0 0 1 270 335`} {...lineProps} />
-      <path d={`M 165 500 A 40 40 0 0 1 215 500`} {...lineProps} />
-      <line x1={155} y1={478} x2={225} y2={478} stroke="rgba(255,255,255,0.85)" strokeWidth={3} />
-      <circle cx={190} cy={465} r={14} {...lineProps} />
-      <path d={botThreePoint} {...lineProps} />
-      <line x1={15} y1={500} x2={15} y2={360} {...lineProps} />
-      <line x1={365} y1={500} x2={365} y2={360} {...lineProps} />
-    </g>
-  );
 }
 
-/* ─── Arrow head marker ─────────────────────────────────────── */
-function ArrowMarker() {
+function easeInOut(t: number): number {
+  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+}
+
+/* ─── SVG marker defs ────────────────────────────────────────────────────── */
+function AllMarkerDefs() {
   return (
     <defs>
-      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="#facc15" />
+      <marker id="ah-y" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill={ARROW_COLOR} />
+      </marker>
+      <marker id="ah-g" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill={DASHED_COLOR} />
       </marker>
     </defs>
   );
 }
 
-/* ─── Animation helpers ──────────────────────────────────────── */
-/** Easing: ease-in-out */
-function easeInOut(t: number): number {
-  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+/* ─── Basketball court ───────────────────────────────────────────────────── */
+function BasketballCourt() {
+  const lp = { stroke: "rgba(255,255,255,0.88)", strokeWidth: 2, fill: "none" };
+  return (
+    <g>
+      <rect x={0} y={0} width={CW} height={CH} fill="#c8803a" />
+      {Array.from({ length: 14 }, (_, i) => (
+        <line key={i} x1={0} y1={22 + i * 31} x2={CW} y2={22 + i * 31}
+          stroke="rgba(155,85,15,0.22)" strokeWidth={1} />
+      ))}
+      <rect x={BX} y={BY} width={BW} height={BH} {...lp} />
+      <line x1={MCX} y1={BY} x2={MCX} y2={BY + BH} {...lp} />
+      <circle cx={MCX} cy={MCY} r={55} {...lp} />
+      <circle cx={MCX} cy={MCY} r={3} fill="rgba(255,255,255,0.88)" />
+      {/* Left basket */}
+      <rect x={BX} y={MCY - PAINT_H} width={PAINT_D} height={PAINT_H * 2}
+        {...lp} fill="rgba(255,255,255,0.07)" />
+      <line x1={L_FT_X} y1={MCY - PAINT_H} x2={L_FT_X} y2={MCY + PAINT_H} {...lp} />
+      <path d={`M ${L_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 1 ${L_FT_X} ${MCY + FT_R}`} {...lp} />
+      <path d={`M ${L_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 0 ${L_FT_X} ${MCY + FT_R}`}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={2} fill="none" strokeDasharray="8 5" />
+      <line x1={BX + 22} y1={MCY - 27} x2={BX + 22} y2={MCY + 27}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={3} />
+      <circle cx={LBX} cy={MCY} r={11} {...lp} />
+      <line x1={BX} y1={TP3_Y1} x2={L_TP3_X} y2={TP3_Y1} {...lp} />
+      <line x1={BX} y1={TP3_Y2} x2={L_TP3_X} y2={TP3_Y2} {...lp} />
+      <path d={`M ${L_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 0 ${L_TP3_X} ${TP3_Y2}`} {...lp} />
+      {/* Right basket */}
+      <rect x={BX + BW - PAINT_D} y={MCY - PAINT_H} width={PAINT_D} height={PAINT_H * 2}
+        {...lp} fill="rgba(255,255,255,0.07)" />
+      <line x1={R_FT_X} y1={MCY - PAINT_H} x2={R_FT_X} y2={MCY + PAINT_H} {...lp} />
+      <path d={`M ${R_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 0 ${R_FT_X} ${MCY + FT_R}`} {...lp} />
+      <path d={`M ${R_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 1 ${R_FT_X} ${MCY + FT_R}`}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={2} fill="none" strokeDasharray="8 5" />
+      <line x1={BX + BW - 22} y1={MCY - 27} x2={BX + BW - 22} y2={MCY + 27}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={3} />
+      <circle cx={RBX} cy={MCY} r={11} {...lp} />
+      <line x1={BX + BW} y1={TP3_Y1} x2={R_TP3_X} y2={TP3_Y1} {...lp} />
+      <line x1={BX + BW} y1={TP3_Y2} x2={R_TP3_X} y2={TP3_Y2} {...lp} />
+      <path d={`M ${R_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 1 ${R_TP3_X} ${TP3_Y2}`} {...lp} />
+    </g>
+  );
 }
 
-/** Given arrows and players, find nearest player per arrow (within threshold) */
-function buildArrowPlayerMap(
-  arrows: Arrow[],
-  players: Player[]
-): Map<string, string> {
-  const map = new Map<string, string>();
-  const used = new Set<string>();
-  for (const arrow of arrows) {
-    let minDist = 55; // max snap distance in SVG units
-    let nearest: Player | null = null;
-    for (const p of players) {
-      if (used.has(p.id)) continue;
-      const dx = p.x - arrow.x1;
-      const dy = p.y - arrow.y1;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = p;
-      }
-    }
-    if (nearest) {
-      map.set(arrow.id, nearest.id);
-      used.add(nearest.id);
-    }
+/* ─── Player marker ──────────────────────────────────────────────────────── */
+function PlayerMarker({
+  player, isSelected, onPointerDown, interactive,
+}: {
+  player: Player;
+  isSelected: boolean;
+  onPointerDown: (e: React.PointerEvent) => void;
+  interactive: boolean;
+}) {
+  const cls = interactive ? "cursor-grab active:cursor-grabbing" : "";
+
+  if (player.team === "ball") {
+    return (
+      <g transform={`translate(${player.x},${player.y})`}
+        onPointerDown={onPointerDown} style={{ touchAction: "none" }} className={cls}>
+        {isSelected && <circle r={22} fill="none" stroke="#facc15" strokeWidth={2.5} strokeDasharray="4 3" />}
+        <circle r={14} fill="#e8581c" stroke="#5a2700" strokeWidth={1.2} />
+        <path d="M-14,0 Q0,-6 14,0" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+        <path d="M-14,0 Q0,6 14,0" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+        <path d="M0,-14 Q6,0 0,14" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+        <path d="M0,-14 Q-6,0 0,14" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+        <text y={30} textAnchor="middle" fill="rgba(0,0,0,0.7)" stroke="rgba(0,0,0,0.7)"
+          strokeWidth={2} strokeLinejoin="round" fontSize={9} fontWeight="bold">BOLL</text>
+        <text y={30} textAnchor="middle" fill="white" fontSize={9} fontWeight="bold">BOLL</text>
+      </g>
+    );
   }
-  return map;
+
+  const fill = player.team === "home" ? "#dc2626" : "#2563eb";
+  const hasRole = !!(player.role && player.role.trim());
+
+  return (
+    <g transform={`translate(${player.x},${player.y})`}
+      onPointerDown={onPointerDown} style={{ touchAction: "none" }} className={cls}>
+      {isSelected && <circle r={24} fill="none" stroke="#facc15" strokeWidth={2.5} strokeDasharray="4 3" />}
+      <circle r={18} fill={fill} stroke="white" strokeWidth={2.5} />
+      <text textAnchor="middle" dominantBaseline="central" fill="white" fontSize={13} fontWeight="bold">
+        {player.number}
+      </text>
+      {player.name && (
+        <>
+          <text y={31} textAnchor="middle" fill="rgba(0,0,0,0.75)" stroke="rgba(0,0,0,0.75)"
+            strokeWidth={2.5} strokeLinejoin="round" fontSize={9} fontWeight="bold">{player.name}</text>
+          <text y={31} textAnchor="middle" fill="white" fontSize={9} fontWeight="bold">{player.name}</text>
+        </>
+      )}
+      {hasRole && (
+        <>
+          <text y={player.name ? 43 : 31} textAnchor="middle"
+            fill="rgba(0,0,0,0.75)" stroke="rgba(0,0,0,0.75)"
+            strokeWidth={2} strokeLinejoin="round" fontSize={8} fontStyle="italic">{player.role}</text>
+          <text y={player.name ? 43 : 31} textAnchor="middle"
+            fill="#fcd34d" fontSize={8} fontStyle="italic">{player.role}</text>
+        </>
+      )}
+    </g>
+  );
 }
 
-/* ─── Main page ──────────────────────────────────────────────── */
+/* ─── Drawing element ────────────────────────────────────────────────────── */
+function DrawingEl({
+  d, erasable, onErase,
+}: {
+  d: Drawing;
+  erasable: boolean;
+  onErase?: () => void;
+}) {
+  const ep = erasable ? { onClick: onErase, className: "cursor-pointer" } : {};
+  switch (d.type) {
+    case "arrow":
+      return (
+        <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
+          stroke={d.color} strokeWidth={2.5} strokeLinecap="round"
+          markerEnd="url(#ah-y)" {...ep} />
+      );
+    case "dashed":
+      return (
+        <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
+          stroke={d.color} strokeWidth={2.5} strokeLinecap="round"
+          strokeDasharray="9 5" markerEnd="url(#ah-g)" {...ep} />
+      );
+    case "circle": {
+      const r = Math.sqrt((d.x2 - d.x1) ** 2 + (d.y2 - d.y1) ** 2);
+      return (
+        <circle cx={d.x1} cy={d.y1} r={r}
+          stroke={d.color} strokeWidth={2} fill="none" {...ep} />
+      );
+    }
+    case "rect":
+      return (
+        <rect
+          x={Math.min(d.x1, d.x2)} y={Math.min(d.y1, d.y2)}
+          width={Math.abs(d.x2 - d.x1)} height={Math.abs(d.y2 - d.y1)}
+          stroke={d.color} strokeWidth={2} fill="none" {...ep} />
+      );
+    case "zone":
+      return (
+        <rect
+          x={Math.min(d.x1, d.x2)} y={Math.min(d.y1, d.y2)}
+          width={Math.abs(d.x2 - d.x1)} height={Math.abs(d.y2 - d.y1)}
+          fill={d.color} stroke="none" {...ep} />
+      );
+    default:
+      return null;
+  }
+}
+
+/* ─── Sync badge ─────────────────────────────────────────────────────────── */
+function SyncBadge({ status }: { status: "offline" | "connecting" | "live" }) {
+  const c = {
+    offline:    { dot: "bg-slate-400",                label: "Offline (lokal)" },
+    connecting: { dot: "bg-yellow-400 animate-pulse", label: "Ansluter\u2026" },
+    live:       { dot: "bg-green-400",                label: "Realtid aktiv" },
+  }[status];
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+      <span className={`w-2 h-2 rounded-full ${c.dot}`} aria-hidden="true" />
+      {c.label}
+    </span>
+  );
+}
+
+/* ─── Main page ──────────────────────────────────────────────────────────── */
 export default function TaktikPage() {
   const { user, getMyTeam } = useAuth();
   const myTeam = getMyTeam();
-
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [arrows, setArrows] = useState<Arrow[]>([]);
-  const [tool, setTool] = useState<Tool>("select");
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
-  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
-
-  const [tactics, setTactics] = useState<Tactic[]>([]);
-  const [tacticName, setTacticName] = useState("");
-  const [showPanel, setShowPanel] = useState(false);
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [animPos, setAnimPos] = useState<Map<string, { x: number; y: number }>>(
-    new Map()
-  );
-  const animFrameRef = useRef<number>(0);
-
-  const [syncStatus, setSyncStatus] = useState<"offline" | "connecting" | "live">("offline");
-
-  /*
-   * Echo suppression counter: incremented before each push to Firestore,
-   * decremented when we receive our own event back. Using a counter (instead
-   * of a boolean) handles the case where multiple rapid local updates result
-   * in multiple subscription callbacks.
-   */
-  const suppressCountRef = useRef(0);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const isOnline = !!myTeam;
 
-  /* ─── Cast URL (computed client-side to avoid SSR mismatch) ─── */
-  /* Derive a stable cast URL from the team's id and name so the useCast hook
-   * only re-registers when those values actually change (not when the myTeam
-   * object reference changes, which can happen on every re-render because
-   * getMyTeam() reads from localStorage). */
-  const teamIdForCast = myTeam?.id ?? null;
+  const [steps, setSteps] = useState<Step[]>(() => [makeStep("Steg 1")]);
+  const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [tool, setTool] = useState<Tool>("select");
+  const [zoneColor, setZoneColor] = useState(ZONE_COLORS[0].color);
+
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [drawStart, setDrawStart] = useState<{ x: number; y: number } | null>(null);
+  const [drawCursor, setDrawCursor] = useState<{ x: number; y: number } | null>(null);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playStepIdx, setPlayStepIdx] = useState(0);
+  const [playProgress, setPlayProgress] = useState(0);
+
+  const [rightTab, setRightTab] = useState<"players" | "tactics" | "notes">("players");
+  const [showRight, setShowRight] = useState(true);
+
+  const [savedTactics, setSavedTactics] = useState<TacticDoc[]>([]);
+  const [tacticName, setTacticName] = useState("");
+  const [coachNotes, setCoachNotes] = useState("");
+
+  const [syncStatus, setSyncStatus] = useState<"offline" | "connecting" | "live">("offline");
+  const suppressRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const svgRef = useRef<SVGSVGElement>(null);
+  const animStateRef = useRef({ isPlaying: false, stepIdx: 0, stepStart: 0, steps: [] as Step[] });
+  const animRafRef = useRef<number>(0);
+  const liveRef = useRef({ steps, currentStepIdx, coachNotes });
+
+  useEffect(() => {
+    liveRef.current = { steps, currentStepIdx, coachNotes };
+    animStateRef.current.steps = steps;
+  }, [steps, currentStepIdx, coachNotes]);
+
+  const currentStep = steps[currentStepIdx] ?? steps[0];
+
+  const displayPlayers = useMemo(() => {
+    const base = steps[currentStepIdx]?.players ?? [];
+    if (!isPlaying || steps.length < 2) return base;
+    const from = steps[Math.min(playStepIdx, steps.length - 1)];
+    const to   = steps[Math.min(playStepIdx + 1, steps.length - 1)];
+    if (!from || !to) return base;
+    const t = easeInOut(playProgress);
+    return from.players.map(fp => {
+      const tp = to.players.find(p => p.id === fp.id);
+      if (!tp) return fp;
+      return { ...fp, x: fp.x + (tp.x - fp.x) * t, y: fp.y + (tp.y - fp.y) * t };
+    });
+  }, [steps, currentStepIdx, isPlaying, playStepIdx, playProgress]);
+
+  const displayDrawings = useMemo(() => {
+    if (isPlaying && steps.length >= 2)
+      return steps[Math.min(playStepIdx, steps.length - 1)]?.drawings ?? [];
+    return steps[currentStepIdx]?.drawings ?? [];
+  }, [steps, currentStepIdx, isPlaying, playStepIdx]);
+
+  const teamIdForCast   = myTeam?.id ?? null;
   const teamNameForCast = myTeam?.name ?? null;
   const castUrl = useMemo(() => {
-    if (typeof window === "undefined" || !teamIdForCast || !teamNameForCast)
-      return null;
-    return (
-      `${window.location.origin}/cast` +
-      `?team=${teamIdForCast}` +
-      `&name=${encodeURIComponent(teamNameForCast)}`
-    );
+    if (typeof window === "undefined" || !teamIdForCast || !teamNameForCast) return null;
+    return `${window.location.origin}/cast?team=${teamIdForCast}&name=${encodeURIComponent(teamNameForCast)}`;
   }, [teamIdForCast, teamNameForCast]);
+  const { isAvailable: castAvailable, isPresenting, startCast, stopCast } = useCast(castUrl);
 
-  const { isAvailable: castAvailable, isPresenting, startCast, stopCast } =
-    useCast(castUrl);
+  const pushLive = useCallback(() => {
+    if (!isOnline || !user || !myTeam) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const { steps: s, currentStepIdx: ci, coachNotes: cn } = liveRef.current;
+      const step = s[ci] ?? s[0];
+      if (!step) return;
+      suppressRef.current += 1;
+      await setDoc(doc(db, "tactic_live_state", myTeam.id), {
+        teamId: myTeam.id,
+        players: step.players,
+        drawings: step.drawings,
+        steps: s,
+        currentStepIdx: ci,
+        coachNotes: cn,
+        animationPlaying: false,
+        animationStartTime: null,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id,
+      });
+    }, 150);
+  }, [isOnline, user, myTeam]);
 
-  /* ─── Push live board state to Firestore (debounced 120 ms) ─── */
-  const pushLiveState = useCallback(
-    (
-      nextPlayers: Player[],
-      nextArrows: Arrow[],
-      animPlaying = false,
-      animStartTime: string | null = null
-    ) => {
-      if (!isOnline || !user) return;
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = setTimeout(async () => {
-        suppressCountRef.current += 1;
-        await setDoc(
-          doc(db, "tactic_live_state", myTeam!.id),
-          {
-            teamId: myTeam!.id,
-            players: nextPlayers,
-            arrows: nextArrows,
-            animationPlaying: animPlaying,
-            animationStartTime: animStartTime,
-            updatedAt: new Date().toISOString(),
-            updatedBy: user.id,
-          }
-        );
-      }, 120);
-    },
-    [isOnline, user, myTeam]
-  );
+  const getSVGCoords = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) * (CW / rect.width),
+      y: (clientY - rect.top)  * (CH / rect.height),
+    };
+  }, []);
 
-  const getSVGCoords = useCallback(
-    (clientX: number, clientY: number) => {
-      const svg = svgRef.current;
-      if (!svg) return { x: 0, y: 0 };
-      const rect = svg.getBoundingClientRect();
-      const scaleX = W / rect.width;
-      const scaleY = H / rect.height;
-      return {
-        x: (clientX - rect.left) * scaleX,
-        y: (clientY - rect.top) * scaleY,
-      };
+  const updateCurrentStep = useCallback((updater: (s: Step) => Step) => {
+    setSteps(prev => prev.map((s, i) => i === currentStepIdx ? updater(s) : s));
+  }, [currentStepIdx]);
+
+  const movePlayer = useCallback((id: string, x: number, y: number) => {
+    setSteps(prev => prev.map((s, i) =>
+      i === currentStepIdx
+        ? { ...s, players: s.players.map(p => p.id === id ? { ...p, x, y } : p) }
+        : s
+    ));
+  }, [currentStepIdx]);
+
+  const addDrawing = useCallback((d: Drawing) => {
+    updateCurrentStep(s => ({ ...s, drawings: [...s.drawings, d] }));
+  }, [updateCurrentStep]);
+
+  const removeDrawing = useCallback((id: string) => {
+    updateCurrentStep(s => ({ ...s, drawings: s.drawings.filter(d => d.id !== id) }));
+  }, [updateCurrentStep]);
+
+  const removePlayer = useCallback((id: string) => {
+    updateCurrentStep(s => ({ ...s, players: s.players.filter(p => p.id !== id) }));
+  }, [updateCurrentStep]);
+
+  const updatePlayerInfo = useCallback(
+    (id: string, updates: Partial<Pick<Player, "name" | "role">>) => {
+      setSteps(prev => prev.map(s => ({
+        ...s,
+        players: s.players.map(p => p.id === id ? { ...p, ...updates } : p),
+      })));
     },
     []
   );
 
+  const addStep = () => {
+    const label = `Steg ${steps.length + 1}`;
+    const newStep = makeStep(label, steps[currentStepIdx]);
+    setSteps(s => [...s, newStep]);
+    setCurrentStepIdx(steps.length);
+    setSelectedPlayerId(null);
+  };
+
+  const removeStep = (idx: number) => {
+    if (steps.length <= 1) return;
+    setSteps(prev => prev.filter((_, i) => i !== idx));
+    setCurrentStepIdx(prev => Math.max(0, Math.min(prev, steps.length - 2)));
+  };
+
+  const clearBoard = () => {
+    setSteps([makeStep("Steg 1")]);
+    setCurrentStepIdx(0);
+    setCoachNotes("");
+    setSelectedPlayerId(null);
+    stopAnimation();
+  };
+
   const handleSVGPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (isAnimating) return;
+    if (isPlaying) return;
     const coords = getSVGCoords(e.clientX, e.clientY);
-    if (tool === "addO" || tool === "addX") {
-      const newPlayer: Player = {
-        id: crypto.randomUUID(),
-        type: tool === "addO" ? "O" : "X",
-        x: coords.x,
-        y: coords.y,
-      };
-      setPlayers((prev) => {
-        const next = [...prev, newPlayer];
-        pushLiveState(next, arrows);
-        return next;
-      });
-    } else if (tool === "arrow") {
+    if (["arrow", "dashed", "circle", "rect", "zone"].includes(tool)) {
       setDrawStart(coords);
-      setCursorPos(coords);
+      setDrawCursor(coords);
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } else if (tool === "select") {
+      setSelectedPlayerId(null);
     }
   };
 
   const handleSVGPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (isAnimating) return;
-    if (tool === "arrow" && drawStart) {
-      const coords = getSVGCoords(e.clientX, e.clientY);
-      setCursorPos(coords);
-    }
-    if (tool === "select" && draggingId) {
-      const coords = getSVGCoords(e.clientX, e.clientY);
-      setPlayers((prev) => {
-        const next = prev.map((p) =>
-          p.id === draggingId ? { ...p, x: coords.x, y: coords.y } : p
-        );
-        pushLiveState(next, arrows);
-        return next;
-      });
+    if (isPlaying) return;
+    const coords = getSVGCoords(e.clientX, e.clientY);
+    if (drawStart) setDrawCursor(coords);
+    if (tool === "select" && dragId) {
+      movePlayer(dragId, coords.x, coords.y);
+      pushLive();
     }
   };
 
-  const handleSVGPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (isAnimating) return;
-    if (tool === "arrow" && drawStart) {
-      const coords = getSVGCoords(e.clientX, e.clientY);
-      const dx = coords.x - drawStart.x;
-      const dy = coords.y - drawStart.y;
-      if (Math.sqrt(dx * dx + dy * dy) > 10) {
-        const newArrow: Arrow = {
-          id: crypto.randomUUID(),
-          x1: drawStart.x,
-          y1: drawStart.y,
-          x2: coords.x,
-          y2: coords.y,
-        };
-        setArrows((prev) => {
-          const next = [...prev, newArrow];
-          pushLiveState(players, next);
-          return next;
+  const handleSVGPointerUp = () => {
+    if (isPlaying) return;
+    if (drawStart && drawCursor) {
+      const dx = drawCursor.x - drawStart.x;
+      const dy = drawCursor.y - drawStart.y;
+      const minDist = ["circle", "rect", "zone"].includes(tool) ? MIN_SHAPE_DIST : MIN_LINE_DIST;
+      if (Math.sqrt(dx * dx + dy * dy) > minDist) {
+        const color =
+          tool === "arrow"  ? ARROW_COLOR
+          : tool === "dashed" ? DASHED_COLOR
+          : tool === "zone"   ? zoneColor
+          : SHAPE_COLOR;
+        addDrawing({
+          id: crypto.randomUUID(), type: tool as DrawingType, color,
+          x1: drawStart.x, y1: drawStart.y, x2: drawCursor.x, y2: drawCursor.y,
         });
+        pushLive();
       }
-      setDrawStart(null);
-      setCursorPos(null);
     }
-    setDraggingId(null);
+    setDrawStart(null);
+    setDrawCursor(null);
+    setDragId(null);
   };
 
   const handlePlayerPointerDown = (e: React.PointerEvent, id: string) => {
-    if (isAnimating) return;
+    if (isPlaying) return;
+    e.stopPropagation();
     if (tool === "select") {
-      e.stopPropagation();
-      setDraggingId(id);
+      setDragId(id);
+      setSelectedPlayerId(id);
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
     } else if (tool === "erase") {
-      e.stopPropagation();
-      setPlayers((prev) => {
-        const next = prev.filter((p) => p.id !== id);
-        pushLiveState(next, arrows);
-        return next;
+      removePlayer(id);
+      pushLive();
+    }
+  };
+
+  const handleDrawingClick = (id: string) => {
+    if (isPlaying || tool !== "erase") return;
+    removeDrawing(id);
+    pushLive();
+  };
+
+  const stopAnimation = useCallback(() => {
+    cancelAnimationFrame(animRafRef.current);
+    animStateRef.current.isPlaying = false;
+    setIsPlaying(false);
+    setPlayProgress(0);
+  }, []);
+
+  const playAnimation = () => {
+    if (steps.length < 2) return;
+    animStateRef.current = { isPlaying: true, stepIdx: 0, stepStart: performance.now(), steps };
+    setIsPlaying(true);
+    setPlayStepIdx(0);
+    setPlayProgress(0);
+    if (isOnline && user && myTeam) {
+      suppressRef.current += 1;
+      setDoc(doc(db, "tactic_live_state", myTeam.id), {
+        teamId: myTeam.id,
+        players: steps[0].players,
+        drawings: steps[0].drawings,
+        steps,
+        currentStepIdx,
+        coachNotes,
+        animationPlaying: true,
+        animationStartTime: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id,
       });
     }
   };
 
-  const handleArrowClick = (id: string) => {
-    if (isAnimating) return;
-    if (tool === "erase") {
-      setArrows((prev) => {
-        const next = prev.filter((a) => a.id !== id);
-        pushLiveState(players, next);
-        return next;
-      });
-    }
-  };
-
-  /* ─── Animation engine ──────────────────────────────────────── */
-  /**
-   * Start (or resume) an animation from `offsetMs` milliseconds in.
-   * Works for both local playback and synced playback from other clients.
-   */
-  const startAnimationAt = useCallback(
-    (offsetMs: number, sourcePlayers: Player[], sourceArrows: Arrow[]) => {
-      cancelAnimationFrame(animFrameRef.current);
-
-      const arrowPlayerMap = buildArrowPlayerMap(sourceArrows, sourcePlayers);
-      if (arrowPlayerMap.size === 0) return;
-
-      /* If the animation has already finished by the time we receive the event,
-       * settle players at their end positions immediately without animating. */
-      if (offsetMs >= ANIMATION_DURATION) {
-        setPlayers(
-          sourcePlayers.map((p) => {
-            const arrowId = [...arrowPlayerMap.entries()].find(([, pid]) => pid === p.id)?.[0];
-            if (!arrowId) return p;
-            const arrow = sourceArrows.find((a) => a.id === arrowId);
-            return arrow ? { ...p, x: arrow.x2, y: arrow.y2 } : p;
-          })
-        );
-        return;
-      }
-
-      const startTime = performance.now() - offsetMs;
-      setIsAnimating(true);
-
-      const tick = (now: number) => {
-        const raw = Math.min((now - startTime) / ANIMATION_DURATION, 1);
-        const t = easeInOut(raw);
-
-        const newPos = new Map<string, { x: number; y: number }>();
-        for (const [arrowId, playerId] of arrowPlayerMap) {
-          const arrow = sourceArrows.find((a) => a.id === arrowId);
-          if (!arrow) continue;
-          newPos.set(playerId, {
-            x: arrow.x1 + (arrow.x2 - arrow.x1) * t,
-            y: arrow.y1 + (arrow.y2 - arrow.y1) * t,
-          });
-        }
-        setAnimPos(newPos);
-
-        if (raw < 1) {
-          animFrameRef.current = requestAnimationFrame(tick);
+  useEffect(() => {
+    if (!isPlaying) return;
+    let alive = true;
+    const tick = (now: number) => {
+      if (!alive) return;
+      const state = animStateRef.current;
+      if (!state.isPlaying) return;
+      const elapsed  = now - state.stepStart;
+      const progress = Math.min(elapsed / ANIM_MS, 1);
+      setPlayProgress(progress);
+      setPlayStepIdx(state.stepIdx);
+      if (progress >= 1) {
+        if (state.stepIdx < state.steps.length - 2) {
+          animStateRef.current.stepIdx += 1;
+          animStateRef.current.stepStart = now;
         } else {
-          setPlayers((prev) =>
-            prev.map((p) => {
-              const pos = newPos.get(p.id);
-              return pos ? { ...p, x: pos.x, y: pos.y } : p;
-            })
-          );
-          setAnimPos(new Map());
-          setIsAnimating(false);
+          animStateRef.current.isPlaying = false;
+          setIsPlaying(false);
+          setPlayProgress(0);
+          setCurrentStepIdx(state.steps.length - 1);
+          return;
         }
-      };
+      }
+      animRafRef.current = requestAnimationFrame(tick);
+    };
+    animRafRef.current = requestAnimationFrame(tick);
+    return () => { alive = false; cancelAnimationFrame(animRafRef.current); };
+  }, [isPlaying]);
 
-      animFrameRef.current = requestAnimationFrame(tick);
-    },
-    []
-  );
+  useEffect(() => () => cancelAnimationFrame(animRafRef.current), []);
 
-  /* ─── Initial load + real-time subscription ─────────────────── */
   useEffect(() => {
     if (!isOnline) {
-      const saved = localStorage.getItem("basketball_tactics");
-      if (saved) setTactics(JSON.parse(saved) as Tactic[]);
+      try {
+        const saved = localStorage.getItem("basketball_tactics_v2");
+        if (saved) setSavedTactics(JSON.parse(saved));
+      } catch { /* ignore */ }
       return;
     }
-
     setSyncStatus("connecting");
     let cancelled = false;
 
-    /* Real-time: live board state */
-    const liveUnsub = onSnapshot(
-      doc(db, "tactic_live_state", myTeam!.id),
-      (snap) => {
-        if (!snap.exists() || cancelled) return;
-        const live = snap.data();
-
-        /* hasPendingWrites is true when the snapshot reflects a local write
-         * that has not yet been confirmed by the server. Suppressing these
-         * echoes prevents the board from jumping while the user is drawing. */
-        if (snap.metadata.hasPendingWrites) return;
-        if (suppressCountRef.current > 0) {
-          suppressCountRef.current -= 1;
-          return;
-        }
-
-        setPlayers((live.players as Player[]) ?? []);
-        setArrows((live.arrows as Arrow[]) ?? []);
-
-        /* Animation sync */
-        if (live.animationPlaying && live.animationStartTime) {
+    const liveUnsub = onSnapshot(doc(db, "tactic_live_state", myTeam!.id), snap => {
+      if (!snap.exists() || cancelled) return;
+      if (snap.metadata.hasPendingWrites) return;
+      if (suppressRef.current > 0) { suppressRef.current -= 1; return; }
+      const live = snap.data();
+      if (live.steps?.length) {
+        const liveSteps = live.steps as Step[];
+        setSteps(liveSteps);
+        if (typeof live.currentStepIdx === "number") setCurrentStepIdx(live.currentStepIdx);
+        if (typeof live.coachNotes === "string") setCoachNotes(live.coachNotes);
+        if (live.animationPlaying && live.animationStartTime && liveSteps.length >= 2) {
           const elapsed = Date.now() - new Date(live.animationStartTime as string).getTime();
-          startAnimationAt(elapsed, (live.players as Player[]) ?? [], (live.arrows as Arrow[]) ?? []);
+          const total   = (liveSteps.length - 1) * ANIM_MS;
+          if (elapsed < total) {
+            const si          = Math.min(Math.floor(elapsed / ANIM_MS), liveSteps.length - 2);
+            const stepElapsed = elapsed - si * ANIM_MS;
+            animStateRef.current = {
+              isPlaying: true, stepIdx: si,
+              stepStart: performance.now() - stepElapsed,
+              steps: liveSteps,
+            };
+            setPlayStepIdx(si);
+            setIsPlaying(true);
+          }
         } else if (!live.animationPlaying) {
-          cancelAnimationFrame(animFrameRef.current);
-          setIsAnimating(false);
-          setAnimPos(new Map());
+          stopAnimation();
         }
-
-        if (!cancelled) setSyncStatus("live");
       }
-    );
+      if (!cancelled) setSyncStatus("live");
+    });
 
-    /* Real-time: saved tactics list */
     const tacticsUnsub = onSnapshot(
-      query(
-        collection(db, "tactics"),
-        where("teamId", "==", myTeam!.id),
-        orderBy("createdAt", "desc")
-      ),
-      (snap) => {
+      query(collection(db, "tactics"), where("teamId", "==", myTeam!.id), orderBy("createdAt", "desc")),
+      snap => {
         if (cancelled) return;
-        setTactics(
-          snap.docs.map((d) => ({
-            id:        d.id,
-            name:      d.data().name as string,
-            players:   d.data().players as Player[],
-            arrows:    d.data().arrows as Arrow[],
-            createdAt: d.data().createdAt as string,
-          }))
-        );
+        setSavedTactics(snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            name: data.name as string,
+            teamId: data.teamId as string,
+            steps: (data.steps as Step[]) ?? [],
+            coachNotes: (data.coachNotes as string) ?? "",
+            createdAt: data.createdAt as string,
+          };
+        }));
       }
     );
 
@@ -490,425 +681,416 @@ export default function TaktikPage() {
       cancelled = true;
       liveUnsub();
       tacticsUnsub();
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, myTeam?.id]);
 
-  /* Cleanup RAF on unmount */
-  useEffect(() => {
-    return () => cancelAnimationFrame(animFrameRef.current);
-  }, []);
-
-  /* ─── Play animation (broadcast start time to all team members) */
-  const playAnimation = () => {
-    if (isAnimating || arrows.length === 0) return;
-    const startTime = new Date().toISOString();
-    startAnimationAt(0, players, arrows);
-    if (isOnline && user) {
-      suppressCountRef.current += 1;
-      setDoc(doc(db, "tactic_live_state", myTeam!.id), {
-        teamId: myTeam!.id,
-        players,
-        arrows,
-        animationPlaying: true,
-        animationStartTime: startTime,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.id,
-      });
-    }
-  };
-
   const saveTactic = async () => {
     if (!tacticName.trim()) return;
-    const newTactic: Tactic = {
-      id: crypto.randomUUID(),
+    const payload = {
       name: tacticName.trim(),
-      players,
-      arrows,
+      teamId: myTeam?.id ?? "offline",
+      steps,
+      coachNotes,
       createdAt: new Date().toISOString(),
     };
-
-    if (isOnline) {
-      await addDoc(collection(db, "tactics"), {
-        name:      newTactic.name,
-        teamId:    myTeam!.id,
-        players:   newTactic.players,
-        arrows:    newTactic.arrows,
-        createdAt: newTactic.createdAt,
-      });
-      /* List update arrives via subscription */
+    if (isOnline && myTeam) {
+      await addDoc(collection(db, "tactics"), payload);
     } else {
-      const updated = [newTactic, ...tactics];
-      setTactics(updated);
-      localStorage.setItem("basketball_tactics", JSON.stringify(updated));
+      const newDoc: TacticDoc = { ...payload, id: crypto.randomUUID() };
+      const updated = [newDoc, ...savedTactics];
+      setSavedTactics(updated);
+      localStorage.setItem("basketball_tactics_v2", JSON.stringify(updated));
     }
     setTacticName("");
   };
 
-  const loadTactic = (t: Tactic) => {
-    setPlayers(t.players);
-    setArrows(t.arrows);
-    setAnimPos(new Map());
-    setShowPanel(false);
-    pushLiveState(t.players, t.arrows);
+  const loadTactic = (t: TacticDoc) => {
+    const loadedSteps = t.steps?.length ? t.steps : [makeStep("Steg 1")];
+    setSteps(loadedSteps);
+    setCurrentStepIdx(0);
+    setCoachNotes(t.coachNotes ?? "");
+    setTacticName(t.name);
+    setSelectedPlayerId(null);
+    stopAnimation();
+    pushLive();
   };
 
   const deleteTactic = async (id: string) => {
     if (isOnline) {
       await deleteDoc(doc(db, "tactics", id));
-      /* List update arrives via subscription */
     } else {
-      const updated = tactics.filter((t) => t.id !== id);
-      setTactics(updated);
-      localStorage.setItem("basketball_tactics", JSON.stringify(updated));
+      const updated = savedTactics.filter(t => t.id !== id);
+      setSavedTactics(updated);
+      localStorage.setItem("basketball_tactics_v2", JSON.stringify(updated));
     }
   };
 
-  const clearBoard = () => {
-    cancelAnimationFrame(animFrameRef.current);
-    setIsAnimating(false);
-    setAnimPos(new Map());
-    setPlayers([]);
-    setArrows([]);
-    pushLiveState([], [], false, null);
+  const exportPng = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const svgStr = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const img  = new Image();
+    img.onload = () => {
+      const scale  = 2;
+      const canvas = document.createElement("canvas");
+      canvas.width  = CW * scale;
+      canvas.height = CH * scale;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0);
+      canvas.toBlob(b => {
+        if (!b) return;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(b);
+        a.download = `${(tacticName || "taktik").replace(/[^\w\s-]/g, "").trim()}-steg${currentStepIdx + 1}.png`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
   };
 
-  const toolConfig: { id: Tool; label: string; color: string }[] = [
-    { id: "select", label: "↖ Flytta", color: "bg-slate-700" },
-    { id: "addO", label: "O Anfall", color: "bg-emerald-600" },
-    { id: "addX", label: "X Försvar", color: "bg-red-600" },
-    { id: "arrow", label: "→ Pil", color: "bg-yellow-500" },
-    { id: "erase", label: "✕ Radera", color: "bg-slate-500" },
-  ];
+  const svgCursor = isPlaying ? "cursor-default"
+    : tool === "erase"  ? "cursor-pointer"
+    : tool === "select" ? (dragId ? "cursor-grabbing" : "cursor-default")
+    : "cursor-crosshair";
 
-  const cursorClass =
-    isAnimating
-      ? "cursor-default"
-      : tool === "addO" || tool === "addX" || tool === "arrow"
-      ? "cursor-crosshair"
-      : tool === "erase"
-      ? "cursor-pointer"
-      : "cursor-default";
-
-  const canPlay = !isAnimating && arrows.length > 0 && players.length > 0;
-
-  /* ─── Auth guard ────────────────────────────────────────────── */
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <span className="text-5xl">🔒</span>
-        <h2 className="text-xl font-bold text-slate-800">
-          Logga in för att använda taktiktavlan
-        </h2>
+        <h2 className="text-xl font-bold text-slate-800">Logga in för att använda taktiktavlan</h2>
         <p className="text-slate-500 text-sm text-center max-w-sm">
           Du måste vara inloggad för att se och redigera lagets taktiktavla.
         </p>
       </div>
     );
   }
-
   if (!myTeam) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <span className="text-5xl">👥</span>
-        <h2 className="text-xl font-bold text-slate-800">
-          Du tillhör inget lag ännu
-        </h2>
+        <h2 className="text-xl font-bold text-slate-800">Du tillhör inget lag ännu</h2>
         <p className="text-slate-500 text-sm text-center max-w-sm">
-          Gå med i ett lag via inbjudningskoden du fått av din tränare för att
-          komma åt lagets taktiktavla.
+          Gå med i ett lag via inbjudningskoden för att komma åt taktiktavlan.
         </p>
       </div>
     );
   }
 
+  const selectedPlayer = selectedPlayerId
+    ? currentStep?.players.find(p => p.id === selectedPlayerId) ?? null
+    : null;
+
+  const TOOLS: { id: Tool; label: string; bg: string; title: string }[] = [
+    { id: "select", label: "⇖ Välj/Flytta",  bg: "bg-slate-700",  title: "Välj och flytta spelare" },
+    { id: "arrow",  label: "→ Pil",                bg: "bg-yellow-500", title: "Rita rörelsepil (fast linje)" },
+    { id: "dashed", label: "- - Pass",                  bg: "bg-lime-500",   title: "Rita passningslinje (streckad)" },
+    { id: "circle", label: "○ Cirkel",              bg: "bg-pink-500",   title: "Markera ett område med cirkel" },
+    { id: "rect",   label: "□ Ruta",                bg: "bg-pink-500",   title: "Markera ett område med ruta" },
+    { id: "zone",   label: "■ Zon",                 bg: "bg-purple-600", title: "Färgmarkera en zon" },
+    { id: "erase",  label: "✕ Radera",              bg: "bg-slate-500",  title: "Radera spelare eller rita" },
+  ];
+
   return (
-    <div>
+    <div className="flex flex-col gap-3">
+
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🏀</span>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              Interaktiv Taktiktavla
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
-              {myTeam.name}
-            </span>
-            <SyncBadge status={isOnline ? syncStatus : "offline"} />
-
-            {/* Cast button — visible when the Presentation API is supported */}
-            {castAvailable && (
-              <button
-                onClick={isPresenting ? stopCast : startCast}
-                title={
-                  isPresenting
-                    ? "Koppla från extern skärm"
-                    : "Visa taktiktavlan på TV / Chromecast / AirPlay"
-                }
-                className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg transition-colors ${
-                  isPresenting
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                <span>📺</span>
-                {isPresenting ? "Castar" : "Casta"}
-              </button>
-            )}
-          </div>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">🏀</span>
+          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Interaktiv Taktiktavla</h1>
         </div>
-        <p className="text-slate-500 text-sm">
-          Placera spelare, rita rörelsepillar och animera övningen med
-          Play-knappen.
-          {isOnline && " Ändringar synkas i realtid med alla i laget."}
-        </p>
-
-        {/* Casting-active banner */}
-        {isPresenting && (
-          <div className="mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 font-medium flex items-center justify-between gap-2">
-            <span>
-              📺 Castar till extern skärm — alla ändringar syns direkt på TV:n.
-            </span>
-            <button
-              onClick={stopCast}
-              className="shrink-0 font-semibold underline hover:no-underline"
-            >
-              Koppla från
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">{myTeam.name}</span>
+          <SyncBadge status={isOnline ? syncStatus : "offline"} />
+          {castAvailable && (
+            <button onClick={isPresenting ? stopCast : startCast}
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg transition-colors ${isPresenting ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+              <span>📺</span>{isPresenting ? "Castar" : "Casta"}
             </button>
-          </div>
-        )}
+          )}
+          <button onClick={() => setShowRight(v => !v)}
+            className="text-xs px-2 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+            {showRight ? "◄ Dölj panel" : "► Visa panel"}
+          </button>
+        </div>
       </div>
 
+      {isPresenting && (
+        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 font-medium flex items-center justify-between gap-2">
+          <span>📺 Castar till extern skärm — alla ändringar syns direkt.</span>
+          <button onClick={stopCast} className="shrink-0 font-semibold underline hover:no-underline">Koppla från</button>
+        </div>
+      )}
+
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {toolConfig.map(({ id, label, color }) => (
-          <button
-            key={id}
-            onClick={() => !isAnimating && setTool(id)}
-            disabled={isAnimating}
-            className={`px-3 py-2 rounded-xl text-sm font-semibold text-white transition-all ${color} ${
-              tool === id && !isAnimating
-                ? "ring-2 ring-offset-2 ring-orange-400 scale-105"
-                : "opacity-75 hover:opacity-100"
-            } disabled:opacity-40`}
-          >
+      <div className="flex flex-wrap gap-2 items-center">
+        {TOOLS.map(({ id, label, bg, title }) => (
+          <button key={id} title={title}
+            onClick={() => !isPlaying && setTool(id)}
+            disabled={isPlaying}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-all ${bg} ${tool === id && !isPlaying ? "ring-2 ring-offset-1 ring-orange-400 scale-105" : "opacity-75 hover:opacity-100"} disabled:opacity-40`}>
             {label}
           </button>
         ))}
-
-        {/* Play / Stop animation button */}
-        <button
-          onClick={isAnimating ? clearBoard : playAnimation}
-          disabled={!canPlay && !isAnimating}
-          title={
-            arrows.length === 0
-              ? "Rita pilar för att aktivera animationen"
-              : "Animera spelare längs pilarna"
-          }
-          className={`px-3 py-2 rounded-xl text-sm font-semibold text-white transition-all ${
-            isAnimating
-              ? "bg-red-500 hover:bg-red-600"
-              : "bg-green-600 hover:bg-green-700 disabled:opacity-40"
-          }`}
-        >
-          {isAnimating ? "⏹ Stopp" : "▶ Spela upp"}
-        </button>
-
-        <button
-          onClick={clearBoard}
-          disabled={isAnimating}
-          className="px-3 py-2 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors ml-auto disabled:opacity-40"
-        >
-          🗑 Rensa
-        </button>
-        <button
-          onClick={() => setShowPanel((s) => !s)}
-          className="px-3 py-2 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors"
-        >
-          💾 Taktiker ({tactics.length})
-        </button>
+        {tool === "zone" && (
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
+            <span className="text-xs text-slate-500 shrink-0">Zon:</span>
+            {ZONE_COLORS.map(zc => (
+              <button key={zc.color} title={zc.label}
+                onClick={() => setZoneColor(zc.color)}
+                className={`w-5 h-5 rounded-full border-2 transition-all ${zoneColor === zc.color ? "border-slate-900 scale-125" : "border-transparent"}`}
+                style={{ backgroundColor: zc.color.replace("0.35", "0.8") }} />
+            ))}
+          </div>
+        )}
+        <div className="ml-auto">
+          <button onClick={clearBoard} disabled={isPlaying}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40">
+            🗑 Ny tavla
+          </button>
+        </div>
       </div>
 
-      {/* Animation hint */}
-      {arrows.length > 0 && players.length > 0 && !isAnimating && (
-        <div className="mb-3 px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-medium">
-          💡 Tryck på <strong>▶ Spela upp</strong> för att animera spelarna längs pilarna.
-          {isOnline && " Alla i laget ser animationen samtidigt."}
-        </div>
-      )}
-      {isAnimating && (
-        <div className="mb-3 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-700 font-medium animate-pulse">
-          🎬 Animerar spelare…
-        </div>
-      )}
+      {/* Main content */}
+      <div className="flex gap-3 flex-col xl:flex-row">
 
-      <div className="flex flex-col lg:flex-row gap-4">
         {/* Court */}
         <div className="flex-1 min-w-0">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <svg
               ref={svgRef}
-              viewBox={`0 0 ${W} ${H}`}
-              className={`w-full select-none touch-none ${cursorClass}`}
-              style={{ maxHeight: "70vh" }}
+              viewBox={`0 0 ${CW} ${CH}`}
+              className={`w-full select-none touch-none ${svgCursor}`}
+              style={{ maxHeight: "65vh" }}
               onPointerDown={handleSVGPointerDown}
               onPointerMove={handleSVGPointerMove}
               onPointerUp={handleSVGPointerUp}
             >
-              <ArrowMarker />
+              <AllMarkerDefs />
               <BasketballCourt />
-
-              {/* Arrows */}
-              {arrows.map((a) => (
-                <line
-                  key={a.id}
-                  x1={a.x1}
-                  y1={a.y1}
-                  x2={a.x2}
-                  y2={a.y2}
-                  stroke="#facc15"
-                  strokeWidth={2.5}
-                  markerEnd="url(#arrowhead)"
-                  strokeLinecap="round"
-                  className={tool === "erase" && !isAnimating ? "cursor-pointer" : ""}
-                  onClick={() => handleArrowClick(a.id)}
-                />
+              {displayDrawings.filter(d => d.type === "zone").map(d => (
+                <DrawingEl key={d.id} d={d} erasable={tool === "erase" && !isPlaying} onErase={() => handleDrawingClick(d.id)} />
               ))}
-
-              {/* Live arrow preview */}
-              {tool === "arrow" && drawStart && cursorPos && (
-                <line
-                  x1={drawStart.x}
-                  y1={drawStart.y}
-                  x2={cursorPos.x}
-                  y2={cursorPos.y}
-                  stroke="#facc15"
-                  strokeWidth={2}
-                  strokeDasharray="6 3"
-                  markerEnd="url(#arrowhead)"
-                />
-              )}
-
-              {/* Players */}
-              {players.map((p) => {
-                const pos = animPos.get(p.id);
-                const cx = pos ? pos.x : p.x;
-                const cy = pos ? pos.y : p.y;
-                return (
-                  <g
-                    key={p.id}
-                    transform={`translate(${cx},${cy})`}
-                    onPointerDown={(e) => handlePlayerPointerDown(e, p.id)}
-                    className={isAnimating ? "" : "cursor-grab active:cursor-grabbing"}
-                    style={{ touchAction: "none" }}
-                  >
-                    <circle
-                      r={18}
-                      fill={p.type === "O" ? "#16a34a" : "#dc2626"}
-                      stroke="white"
-                      strokeWidth={2}
-                    />
-                    <text
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fill="white"
-                      fontSize={16}
-                      fontWeight="bold"
-                    >
-                      {p.type}
-                    </text>
-                  </g>
-                );
-              })}
+              {displayDrawings.filter(d => d.type !== "zone").map(d => (
+                <DrawingEl key={d.id} d={d} erasable={tool === "erase" && !isPlaying} onErase={() => handleDrawingClick(d.id)} />
+              ))}
+              {drawStart && drawCursor && (() => {
+                const pc = tool === "arrow" ? ARROW_COLOR : tool === "dashed" ? DASHED_COLOR : tool === "zone" ? zoneColor : SHAPE_COLOR;
+                if (tool === "arrow")
+                  return <line x1={drawStart.x} y1={drawStart.y} x2={drawCursor.x} y2={drawCursor.y} stroke={pc} strokeWidth={2} strokeDasharray="6 3" markerEnd="url(#ah-y)" opacity={0.7} />;
+                if (tool === "dashed")
+                  return <line x1={drawStart.x} y1={drawStart.y} x2={drawCursor.x} y2={drawCursor.y} stroke={pc} strokeWidth={2} strokeDasharray="9 5" markerEnd="url(#ah-g)" opacity={0.7} />;
+                if (tool === "circle") {
+                  const r = Math.sqrt((drawCursor.x - drawStart.x) ** 2 + (drawCursor.y - drawStart.y) ** 2);
+                  return <circle cx={drawStart.x} cy={drawStart.y} r={r} stroke={pc} strokeWidth={2} fill="none" opacity={0.7} />;
+                }
+                return <rect x={Math.min(drawStart.x, drawCursor.x)} y={Math.min(drawStart.y, drawCursor.y)} width={Math.abs(drawCursor.x - drawStart.x)} height={Math.abs(drawCursor.y - drawStart.y)} stroke={pc} strokeWidth={2} fill={tool === "zone" ? zoneColor : "none"} opacity={0.7} />;
+              })()}
+              {displayPlayers.map(p => (
+                <PlayerMarker key={p.id} player={p}
+                  isSelected={p.id === selectedPlayerId && !isPlaying}
+                  onPointerDown={e => handlePlayerPointerDown(e, p.id)}
+                  interactive={!isPlaying && (tool === "select" || tool === "erase")} />
+              ))}
             </svg>
           </div>
-
-          {/* Legend */}
-          <div className="flex gap-4 mt-3 text-xs text-slate-500">
-            <div className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-emerald-600 inline-block" />
-              O = Anfallare
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-red-600 inline-block" />
-              X = Försvarare
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-5 h-0.5 bg-yellow-400 inline-block" />
-              Pil = Rörelse/Pass
-            </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-red-600 inline-block" />Hemmalag</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-blue-600 inline-block" />Bortalag</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-orange-500 inline-block" />Boll</span>
+            <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-yellow-400 inline-block" />Rörelse</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed border-lime-500" />Pass</span>
           </div>
         </div>
 
-        {/* Save / Load panel */}
-        {showPanel && (
-          <div className="w-full lg:w-72 shrink-0">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-              <h2 className="font-bold text-slate-900 mb-3">Spara taktik</h2>
-              <div className="flex gap-2 mb-4">
-                <input
-                  type="text"
-                  value={tacticName}
-                  onChange={(e) => setTacticName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && saveTactic()}
-                  placeholder="Namn på taktiken..."
-                  className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-                <button
-                  onClick={saveTactic}
-                  disabled={!tacticName.trim()}
-                  className="px-3 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors"
-                >
-                  💾
-                </button>
+        {/* Right panel */}
+        {showRight && (
+          <div className="w-full xl:w-72 shrink-0">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="flex border-b border-slate-100">
+                {(["players", "tactics", "notes"] as const).map(tab => (
+                  <button key={tab} onClick={() => setRightTab(tab)}
+                    className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${rightTab === tab ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50" : "text-slate-500 hover:text-slate-700"}`}>
+                    {tab === "players" ? "Spelare" : tab === "tactics" ? "💾 Taktiker" : "📝 Noter"}
+                  </button>
+                ))}
               </div>
+              <div className="p-4 space-y-4">
 
-              <h3 className="font-semibold text-slate-700 text-sm mb-2">
-                Sparade taktiker
-              </h3>
-              {tactics.length === 0 ? (
-                <p className="text-slate-400 text-sm">
-                  Inga sparade taktiker ännu.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {tactics.map((t) => (
-                    <li
-                      key={t.id}
-                      className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-slate-800 truncate">
-                          {t.name}
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {t.players.length} spelare · {t.arrows.length} pilar
-                        </p>
+                {rightTab === "players" && (
+                  <>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">🔴 Hemmalag</h3>
+                      <div className="space-y-1.5">
+                        {(steps[0]?.players ?? []).filter(p => p.team === "home").map(p => {
+                          const live = currentStep?.players.find(cp => cp.id === p.id);
+                          return (
+                            <div key={p.id} className="flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded-full bg-red-600 flex items-center justify-center text-white text-xs font-bold shrink-0">{p.number}</span>
+                              <input value={live?.name ?? ""} onChange={e => updatePlayerInfo(p.id, { name: e.target.value })} placeholder={`Spelare ${p.number}`}
+                                className="flex-1 text-xs px-1.5 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400 min-w-0" />
+                            </div>
+                          );
+                        })}
                       </div>
-                      <button
-                        onClick={() => loadTactic(t)}
-                        className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-lg font-medium hover:bg-orange-200 transition-colors"
-                      >
-                        Ladda
-                      </button>
-                      <button
-                        onClick={() => deleteTactic(t.id)}
-                        className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded-lg font-medium hover:bg-red-200 transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">🔵 Bortalag</h3>
+                      <div className="space-y-1">
+                        {(steps[0]?.players ?? []).filter(p => p.team === "away").map(p => (
+                          <div key={p.id} className="flex items-center gap-1.5 text-xs text-slate-500">
+                            <span className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shrink-0">{p.number}</span>
+                            <span>Spelare {p.number}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {selectedPlayer && selectedPlayer.team !== "ball" && (
+                      <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+                        <h3 className="text-xs font-bold text-slate-700 mb-1">
+                          {selectedPlayer.team === "home" ? "🔴" : "🔵"} #{selectedPlayer.number}{selectedPlayer.name ? ` – ${selectedPlayer.name}` : ""}
+                        </h3>
+                        <p className="text-xs text-slate-500 mb-2">Taktisk roll:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {TACTICAL_ROLES.map(role => (
+                            <button key={role} onClick={() => updatePlayerInfo(selectedPlayer.id, { role })}
+                              className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${selectedPlayer.role === role ? "bg-orange-500 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-orange-50 hover:border-orange-300"}`}>
+                              {role}
+                            </button>
+                          ))}
+                          {selectedPlayer.role && (
+                            <button onClick={() => updatePlayerInfo(selectedPlayer.id, { role: undefined })}
+                              className="text-xs px-2 py-0.5 rounded-lg font-medium bg-red-50 border border-red-200 text-red-600 hover:bg-red-100">
+                              ✕ Rensa roll
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {!selectedPlayer && (
+                      <p className="text-xs text-slate-400 text-center py-1">Klicka på en spelare (välj-läge) för att tilldela roll</p>
+                    )}
+                  </>
+                )}
+
+                {rightTab === "tactics" && (
+                  <>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Spara taktik</h3>
+                      <div className="flex gap-2">
+                        <input value={tacticName} onChange={e => setTacticName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveTactic()} placeholder="Namn på taktiken…"
+                          className="flex-1 text-xs px-2 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400 min-w-0" />
+                        <button onClick={saveTactic} disabled={!tacticName.trim()}
+                          className="px-3 py-1.5 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 disabled:opacity-40 transition-colors shrink-0">
+                          💾
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Sparade ({savedTactics.length})</h3>
+                      {savedTactics.length === 0 ? (
+                        <p className="text-xs text-slate-400">Inga sparade taktiker ännu.</p>
+                      ) : (
+                        <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+                          {savedTactics.map(t => (
+                            <li key={t.id} className="flex items-center gap-1.5 bg-slate-50 rounded-xl px-2.5 py-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-800 truncate">{t.name}</p>
+                                <p className="text-xs text-slate-400">{t.steps?.length ?? 0} steg</p>
+                              </div>
+                              <button onClick={() => loadTactic(t)} className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-lg font-medium hover:bg-orange-200 transition-colors shrink-0">Ladda</button>
+                              <button onClick={() => deleteTactic(t.id)} className="text-xs px-1.5 py-0.5 bg-red-100 text-red-600 rounded-lg font-medium hover:bg-red-200 transition-colors shrink-0">✕</button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {rightTab === "notes" && (
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">📝 Tränarinstruktioner</h3>
+                    <textarea value={coachNotes} onChange={e => setCoachNotes(e.target.value)} onBlur={() => pushLive()}
+                      placeholder={"Skriv taktiska instruktioner här…\nEx: Kör Give-and-Go på höger sida.\n#4 sätter skärm vid frisparkslinjen."}
+                      rows={10} className="w-full text-xs px-2.5 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none leading-relaxed" />
+                    <p className="text-xs text-slate-400 mt-1">Sparas med taktiken.</p>
+                  </div>
+                )}
+
+              </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* Timeline */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+            <span className="text-xs font-bold text-slate-500 shrink-0">Steg:</span>
+            {steps.map((step, idx) => (
+              <div key={step.id} className="relative group">
+                <button
+                  onClick={() => { if (!isPlaying) { setCurrentStepIdx(idx); setSelectedPlayerId(null); } }}
+                  disabled={isPlaying}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${idx === currentStepIdx && !isPlaying ? "bg-orange-500 text-white ring-2 ring-offset-1 ring-orange-300" : isPlaying && idx === playStepIdx ? "bg-orange-300 text-white animate-pulse" : "bg-slate-100 text-slate-600 hover:bg-slate-200"} disabled:opacity-70`}>
+                  {step.label}
+                </button>
+                {steps.length > 1 && !isPlaying && (
+                  <button onClick={() => removeStep(idx)} title="Ta bort steg"
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-xs leading-none items-center justify-center hidden group-hover:flex">
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button onClick={addStep} disabled={isPlaying}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors border border-dashed border-slate-300 disabled:opacity-40">
+              + Nytt steg
+            </button>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {steps.length < 2 && !isPlaying && <span className="text-xs text-slate-400 hidden sm:block">Lägg till 2+ steg</span>}
+            <button onClick={isPlaying ? stopAnimation : playAnimation} disabled={!isPlaying && steps.length < 2}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all ${isPlaying ? "bg-red-500 hover:bg-red-600" : "bg-green-600 hover:bg-green-700 disabled:opacity-40"}`}>
+              {isPlaying ? "⏹ Stopp" : "▶ Spela upp"}
+            </button>
+            <button onClick={exportPng} disabled={isPlaying} title="Exportera aktuellt steg som PNG"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-40">
+              🖼 Exportera
+            </button>
+          </div>
+        </div>
+        {isPlaying && (
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-full bg-orange-500 rounded-full transition-none"
+                style={{ width: `${((playStepIdx + playProgress) / Math.max(steps.length - 1, 1)) * 100}%` }} />
+            </div>
+            <span className="text-xs text-orange-600 font-medium animate-pulse shrink-0">
+              🎦 Steg {playStepIdx + 1} → {playStepIdx + 2}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {!isPlaying && steps.length >= 2 && (
+        <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-xl text-xs text-green-700 font-medium">
+          💡 Tryck <strong>▶ Spela upp</strong> för att animera spelarna från steg till steg.
+          {isOnline && " Animationen synkas i realtid med alla i laget."}
+        </div>
+      )}
     </div>
   );
 }

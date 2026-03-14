@@ -8,7 +8,12 @@ import { db } from "@/lib/firebaseClient";
 /* ─── Types (mirrors taktik/page.tsx) ───────────────────────── */
 interface Player {
   id: string;
-  type: "O" | "X";
+  /** Legacy format (old tactic board) */
+  type?: "O" | "X";
+  /** New format (current tactic board) — mutually exclusive with `type` */
+  team?: "home" | "away" | "ball";
+  number?: number;
+  name?: string;
   x: number;
   y: number;
 }
@@ -21,10 +26,24 @@ interface Arrow {
   y2: number;
 }
 
+type DrawingType = "arrow" | "dashed" | "circle" | "rect" | "zone";
+
+interface Drawing {
+  id: string;
+  type: DrawingType;
+  color: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 interface LiveState {
   teamId: string;
   players: Player[];
-  arrows: Arrow[];
+  arrows?: Arrow[];
+  drawings?: Drawing[];
+  steps?: unknown[];
   animationPlaying: boolean;
   animationStartTime: string | null;
 }
@@ -32,6 +51,8 @@ interface LiveState {
 /* ─── Court dimensions ────────────────────────────────────────── */
 const W = 380;
 const H = 510;
+const SOURCE_W = 760;
+const SOURCE_H = 460;
 const ANIMATION_DURATION = 1600;
 
 /* ─── Animation helpers ──────────────────────────────────────── */
@@ -84,6 +105,19 @@ function ArrowMarker() {
   );
 }
 
+function DrawingMarkers() {
+  return (
+    <defs>
+      <marker id="cast-ah-y" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#facc15" />
+      </marker>
+      <marker id="cast-ah-g" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#a3e635" />
+      </marker>
+    </defs>
+  );
+}
+
 function BasketballCourt() {
   const lp = { stroke: "rgba(255,255,255,0.85)", strokeWidth: 2, fill: "none" };
   return (
@@ -125,6 +159,7 @@ function CastBoard() {
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [arrows, setArrows] = useState<Arrow[]>([]);
+  const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [animPos, setAnimPos] = useState<
     Map<string, { x: number; y: number }>
   >(new Map());
@@ -208,6 +243,7 @@ function CastBoard() {
         const live = snap.data() as LiveState;
         setPlayers(live.players ?? []);
         setArrows(live.arrows ?? []);
+        setDrawings(live.drawings ?? []);
 
         if (!connected) setConnected(true);
 
@@ -260,7 +296,40 @@ function CastBoard() {
           style={{ display: "block" }}
         >
           <ArrowMarker />
+          <DrawingMarkers />
           <BasketballCourt />
+
+          {/* Zone drawings (rendered behind other elements) */}
+          {drawings.filter(d => d.type === "zone").map(d => {
+            const x = Math.min(d.x1, d.x2) * (W / SOURCE_W);
+            const y = Math.min(d.y1, d.y2) * (H / SOURCE_H);
+            const w = Math.abs(d.x2 - d.x1) * (W / SOURCE_W);
+            const h = Math.abs(d.y2 - d.y1) * (H / SOURCE_H);
+            return <rect key={d.id} x={x} y={y} width={w} height={h} fill={d.color} stroke="none" />;
+          })}
+          {/* Other drawings */}
+          {drawings.filter(d => d.type !== "zone").map(d => {
+            const sx = W / SOURCE_W, sy = H / SOURCE_H;
+            if (d.type === "arrow") {
+              return <line key={d.id} x1={d.x1*sx} y1={d.y1*sy} x2={d.x2*sx} y2={d.y2*sy}
+                stroke={d.color} strokeWidth={3} strokeLinecap="round" markerEnd="url(#cast-ah-y)" />;
+            }
+            if (d.type === "dashed") {
+              return <line key={d.id} x1={d.x1*sx} y1={d.y1*sy} x2={d.x2*sx} y2={d.y2*sy}
+                stroke={d.color} strokeWidth={3} strokeLinecap="round" strokeDasharray="12 6" markerEnd="url(#cast-ah-g)" />;
+            }
+            if (d.type === "circle") {
+              const avgScale = (sx + sy) / 2;
+              const r = Math.sqrt((d.x2 - d.x1) ** 2 + (d.y2 - d.y1) ** 2) * avgScale;
+              return <circle key={d.id} cx={d.x1*sx} cy={d.y1*sy} r={r} stroke={d.color} strokeWidth={2.5} fill="none" />;
+            }
+            if (d.type === "rect") {
+              const rx = Math.min(d.x1, d.x2) * sx, ry = Math.min(d.y1, d.y2) * sy;
+              const rw = Math.abs(d.x2 - d.x1) * sx, rh = Math.abs(d.y2 - d.y1) * sy;
+              return <rect key={d.id} x={rx} y={ry} width={rw} height={rh} stroke={d.color} strokeWidth={2.5} fill="none" />;
+            }
+            return null;
+          })}
 
           {/* Movement arrows */}
           {arrows.map((a) => (
@@ -282,11 +351,28 @@ function CastBoard() {
             const pos = animPos.get(p.id);
             const cx = pos ? pos.x : p.x;
             const cy = pos ? pos.y : p.y;
+            const isBall = p.team === "ball";
+            const fill = p.team === "home" ? "#dc2626"
+              : p.team === "away" ? "#2563eb"
+              : p.type === "O" ? "#16a34a"
+              : "#dc2626";
+            const label = p.number != null ? String(p.number) : (p.type ?? "");
+            if (isBall) {
+              return (
+                <g key={p.id} transform={`translate(${cx},${cy})`}>
+                  <circle r={14} fill="#e8581c" stroke="#5a2700" strokeWidth={1.2} />
+                  <path d="M-14,0 Q0,-6 14,0" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+                  <path d="M-14,0 Q0,6 14,0" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+                  <path d="M0,-14 Q6,0 0,14" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+                  <path d="M0,-14 Q-6,0 0,14" stroke="#5a2700" strokeWidth={1.4} fill="none" />
+                </g>
+              );
+            }
             return (
               <g key={p.id} transform={`translate(${cx},${cy})`}>
                 <circle
                   r={18}
-                  fill={p.type === "O" ? "#16a34a" : "#dc2626"}
+                  fill={fill}
                   stroke="white"
                   strokeWidth={2}
                 />
@@ -297,7 +383,7 @@ function CastBoard() {
                   fontSize={16}
                   fontWeight="bold"
                 >
-                  {p.type}
+                  {label}
                 </text>
               </g>
             );
