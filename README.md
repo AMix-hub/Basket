@@ -6,6 +6,7 @@ Det här projektet använder [Firebase](https://firebase.google.com) som backend
 
 | Variabel | Beskrivning |
 |---|---|
+| `NEXT_PUBLIC_BASE_URL` | Appens publika bas-URL, t.ex. `https://sport-iq.se` – används som redirect-URL i välkomstmejl och måste vara listad som auktoriserad domän i Firebase |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Firebase Web API-nyckel |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Firebase autentiseringsdomän |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Firebase projekt-ID |
@@ -28,9 +29,10 @@ Du hittar alla värden i [Firebase Console](https://console.firebase.google.com)
    firebase login
    firebase deploy --only firestore:rules,storage
    ```
-6. Lägg till din Vercel-domän som auktoriserad i Firebase:
+6. Lägg till din anpassade domän som auktoriserad i Firebase:
    Gå till **Authentication → Settings → Authorized domains** och klicka **Add domain**.
-   Ange din Vercel-URL, t.ex. `ditt-projekt.vercel.app`.
+   Ange din domän, t.ex. `sport-iq.se`.
+   Lägg även till `www.sport-iq.se` om du har en www-omdirigering.
 
 > **OBS:** Utan steg 6 kommer inloggningen att misslyckas på den deployade appen.
 
@@ -41,8 +43,9 @@ Lägg istället till variablerna direkt i Vercel-dashboarden:
 
 1. Gå till ditt projekt på [vercel.com](https://vercel.com)
 2. Välj **Settings → Environment Variables**
-3. Lägg till alla sju variablerna ovan med dina riktiga värden
-4. Gör en ny deploy (eller tryck **Redeploy**) – Vercel hämtar automatiskt värdena
+3. Lägg till alla variabler ovan med dina riktiga värden, inklusive `NEXT_PUBLIC_BASE_URL=https://sport-iq.se`
+4. Lägg till din anpassade domän under **Settings → Domains** i Vercel
+5. Gör en ny deploy (eller tryck **Redeploy**) – Vercel hämtar automatiskt värdena
 
 ### Lokal utveckling (valfritt)
 

@@ -126,7 +126,13 @@ export async function POST(req: NextRequest) {
 
     // Send password-reset email so user can set their own password
     try {
-      const resetLink = await adminAuth.generatePasswordResetLink(email);
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://sport-iq.se";
+      const resetLink = await adminAuth.generatePasswordResetLink(email, {
+        // Redirect the user to the app after they have set their password.
+        // This domain must be listed in Firebase Console →
+        // Authentication → Settings → Authorized domains.
+        url: baseUrl,
+      });
       // If Firebase Trigger Email extension is configured, queue an email
       await adminDb.collection("mail").add({
         to: email,
