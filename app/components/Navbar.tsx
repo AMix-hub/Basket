@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import { useUnreadCount } from "../hooks/useUnreadCount";
@@ -29,16 +30,42 @@ const mainLinks = [
   { href: "/videor", label: "Videor" },
 ];
 
+/** Simple SportIQ brand mark — lightning bolt in an orange circle */
+function SportIQLogo() {
+  return (
+    <svg
+      width="28"
+      height="28"
+      viewBox="0 0 28 28"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <circle cx="14" cy="14" r="14" fill="#f97316" />
+      <path
+        d="M16 4L9 15h6l-3 9 10-13h-6l4-7z"
+        fill="white"
+      />
+    </svg>
+  );
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, getMyTeam } = useAuth();
   const unread = useUnreadCount();
 
   const sportId = user?.sport ?? "basket";
   const sport = getSport(sportId);
   const yearLinks = getSportYearLinks(sportId);
   const sportHome = sportId === "basket" ? "/basket" : `/${sportId}`;
+
+  /* Club logo: from admin's own profile or from the team they belong to */
+  const team = getMyTeam();
+  const clubLogoUrl = user?.clubLogoUrl ?? team?.clubLogoUrl ?? null;
+  /* Club name: admin has it on their profile; coaches/players get it from the team */
+  const clubName = user?.clubName ?? team?.clubName ?? null;
 
   const handleLogout = async () => {
     await logout();
@@ -62,75 +89,74 @@ export default function Navbar() {
     >
       <div className="max-w-5xl mx-auto px-4">
         <div className="flex items-center gap-2 overflow-x-auto py-2.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {/* Logo */}
+
+          {/* ── Logo / Brand ── */}
           <Link
             href={user ? sportHome : "/"}
             className="flex items-center gap-2 py-1 text-white hover:text-orange-400 transition-colors shrink-0 mr-2"
           >
-            <span className="text-2xl leading-none">{sport.emoji}</span>
-            <span className="text-lg font-bold tracking-tight">{sport.name}</span>
+            {user ? (
+              clubLogoUrl ? (
+                <Image
+                  src={clubLogoUrl}
+                  alt="Klubblogga"
+                  width={28}
+                  height={28}
+                  className="rounded-full object-cover"
+                />
+              ) : (
+                <span className="text-2xl leading-none">{sport.emoji}</span>
+              )
+            ) : (
+              <SportIQLogo />
+            )}
+            <span className="text-lg font-bold tracking-tight">
+              {user ? sport.name : "SportIQ"}
+            </span>
+            {user && clubName && (
+              <span className="hidden sm:block text-xs text-slate-400 font-normal ml-1">
+                {clubName}
+              </span>
+            )}
           </Link>
 
-          <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
-
-          {/* Year pill buttons */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            {yearLinks.map(({ href, label, sub }) => {
-              const isActive = pathname === href;
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
-                    isActive
-                      ? "bg-orange-500 text-white shadow-sm"
-                      : "bg-slate-700/60 text-slate-300 hover:bg-slate-700 hover:text-white"
-                  }`}
-                >
-                  {label}
-                  <span
-                    className={`text-xs ${
-                      isActive ? "text-orange-100/80" : "text-slate-500"
-                    }`}
-                  >
-                    {sub}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-
-          <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
-
-          {/* Main nav links */}
-          <div className="flex items-stretch shrink-0">
-            {mainLinks.map(({ href, label }) => {
-              const isActive = pathname === href;
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`relative flex items-center px-4 py-1 text-sm font-medium transition-colors whitespace-nowrap ${
-                    isActive
-                      ? "text-orange-400"
-                      : "text-slate-300 hover:text-white"
-                  }`}
-                >
-                  {label}
-                  {isActive && (
-                    <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t" />
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Role-based links */}
-          {roleLinks.length > 0 && (
+          {/* ── Rest of nav: only shown when logged in ── */}
+          {user && (
             <>
               <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
+
+              {/* Year pill buttons */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {yearLinks.map(({ href, label, sub }) => {
+                  const isActive = pathname === href;
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
+                        isActive
+                          ? "bg-orange-500 text-white shadow-sm"
+                          : "bg-slate-700/60 text-slate-300 hover:bg-slate-700 hover:text-white"
+                      }`}
+                    >
+                      {label}
+                      <span
+                        className={`text-xs ${
+                          isActive ? "text-orange-100/80" : "text-slate-500"
+                        }`}
+                      >
+                        {sub}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
+
+              {/* Main nav links */}
               <div className="flex items-stretch shrink-0">
-                {roleLinks.map(({ href, label }) => {
+                {mainLinks.map(({ href, label }) => {
                   const isActive = pathname === href;
                   return (
                     <Link
@@ -150,32 +176,58 @@ export default function Navbar() {
                   );
                 })}
               </div>
-            </>
-          )}
 
-          {/* Messages link – only for logged-in users */}
-          {user && (
-            <>
-              <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
-              <Link
-                href="/meddelanden"
-                className={`relative flex items-center gap-1.5 px-3 py-1 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
-                  pathname === "/meddelanden"
-                    ? "text-orange-400"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <span>💬</span>
-                <span>Chatt</span>
-                {unread > 0 && (
-                  <span className="absolute -top-0.5 -right-1 text-xs font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 leading-none">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-                {pathname === "/meddelanden" && (
-                  <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t" />
-                )}
-              </Link>
+              {/* Role-based links */}
+              {roleLinks.length > 0 && (
+                <>
+                  <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
+                  <div className="flex items-stretch shrink-0">
+                    {roleLinks.map(({ href, label }) => {
+                      const isActive = pathname === href;
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          className={`relative flex items-center px-4 py-1 text-sm font-medium transition-colors whitespace-nowrap ${
+                            isActive
+                              ? "text-orange-400"
+                              : "text-slate-300 hover:text-white"
+                          }`}
+                        >
+                          {label}
+                          {isActive && (
+                            <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t" />
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Messages link */}
+              <>
+                <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
+                <Link
+                  href="/meddelanden"
+                  className={`relative flex items-center gap-1.5 px-3 py-1 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+                    pathname === "/meddelanden"
+                      ? "text-orange-400"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <span>💬</span>
+                  <span>Chatt</span>
+                  {unread > 0 && (
+                    <span className="absolute -top-0.5 -right-1 text-xs font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 leading-none">
+                      {unread > 9 ? "9+" : unread}
+                    </span>
+                  )}
+                  {pathname === "/meddelanden" && (
+                    <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t" />
+                  )}
+                </Link>
+              </>
             </>
           )}
 

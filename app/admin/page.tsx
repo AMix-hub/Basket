@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
@@ -57,7 +58,7 @@ interface TrainingFreePeriod {
 const ALL_ROLES: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
 
 export default function AdminPage() {
-  const { user, createTeam } = useAuth();
+  const { user, createTeam, updateClubLogo } = useAuth();
   const [copied, setCopied] = useState<string | null>(null);
   // null = not yet loaded (loading state derived from value)
   const [teams, setTeams] = useState<TeamWithMembers[] | null>(null);
@@ -82,6 +83,11 @@ export default function AdminPage() {
   const [newAgeGroup, setNewAgeGroup] = useState("≤7 år");
   const [creatingTeam, setCreatingTeam] = useState(false);
   const [createTeamError, setCreateTeamError] = useState<string | null>(null);
+
+  // Club logo state
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const [logoSuccess, setLogoSuccess] = useState(false);
 
   const loadTeams = useCallback(async (adminId: string) => {
     /* Fetch all teams belonging to this admin */
@@ -328,6 +334,24 @@ export default function AdminPage() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploading(true);
+    setLogoError(null);
+    setLogoSuccess(false);
+    const err = await updateClubLogo(file);
+    if (err) {
+      setLogoError(err);
+    } else {
+      setLogoSuccess(true);
+      setTimeout(() => setLogoSuccess(false), 3000);
+    }
+    setLogoUploading(false);
+    // Reset file input
+    e.target.value = "";
+  };
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;
@@ -390,6 +414,59 @@ export default function AdminPage() {
         <p className="text-slate-500 text-sm">
           Hantera behöriga, bjud in coacher och följ alla lag i din förening.
         </p>
+      </div>
+
+      {/* Club logo */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
+        <h2 className="font-bold text-slate-900 mb-1">Klubblogga</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Ladda upp din förenings logga. Den visas i navigeringsmenyn för alla
+          coacher, spelare och föräldrar i {user.clubName ?? "din förening"}.
+        </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          {user.clubLogoUrl ? (
+            <div className="flex items-center gap-3">
+              <Image
+                src={user.clubLogoUrl}
+                alt="Klubblogga"
+                width={64}
+                height={64}
+                className="rounded-xl object-cover border border-slate-200"
+              />
+              <span className="text-xs text-slate-500">Nuvarande logga</span>
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center text-2xl border border-dashed border-slate-300">
+              🏛
+            </div>
+          )}
+          <label
+            className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+              logoUploading
+                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                : "bg-orange-500 hover:bg-orange-600 text-white"
+            }`}
+          >
+            {logoUploading ? "Laddar upp…" : "📷 Välj bild"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={logoUploading}
+              onChange={handleLogoUpload}
+            />
+          </label>
+        </div>
+        {logoError && (
+          <p className="mt-3 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+            {logoError}
+          </p>
+        )}
+        {logoSuccess && (
+          <p className="mt-3 text-emerald-600 text-sm bg-emerald-50 px-3 py-2 rounded-xl">
+            ✓ Loggan har uppdaterats!
+          </p>
+        )}
       </div>
 
       {/* Coach invite code */}
