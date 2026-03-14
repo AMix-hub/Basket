@@ -132,7 +132,7 @@ const ATTENDANCE_KEY = "basketball_attendance";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function KalenderPage() {
-  const { user, getMyTeam, getAllTeams } = useAuth();
+  const { user, getMyTeam, getAllTeams, getMyTeams } = useAuth();
   const defaultTeam = getMyTeam();
 
   // For admins with multiple teams, allow selecting which team to view/add to
@@ -202,6 +202,8 @@ export default function KalenderPage() {
   // Create activity modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createModalDate, setCreateModalDate] = useState(toYMD(today));
+  // Team selected in the create modal (required – user must choose a group)
+  const [createModalTeamId, setCreateModalTeamId] = useState<string>("");
 
   // Ref for the selected date panel – used to scroll into view when date is selected
   const dateListRef = useRef<HTMLDivElement>(null);
@@ -226,6 +228,12 @@ export default function KalenderPage() {
   useEffect(() => {
     loadAllTeams();
   }, [loadAllTeams]);
+
+  // Compute the list of teams where the current user may create activities.
+  // Admins see all their teams; coaches/assistants see all teams they belong to.
+  const createableTeams: Team[] = user?.roles.includes("admin")
+    ? allTeams.filter((t) => t.adminId === user.id)
+    : getMyTeams();
 
   // Scroll to the selected date panel when a date is clicked (useful on mobile)
   useEffect(() => {
@@ -354,7 +362,12 @@ export default function KalenderPage() {
 
   /* ── Add session(s) ── */
   const addSession = async () => {
-    if (!newTitle.trim() || !team || !user) return;
+    if (!newTitle.trim() || !user) return;
+    // Resolve the target team: prefer the explicitly selected team from the
+    // create modal; fall back to the currently-viewed team.
+    const targetTeam =
+      createableTeams.find((t) => t.id === createModalTeamId) ?? team;
+    if (!targetTeam) return;
 
     const selectedHall = halls.find((h) => h.id === newHallId);
     const hallFields = selectedHall
@@ -375,7 +388,7 @@ export default function KalenderPage() {
         const batch = writeBatch(db);
         dates.slice(i, i + BATCH_SIZE).forEach((date) => {
           batch.set(doc(collection(db, "sessions")), {
-            teamId: team.id,
+            teamId: targetTeam.id,
             date,
             title: newTitle.trim(),
             type: newType,
@@ -392,7 +405,7 @@ export default function KalenderPage() {
     } else {
       if (!createModalDate) return;
       await addDoc(collection(db, "sessions"), {
-        teamId: team.id,
+        teamId: targetTeam.id,
         date: createModalDate,
         title: newTitle.trim(),
         type: newType,
@@ -1000,10 +1013,16 @@ export default function KalenderPage() {
           )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          {canEdit && team && (
+          {canEdit && createableTeams.length > 0 && (
             <button
               onClick={() => {
-                setCreateModalDate(selectedDate ?? toYMD(today));
+                const date = selectedDate ?? toYMD(today);
+                setCreateModalDate(date);
+                setRecurStartDate(date);
+                setCreateModalTeamId(
+                  createableTeams.find((t) => t.id === team?.id)?.id ??
+                  createableTeams[0].id
+                );
                 setNewTitle("");
                 setNewType("träning");
                 setNewTime("17:00");
@@ -1032,13 +1051,37 @@ export default function KalenderPage() {
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-slate-900 mb-3">Skapa ny aktivitet</h3>
             <div className="space-y-3">
-              {/* Date */}
+              {/* Group selector – required; only teams where user has permission */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  Grupp <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  value={createModalTeamId}
+                  onChange={(e) => setCreateModalTeamId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                  {createableTeams.length === 0 && (
+                    <option value="">Inga lag tillgängliga</option>
+                  )}
+                  {createableTeams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.ageGroup ? ` (${t.ageGroup})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* Date – changing the date also syncs Startdatum for recurring */}
               <div>
                 <label className="text-xs font-semibold text-slate-600 block mb-1">Datum</label>
                 <input
                   type="date"
                   value={createModalDate}
-                  onChange={(e) => setCreateModalDate(e.target.value)}
+                  onChange={(e) => {
+                    setCreateModalDate(e.target.value);
+                    setRecurStartDate(e.target.value);
+                  }}
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>
@@ -1175,6 +1218,7 @@ export default function KalenderPage() {
               </button>
               <button
                 disabled={
+                  !createModalTeamId ||
                   !newTitle.trim() ||
                   (isRecurring
                     ? !recurStartDate || !recurEndDate || recurEndDate < recurStartDate
@@ -1329,10 +1373,15 @@ export default function KalenderPage() {
                     }
                   )}
                 </h3>
-                {canEdit && team && (
+                {canEdit && createableTeams.length > 0 && (
                   <button
                     onClick={() => {
                       setCreateModalDate(selectedDate);
+                      setRecurStartDate(selectedDate);
+                      setCreateModalTeamId(
+                        createableTeams.find((t) => t.id === team?.id)?.id ??
+                        createableTeams[0].id
+                      );
                       setNewTitle("");
                       setNewType("träning");
                       setNewTime("17:00");
