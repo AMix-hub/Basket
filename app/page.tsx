@@ -51,10 +51,10 @@ export default function Home() {
   return (
     <div>
       {/* Hero */}
-      <div className="relative text-center mb-14 py-16 px-4 rounded-3xl overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="relative text-center mb-14 py-16 px-4 -mx-4 overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_30%_50%,_#f97316_0%,_transparent_60%)]" />
         <div className="relative">
-          <div className="flex justify-center mb-5">
+          <div className="flex justify-center items-center gap-3 mb-5">
             <Image
               src="/sportiq-logo.png"
               alt="SportIQ"
@@ -62,6 +62,7 @@ export default function Home() {
               height={80}
               className="rounded-full object-cover shadow-lg"
             />
+            <span className="text-3xl font-extrabold text-white tracking-tight">SportIQ</span>
           </div>
           <span className="inline-flex items-center gap-2 bg-white/10 text-white/80 text-xs font-semibold px-4 py-1.5 rounded-full mb-5 tracking-wide uppercase">
             🏆 Sportplanering för coacher
