@@ -362,9 +362,13 @@ function SyncBadge({ status }: { status: "offline" | "connecting" | "live" }) {
 
 /* ─── Main page ──────────────────────────────────────────────────────────── */
 export default function TaktikPage() {
-  const { user, getMyTeam } = useAuth();
-  const myTeam = getMyTeam();
-  const isOnline = !!myTeam;
+  const { user, getMyTeams } = useAuth();
+  const myTeams = getMyTeams();
+
+  /* ── Team selector ─────────────────────────────────────────────────────── */
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const activeTeam = myTeams.find((t) => t.id === selectedTeamId) ?? myTeams[0] ?? null;
+  const isOnline = !!activeTeam;
 
   const [steps, setSteps] = useState<Step[]>(() => [makeStep("Steg 1")]);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
@@ -394,6 +398,10 @@ export default function TaktikPage() {
   const [syncStatus, setSyncStatus] = useState<"offline" | "connecting" | "live">("offline");
   const suppressRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── Fullscreen ────────────────────────────────────────────────────────── */
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const animStateRef = useRef({ isPlaying: false, stepIdx: 0, stepStart: 0, steps: [] as Step[] });
@@ -427,8 +435,8 @@ export default function TaktikPage() {
     return steps[currentStepIdx]?.drawings ?? [];
   }, [steps, currentStepIdx, isPlaying, playStepIdx]);
 
-  const teamIdForCast   = myTeam?.id ?? null;
-  const teamNameForCast = myTeam?.name ?? null;
+  const teamIdForCast   = activeTeam?.id ?? null;
+  const teamNameForCast = activeTeam?.name ?? null;
   const castUrl = useMemo(() => {
     if (typeof window === "undefined" || !teamIdForCast || !teamNameForCast) return null;
     return `${window.location.origin}/cast?team=${teamIdForCast}&name=${encodeURIComponent(teamNameForCast)}`;
@@ -436,15 +444,15 @@ export default function TaktikPage() {
   const { isAvailable: castAvailable, isPresenting, startCast, stopCast } = useCast(castUrl);
 
   const pushLive = useCallback(() => {
-    if (!isOnline || !user || !myTeam) return;
+    if (!isOnline || !user || !activeTeam) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       const { steps: s, currentStepIdx: ci, coachNotes: cn } = liveRef.current;
       const step = s[ci] ?? s[0];
       if (!step) return;
       suppressRef.current += 1;
-      await setDoc(doc(db, "tactic_live_state", myTeam.id), {
-        teamId: myTeam.id,
+      await setDoc(doc(db, "tactic_live_state", activeTeam.id), {
+        teamId: activeTeam.id,
         players: step.players,
         drawings: step.drawings,
         steps: s,
@@ -456,7 +464,7 @@ export default function TaktikPage() {
         updatedBy: user.id,
       });
     }, 150);
-  }, [isOnline, user, myTeam]);
+  }, [isOnline, user, activeTeam]);
 
   const pushUndo = useCallback(() => {
     const snapshot = structuredClone(liveRef.current.steps) as Step[];
@@ -650,10 +658,10 @@ export default function TaktikPage() {
     setIsPlaying(true);
     setPlayStepIdx(0);
     setPlayProgress(0);
-    if (isOnline && user && myTeam) {
+    if (isOnline && user && activeTeam) {
       suppressRef.current += 1;
-      setDoc(doc(db, "tactic_live_state", myTeam.id), {
-        teamId: myTeam.id,
+      setDoc(doc(db, "tactic_live_state", activeTeam.id), {
+        teamId: activeTeam.id,
         players: steps[0].players,
         drawings: steps[0].drawings,
         steps,
@@ -709,6 +717,25 @@ export default function TaktikPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, isPlaying]);
 
+  /* ── Fullscreen change detection ─────────────────────────────────────── */
+  useEffect(() => {
+    const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFsChange);
+    document.addEventListener("webkitfullscreenchange", handleFsChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFsChange);
+      document.removeEventListener("webkitfullscreenchange", handleFsChange);
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (!document.fullscreenElement) {
+      await boardRef.current?.requestFullscreen?.().catch(() => {});
+    } else {
+      await document.exitFullscreen?.().catch(() => {});
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOnline) {
       try {
@@ -720,7 +747,7 @@ export default function TaktikPage() {
     setSyncStatus("connecting");
     let cancelled = false;
 
-    const liveUnsub = onSnapshot(doc(db, "tactic_live_state", myTeam!.id), snap => {
+    const liveUnsub = onSnapshot(doc(db, "tactic_live_state", activeTeam!.id), snap => {
       if (!snap.exists() || cancelled) return;
       if (snap.metadata.hasPendingWrites) return;
       if (suppressRef.current > 0) { suppressRef.current -= 1; return; }
@@ -752,7 +779,7 @@ export default function TaktikPage() {
     });
 
     const tacticsUnsub = onSnapshot(
-      query(collection(db, "tactics"), where("teamId", "==", myTeam!.id), orderBy("createdAt", "desc")),
+      query(collection(db, "tactics"), where("teamId", "==", activeTeam!.id), orderBy("createdAt", "desc")),
       snap => {
         if (cancelled) return;
         setSavedTactics(snap.docs.map(d => {
@@ -776,18 +803,18 @@ export default function TaktikPage() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnline, myTeam?.id]);
+  }, [isOnline, activeTeam?.id]);
 
   const saveTactic = async () => {
     if (!tacticName.trim()) return;
     const payload = {
       name: tacticName.trim(),
-      teamId: myTeam?.id ?? "offline",
+      teamId: activeTeam?.id ?? "offline",
       steps,
       coachNotes,
       createdAt: new Date().toISOString(),
     };
-    if (isOnline && myTeam) {
+    if (isOnline && activeTeam) {
       await addDoc(collection(db, "tactics"), payload);
     } else {
       const newDoc: TacticDoc = { ...payload, id: crypto.randomUUID() };
@@ -868,7 +895,7 @@ export default function TaktikPage() {
       </div>
     );
   }
-  if (!myTeam) {
+  if (!activeTeam) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
         <span className="text-5xl">👥</span>
@@ -904,7 +931,31 @@ export default function TaktikPage() {
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Interaktiv Taktiktavla</h1>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">{myTeam.name}</span>
+          {/* Team selector: show dropdown when user belongs to multiple teams */}
+          {myTeams.length > 1 ? (
+            <select
+              value={activeTeam.id}
+              onChange={(e) => {
+                setSelectedTeamId(e.target.value);
+                // Full board reset for the new team
+                undoStackRef.current = [];
+                setCanUndo(false);
+                setSteps([makeStep("Steg 1")]);
+                setCurrentStepIdx(0);
+                setCoachNotes("");
+                setTacticName("");
+                setSelectedPlayerId(null);
+                stopAnimation();
+              }}
+              className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-orange-400"
+            >
+              {myTeams.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">{activeTeam.name}</span>
+          )}
           <SyncBadge status={isOnline ? syncStatus : "offline"} />
           {castAvailable && (
             <button onClick={isPresenting ? stopCast : startCast}
@@ -915,6 +966,11 @@ export default function TaktikPage() {
           <button onClick={() => setShowRight(v => !v)}
             className="text-xs px-2 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
             {showRight ? "◄ Dölj panel" : "► Visa panel"}
+          </button>
+          <button onClick={toggleFullscreen}
+            title={isFullscreen ? "Avsluta helskärm (Esc)" : "Helskärm – döljer navigering"}
+            className="text-xs px-2 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+            {isFullscreen ? "⛶ Avsluta" : "⛶ Helskärm"}
           </button>
         </div>
       </div>
@@ -963,13 +1019,13 @@ export default function TaktikPage() {
       <div className="flex gap-3 flex-col xl:flex-row">
 
         {/* Court */}
-        <div className="flex-1 min-w-0">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div ref={boardRef} className={`flex-1 min-w-0 relative${isFullscreen ? " bg-black flex items-center justify-center" : ""}`}>
+          <div className={`overflow-hidden${isFullscreen ? " w-full" : " bg-white rounded-2xl border border-slate-200 shadow-sm"}`}>
             <svg
               ref={svgRef}
               viewBox={`0 0 ${CW} ${CH}`}
               className={`w-full select-none touch-none ${svgCursor}`}
-              style={{ maxHeight: "65vh" }}
+              style={{ maxHeight: isFullscreen ? "100dvh" : "65vh" }}
               onPointerDown={handleSVGPointerDown}
               onPointerMove={handleSVGPointerMove}
               onPointerUp={handleSVGPointerUp}
@@ -1011,13 +1067,25 @@ export default function TaktikPage() {
               ))}
             </svg>
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
-            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-red-600 inline-block" />Hemmalag</span>
-            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-blue-600 inline-block" />Bortalag</span>
-            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-orange-500 inline-block" />Boll</span>
-            <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-yellow-400 inline-block" />Rörelse</span>
-            <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed border-lime-500" />Pass</span>
-          </div>
+          {/* Exit fullscreen button — only shown when in fullscreen mode */}
+          {isFullscreen && (
+            <button
+              onClick={toggleFullscreen}
+              title="Avsluta helskärm (Esc)"
+              className="absolute top-3 right-3 z-10 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-black/50 text-white/80 hover:bg-black/70 transition-colors"
+            >
+              ⛶ Avsluta
+            </button>
+          )}
+          {!isFullscreen && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-red-600 inline-block" />Hemmalag</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-blue-600 inline-block" />Bortalag</span>
+              <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-orange-500 inline-block" />Boll</span>
+              <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 bg-yellow-400 inline-block" />Rörelse</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed border-lime-500" />Pass</span>
+            </div>
+          )}
         </div>
 
         {/* Right panel */}
