@@ -30,19 +30,6 @@ const mainLinks = [
   { href: "/videor", label: "Videor" },
 ];
 
-/** SportIQ logo image */
-function SportIQLogo() {
-  return (
-    <Image
-      src="/sportiq-logo.png"
-      alt="SportIQ"
-      width={50}
-      height={50}
-      className="rounded-full object-cover"
-    />
-  );
-}
-
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -83,13 +70,13 @@ export default function Navbar() {
       <div className="max-w-5xl mx-auto px-4">
         <div className="flex items-center gap-2 overflow-x-auto py-2.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 
-          {/* ── Logo / Brand ── */}
-          <Link
-            href={user ? sportHome : "/"}
-            className="flex items-center gap-2 py-1 text-white hover:text-orange-400 transition-colors shrink-0 mr-2"
-          >
-            {user ? (
-              clubLogoUrl ? (
+          {/* ── Logo / Brand (only when logged in) ── */}
+          {user && (
+            <Link
+              href={sportHome}
+              className="flex items-center gap-2 py-1 text-white hover:text-orange-400 transition-colors shrink-0 mr-2"
+            >
+              {clubLogoUrl ? (
                 <Image
                   src={clubLogoUrl}
                   alt="Klubblogga"
@@ -100,19 +87,17 @@ export default function Navbar() {
                 />
               ) : (
                 <span className="text-2xl leading-none">{sport.emoji}</span>
-              )
-            ) : (
-              <SportIQLogo />
-            )}
-            <span className="text-xl font-extrabold tracking-tight">
-              {user ? sport.name : "SportIQ"}
-            </span>
-            {user && clubName && (
-              <span className="hidden sm:block text-xs text-slate-400 font-normal ml-1">
-                {clubName}
+              )}
+              <span className="text-xl font-extrabold tracking-tight">
+                {sport.name}
               </span>
-            )}
-          </Link>
+              {clubName && (
+                <span className="hidden sm:block text-xs text-slate-400 font-normal ml-1">
+                  {clubName}
+                </span>
+              )}
+            </Link>
+          )}
 
           {/* ── Rest of nav: only shown when logged in ── */}
           {user && (
