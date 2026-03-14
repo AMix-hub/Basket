@@ -40,6 +40,8 @@ export default function DevPage() {
   const [newCategory, setNewCategory] = useState<DevItemCategory>("idea");
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState<DevItemCategory | "all">("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
@@ -100,6 +102,31 @@ export default function DevPage() {
     }
   };
 
+  const startEdit = (item: DevItem) => {
+    if (item.done) return;
+    setEditingId(item.id);
+    setEditText(item.text);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText("");
+  };
+
+  const saveEdit = async (item: DevItem) => {
+    const trimmed = editText.trim();
+    if (!trimmed || trimmed === item.text.trim()) {
+      cancelEdit();
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "dev_items", item.id), { text: trimmed });
+      cancelEdit();
+    } catch {
+      alert("Det gick inte att spara. Försök igen.");
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
@@ -135,6 +162,15 @@ export default function DevPage() {
   const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
   const pending = filtered.filter((i) => !i.done);
   const done    = filtered.filter((i) => i.done);
+
+  const noEditProps = {
+    editing: false as const,
+    editText: "",
+    onEditStart: () => {},
+    onEditChange: () => {},
+    onEditSave: () => {},
+    onEditCancel: () => {},
+  };
 
   return (
     <div>
@@ -226,6 +262,12 @@ export default function DevPage() {
                       item={item}
                       onToggle={() => toggleDone(item)}
                       onDelete={() => removeItem(item)}
+                      editing={editingId === item.id}
+                      editText={editText}
+                      onEditStart={() => startEdit(item)}
+                      onEditChange={setEditText}
+                      onEditSave={() => saveEdit(item)}
+                      onEditCancel={cancelEdit}
                     />
                   ))}
                 </ul>
@@ -245,6 +287,7 @@ export default function DevPage() {
                       item={item}
                       onToggle={() => toggleDone(item)}
                       onDelete={() => removeItem(item)}
+                      {...noEditProps}
                     />
                   ))}
                 </ul>
@@ -265,10 +308,22 @@ function ItemRow({
   item,
   onToggle,
   onDelete,
+  editing,
+  editText,
+  onEditStart,
+  onEditChange,
+  onEditSave,
+  onEditCancel,
 }: {
   item: DevItem;
   onToggle: () => void;
   onDelete: () => void;
+  editing: boolean;
+  editText: string;
+  onEditStart: () => void;
+  onEditChange: (val: string) => void;
+  onEditSave: () => void;
+  onEditCancel: () => void;
 }) {
   const cat = categoryConfig[item.category];
 
@@ -286,9 +341,37 @@ function ItemRow({
         {item.done && <span className="text-xs leading-none">✓</span>}
       </button>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-800"}`}>
-          {item.text}
-        </p>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={editText}
+              onChange={(e) => onEditChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onEditSave();
+                if (e.key === "Escape") onEditCancel();
+              }}
+              autoFocus
+              className="flex-1 border border-orange-300 rounded-lg px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+            <button
+              onClick={onEditSave}
+              className="px-2 py-1 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              Spara
+            </button>
+            <button
+              onClick={onEditCancel}
+              className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Avbryt
+            </button>
+          </div>
+        ) : (
+          <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-800"}`}>
+            {item.text}
+          </p>
+        )}
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
             {cat.emoji} {cat.label}
@@ -303,13 +386,24 @@ function ItemRow({
           )}
         </div>
       </div>
-      <button
-        onClick={onDelete}
-        aria-label="Ta bort"
-        className="text-slate-300 hover:text-red-500 transition-colors text-sm shrink-0 mt-0.5"
-      >
-        ✕
-      </button>
+      <div className="flex items-center gap-1 shrink-0 mt-0.5">
+        {!item.done && !editing && (
+          <button
+            onClick={onEditStart}
+            aria-label="Redigera"
+            className="text-slate-300 hover:text-orange-500 transition-colors text-sm"
+          >
+            ✏️
+          </button>
+        )}
+        <button
+          onClick={onDelete}
+          aria-label="Ta bort"
+          className="text-slate-300 hover:text-red-500 transition-colors text-sm"
+        >
+          ✕
+        </button>
+      </div>
     </li>
   );
 }
