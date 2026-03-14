@@ -126,13 +126,45 @@ export async function POST(req: NextRequest) {
 
     // Send password-reset email so user can set their own password
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_BASE_URL ?? "https://sport-iq.se";
-      const resetLink = await adminAuth.generatePasswordResetLink(email, {
-        // Redirect the user to the app after they have set their password.
+      // Normalize the base URL: strip trailing slash and remove any "www." prefix
+      // so that the link in the email always resolves correctly even if the env
+      // variable was accidentally set with "www." (e.g. https://www.sport-iq.se).
+      const rawBaseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ??
+        process.env.NEXT_PUBLIC_BASE_URL ??
+        "https://sport-iq.se";
+      let baseUrl = rawBaseUrl.replace(/\/$/, "");
+      try {
+        const parsed = new URL(baseUrl);
+        parsed.hostname = parsed.hostname.replace(/^www\./, "");
+        baseUrl = parsed.toString().replace(/\/$/, "");
+      } catch {
+        // If URL parsing fails, proceed with the raw value
+      }
+
+      const firebaseResetLink = await adminAuth.generatePasswordResetLink(email, {
+        // Redirect the user to the app after Firebase has processed the action.
         // This domain must be listed in Firebase Console →
         // Authentication → Settings → Authorized domains.
         url: baseUrl,
       });
+
+      // Build a direct link to the app's own set-password page using the
+      // oobCode from the Firebase password reset link.  This avoids any
+      // intermediate redirect through the Firebase-hosted action handler (which
+      // may be configured with a different domain) and lands the user directly
+      // on the correct page without www-related DNS issues.
+      let setPasswordUrl = firebaseResetLink;
+      try {
+        const parsedActionUrl = new URL(firebaseResetLink);
+        const oobCode = parsedActionUrl.searchParams.get("oobCode");
+        if (oobCode) {
+          setPasswordUrl = `${baseUrl}/set-password?oobCode=${encodeURIComponent(oobCode)}`;
+        }
+      } catch {
+        // Fallback: keep the original Firebase action URL
+      }
+
       // If Firebase Trigger Email extension is configured, queue an email
       await adminDb.collection("mail").add({
         to: email,
@@ -141,7 +173,7 @@ export async function POST(req: NextRequest) {
           html: `
             <p>Hej ${name},</p>
             <p>Du har blivit inbjuden till appen. Klicka på länken nedan för att sätta ditt lösenord och aktivera ditt konto:</p>
-            <p><a href="${resetLink}">${resetLink}</a></p>
+            <p><a href="${setPasswordUrl}">${setPasswordUrl}</a></p>
             <p>Länken är giltig i en begränsad tid (Firebase standard).</p>
             <p>Välkommen!</p>
           `,
