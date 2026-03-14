@@ -38,7 +38,7 @@ const app = getApps().length === 0
   ? initializeApp({
       ...firebaseConfig,
       apiKey:     firebaseConfig.apiKey     || "AIzaSyPlaceholderKeyForBuildOnly0000",
-      authDomain: firebaseConfig.authDomain || "placeholder.firebaseapp.com",
+      authDomain: firebaseConfig.authDomain || "sport-iq.se",
       projectId:  firebaseConfig.projectId  || "placeholder-project",
     })
   : getApps()[0];
