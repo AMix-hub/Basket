@@ -28,11 +28,24 @@ Du hittar alla värden i [Firebase Console](https://console.firebase.google.com)
    firebase login
    firebase deploy --only firestore:rules,storage
    ```
-6. Lägg till din Vercel-domän som auktoriserad i Firebase:
-   Gå till **Authentication → Settings → Authorized domains** och klicka **Add domain**.
-   Ange din Vercel-URL, t.ex. `ditt-projekt.vercel.app`.
+6. Lägg till `sport-iq.se` (och din eventuella Vercel-URL) som auktoriserade domäner i Firebase:
+   - Gå till **Authentication → Settings → Authorized domains**.
+   - Klicka **Add domain** och ange `sport-iq.se`.
+   - Klicka **Add domain** en gång till och ange din Vercel-URL, t.ex. `ditt-projekt.vercel.app`.
 
 > **OBS:** Utan steg 6 kommer inloggningen att misslyckas på den deployade appen.
+
+### Anpassa authDomain till sport-iq.se
+
+Firebase använder `authDomain` för OAuth-omdirigeringar (popup/redirect-flöden). För att använda din egna domän `sport-iq.se`:
+
+1. Se till att `sport-iq.se` är tillagd som **Authorized domain** (se steg 6 ovan).
+2. Sätt `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sport-iq.se` i din `.env.local` (och i Vercel → Settings → Environment Variables).
+3. Konfigurera Firebase Hosting för `sport-iq.se` om du vill att OAuth-redirect-sidan ska servas från din egna domän.
+   Gå till [Firebase Console → Hosting → Add custom domain](https://console.firebase.google.com).
+
+> **Tips:** Utan Firebase Hosting på `sport-iq.se` fungerar popup-baserade inloggningsflöden ändå,
+> men redirect-baserade flöden kräver att domänen är kopplad till Firebase Hosting.
 
 ### Driftsättning via Vercel (rekommenderat)
 
@@ -55,7 +68,7 @@ Om du någon gång vill köra projektet på din egen dator:
 2. Fyll i dina riktiga värden i `.env.local`:
    ```
    NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSy...
-   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=ditt-projekt.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sport-iq.se
    NEXT_PUBLIC_FIREBASE_PROJECT_ID=ditt-projekt-id
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=ditt-projekt.firebasestorage.app
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789012
