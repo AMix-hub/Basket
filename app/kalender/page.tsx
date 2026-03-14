@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   collection,
   query,
@@ -199,6 +199,13 @@ export default function KalenderPage() {
   // Session notes (exercises linked to plan sessions)
   const [sessionNotes, setSessionNotes] = useState<Record<string, SessionNote>>({});
 
+  // Create activity modal state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModalDate, setCreateModalDate] = useState(toYMD(today));
+
+  // Ref for the selected date panel – used to scroll into view when date is selected
+  const dateListRef = useRef<HTMLDivElement>(null);
+
   // Load players & attendance from localStorage
   useEffect(() => {
     const p = localStorage.getItem(PLAYERS_KEY);
@@ -219,6 +226,13 @@ export default function KalenderPage() {
   useEffect(() => {
     loadAllTeams();
   }, [loadAllTeams]);
+
+  // Scroll to the selected date panel when a date is clicked (useful on mobile)
+  useEffect(() => {
+    if (selectedDate && dateListRef.current) {
+      dateListRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [selectedDate]);
 
   // Load halls belonging to the admin of this team (or current user if admin)
   useEffect(() => {
@@ -376,10 +390,10 @@ export default function KalenderPage() {
       }
       await Promise.all(batchPromises);
     } else {
-      if (!selectedDate) return;
+      if (!createModalDate) return;
       await addDoc(collection(db, "sessions"), {
         teamId: team.id,
-        date: selectedDate,
+        date: createModalDate,
         title: newTitle.trim(),
         type: newType,
         time: newTime,
@@ -395,6 +409,7 @@ export default function KalenderPage() {
     setNewEndTime("18:30");
     setNewHallId("");
     setIsRecurring(false);
+    setShowCreateModal(false);
   };
 
   /* ── Delete session (with cancellation modal) ── */
@@ -984,13 +999,196 @@ export default function KalenderPage() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowPlayerPanel((s) => !s)}
-          className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 text-white hover:bg-slate-700 transition-colors shrink-0"
-        >
-          👥 Spelare ({players.length})
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          {canEdit && team && (
+            <button
+              onClick={() => {
+                setCreateModalDate(selectedDate ?? toYMD(today));
+                setNewTitle("");
+                setNewType("träning");
+                setNewTime("17:00");
+                setNewEndTime("18:30");
+                setNewHallId("");
+                setIsRecurring(false);
+                setShowCreateModal(true);
+              }}
+              className="px-4 py-2 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors shrink-0"
+            >
+              + Skapa ny aktivitet
+            </button>
+          )}
+          <button
+            onClick={() => setShowPlayerPanel((s) => !s)}
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 text-white hover:bg-slate-700 transition-colors shrink-0"
+          >
+            👥 Spelare ({players.length})
+          </button>
+        </div>
       </div>
+
+      {/* Create activity modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-900 mb-3">Skapa ny aktivitet</h3>
+            <div className="space-y-3">
+              {/* Date */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Datum</label>
+                <input
+                  type="date"
+                  value={createModalDate}
+                  onChange={(e) => setCreateModalDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+              {/* Title */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Titel</label>
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !isRecurring && addSession()}
+                  placeholder="Titel på passet..."
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+              {/* Type */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Typ</label>
+                <select
+                  value={newType}
+                  onChange={(e) => setNewType(e.target.value as "träning" | "match")}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                  <option value="träning">Träning</option>
+                  <option value="match">Match</option>
+                </select>
+              </div>
+              {/* Times */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs text-slate-500 block mb-0.5">Starttid</label>
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs text-slate-500 block mb-0.5">Sluttid</label>
+                  <input
+                    type="time"
+                    value={newEndTime}
+                    onChange={(e) => setNewEndTime(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+              {/* Hall */}
+              {halls.length > 0 && (
+                <div>
+                  <label className="text-xs text-slate-500 block mb-0.5">Hall</label>
+                  <select
+                    value={newHallId}
+                    onChange={(e) => setNewHallId(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  >
+                    <option value="">🏟 Välj hall (valfritt)</option>
+                    {halls.map((h) => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {/* Recurring toggle */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isRecurring}
+                  onChange={(e) => setIsRecurring(e.target.checked)}
+                  className="accent-orange-500 w-4 h-4"
+                />
+                <span className="text-sm text-slate-700">🔁 Återkommande</span>
+              </label>
+              {/* Recurring fields */}
+              {isRecurring && (
+                <div className="space-y-2 bg-blue-50 rounded-xl p-3 border border-blue-100">
+                  <p className="text-xs font-semibold text-blue-700">Generera återkommande pass</p>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-slate-500 block mb-0.5">Startdatum</label>
+                      <input
+                        type="date"
+                        value={recurStartDate}
+                        onChange={(e) => setRecurStartDate(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-slate-500 block mb-0.5">Slutdatum</label>
+                      <input
+                        type="date"
+                        value={recurEndDate}
+                        min={recurStartDate}
+                        onChange={(e) => setRecurEndDate(e.target.value)}
+                        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Veckodag</label>
+                    <select
+                      value={recurWeekday}
+                      onChange={(e) => setRecurWeekday(Number(e.target.value))}
+                      className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                    >
+                      {WEEKDAY_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {recurStartDate && recurEndDate && recurEndDate >= recurStartDate && (() => {
+                    const allDates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
+                    const filtered = allDates.filter((d) => !isInFreePeriod(d, freePeriods));
+                    const skipped = allDates.length - filtered.length;
+                    return (
+                      <div className="text-xs text-blue-600 space-y-0.5">
+                        <p>{filtered.length} pass kommer att skapas</p>
+                        {skipped > 0 && (
+                          <p className="text-purple-600">🚫 {skipped} datum hoppas över (träningsfria perioder)</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                disabled={
+                  !newTitle.trim() ||
+                  (isRecurring
+                    ? !recurStartDate || !recurEndDate || recurEndDate < recurStartDate
+                    : !createModalDate)
+                }
+                onClick={addSession}
+                className="flex-1 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-40 transition-colors"
+              >
+                {isRecurring ? "🔁 Skapa återkommande" : "+ Lägg till"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* No team banner */}
       {!team && (
@@ -1118,18 +1316,37 @@ export default function KalenderPage() {
         <div className="w-full lg:w-80 shrink-0 space-y-4">
           {/* Selected date panel */}
           {selectedDate && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-              <h3 className="font-bold text-slate-900 mb-3">
-                {new Date(selectedDate + "T12:00:00").toLocaleDateString(
-                  "sv-SE",
-                  {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  }
+            <div ref={dateListRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-slate-900">
+                  {new Date(selectedDate + "T12:00:00").toLocaleDateString(
+                    "sv-SE",
+                    {
+                      weekday: "long",
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    }
+                  )}
+                </h3>
+                {canEdit && team && (
+                  <button
+                    onClick={() => {
+                      setCreateModalDate(selectedDate);
+                      setNewTitle("");
+                      setNewType("träning");
+                      setNewTime("17:00");
+                      setNewEndTime("18:30");
+                      setNewHallId("");
+                      setIsRecurring(false);
+                      setShowCreateModal(true);
+                    }}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600 transition-colors shrink-0"
+                  >
+                    + Lägg till
+                  </button>
                 )}
-              </h3>
+              </div>
 
               {/* Sessions on this date */}
               {/* Training-free period notice */}
@@ -1145,6 +1362,9 @@ export default function KalenderPage() {
                   ? sessionNotes[`${s.planYear}_${s.planSessionNumber}`]
                   : undefined;
                 const isExpanded = selectedSession?.id === s.id;
+                // Find team name for multi-team view
+                const sessionTeam = s.teamId ? allTeams.find((t) => t.id === s.teamId) : null;
+                const showTeamName = selectedTeamId === "__all__" && sessionTeam;
                 return (
                   <div
                     key={s.id}
@@ -1182,6 +1402,11 @@ export default function KalenderPage() {
                             title="Återkommande"
                           >
                             🔁
+                          </span>
+                        )}
+                        {showTeamName && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            👥 {sessionTeam.name}
                           </span>
                         )}
                       </div>
@@ -1254,164 +1479,8 @@ export default function KalenderPage() {
                   </div>
                 );
               })}
-
-              {/* Add session form – only for coaches/admins/assistants */}
-              {canEdit && team && (
-                <div className="mt-3 space-y-2">
-                  <input
-                    type="text"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && !isRecurring && addSession()
-                    }
-                    placeholder="Titel på passet..."
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  />
-                  <div className="flex gap-2">
-                    <select
-                      value={newType}
-                      onChange={(e) =>
-                        setNewType(e.target.value as "träning" | "match")
-                      }
-                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-                    >
-                      <option value="träning">Träning</option>
-                      <option value="match">Match</option>
-                    </select>
-                  </div>
-                  {/* Start and end time */}
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-slate-500 block mb-0.5">Starttid</label>
-                      <input
-                        type="time"
-                        value={newTime}
-                        onChange={(e) => setNewTime(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label className="text-xs text-slate-500 block mb-0.5">Sluttid</label>
-                      <input
-                        type="time"
-                        value={newEndTime}
-                        onChange={(e) => setNewEndTime(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                      />
-                    </div>
-                  </div>
-                  {/* Hall selector */}
-                  {halls.length > 0 && (
-                    <select
-                      value={newHallId}
-                      onChange={(e) => setNewHallId(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-                    >
-                      <option value="">🏟 Välj hall (valfritt)</option>
-                      {halls.map((h) => (
-                        <option key={h.id} value={h.id}>{h.name}</option>
-                      ))}
-                    </select>
-                  )}
-
-                  {/* Recurring toggle */}
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={isRecurring}
-                      onChange={(e) => setIsRecurring(e.target.checked)}
-                      className="accent-orange-500 w-4 h-4"
-                    />
-                    <span className="text-sm text-slate-700">
-                      🔁 Återkommande
-                    </span>
-                  </label>
-
-                  {/* Recurring fields */}
-                  {isRecurring && (
-                    <div className="space-y-2 bg-blue-50 rounded-xl p-3 border border-blue-100">
-                      <p className="text-xs font-semibold text-blue-700">
-                        Generera återkommande pass
-                      </p>
-                      <div className="flex gap-2">
-                        <div className="flex-1">
-                          <label className="text-xs text-slate-500 block mb-0.5">
-                            Startdatum
-                          </label>
-                          <input
-                            type="date"
-                            value={recurStartDate}
-                            onChange={(e) => setRecurStartDate(e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="text-xs text-slate-500 block mb-0.5">
-                            Slutdatum
-                          </label>
-                          <input
-                            type="date"
-                            value={recurEndDate}
-                            min={recurStartDate}
-                            onChange={(e) => setRecurEndDate(e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-xs text-slate-500 block mb-0.5">
-                          Veckodag
-                        </label>
-                        <select
-                          value={recurWeekday}
-                          onChange={(e) =>
-                            setRecurWeekday(Number(e.target.value))
-                          }
-                          className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-                        >
-                          {WEEKDAY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      {recurStartDate &&
-                        recurEndDate &&
-                        recurEndDate >= recurStartDate && (() => {
-                          const allDates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
-                          const filtered = allDates.filter((d) => !isInFreePeriod(d, freePeriods));
-                          const skipped = allDates.length - filtered.length;
-                          return (
-                            <div className="text-xs text-blue-600 space-y-0.5">
-                              <p>{filtered.length} pass kommer att skapas</p>
-                              {skipped > 0 && (
-                                <p className="text-purple-600">
-                                  🚫 {skipped} datum hoppas över (träningsfria perioder)
-                                </p>
-                              )}
-                            </div>
-                          );
-                        })()}
-                    </div>
-                  )}
-
-                  <button
-                    onClick={addSession}
-                    disabled={
-                      !newTitle.trim() ||
-                      (isRecurring
-                        ? !recurStartDate ||
-                          !recurEndDate ||
-                          recurEndDate < recurStartDate
-                        : !selectedDate)
-                    }
-                    className="w-full py-2 rounded-xl bg-orange-500 text-white font-semibold text-sm hover:bg-orange-600 disabled:opacity-40 transition-colors"
-                  >
-                    {isRecurring ? "🔁 Skapa återkommande pass" : "+ Lägg till pass"}
-                  </button>
-                </div>
+              {sessionsOnDate(selectedDate).length === 0 && !isInFreePeriod(selectedDate, freePeriods) && (
+                <p className="text-slate-400 text-sm">Inga aktiviteter på detta datum.</p>
               )}
             </div>
           )}
