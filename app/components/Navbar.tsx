@@ -30,23 +30,16 @@ const mainLinks = [
   { href: "/videor", label: "Videor" },
 ];
 
-/** Simple SportIQ brand mark — lightning bolt in an orange circle */
+/** SportIQ logo image */
 function SportIQLogo() {
   return (
-    <svg
-      width="28"
-      height="28"
-      viewBox="0 0 28 28"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <circle cx="14" cy="14" r="14" fill="#f97316" />
-      <path
-        d="M16 4L9 15h6l-3 9 10-13h-6l4-7z"
-        fill="white"
-      />
-    </svg>
+    <Image
+      src="/sportiq-logo.png"
+      alt="SportIQ"
+      width={28}
+      height={28}
+      className="rounded-full object-cover"
+    />
   );
 }
 
