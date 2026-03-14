@@ -42,8 +42,10 @@ export interface User {
   email: string;
   /** All roles assigned to this user (at least one). */
   roles: UserRole[];
-  /** ID of the team this user belongs to (null if not in a team) */
+  /** Primary team ID (first joined, or null if not in any team). */
   teamId: string | null;
+  /** All team IDs this user belongs to (supports multi-group membership). */
+  teamIds: string[];
   childName?: string;        // parent: child's name in the player list
   coachInviteCode?: string;  // admin:  code coaches use to register
   clubName?: string;         // admin:  association / club name
@@ -97,6 +99,8 @@ interface AuthContextType {
   ) => Promise<string | null>;
   joinTeam: (inviteCode: string, childName?: string) => Promise<boolean>;
   getMyTeam: () => Team | null;
+  /** Returns all teams the current user belongs to (multi-group support). */
+  getMyTeams: () => Team[];
   getAllTeams: () => Promise<Team[]>;
   /**
    * Admin creates a new team. Returns null on success, or a Swedish error string.
@@ -167,7 +171,8 @@ function toUser(id: string, p: DbProfile, email: string): User {
     name: p.name,
     email,
     roles,
-    teamId: null, // resolved separately via team_members
+    teamId: null,   // resolved separately via team_members
+    teamIds: [],    // resolved separately via team_members
     childName: p.childName ?? undefined,
     coachInviteCode: p.coachInviteCode ?? undefined,
     clubName: p.clubName ?? undefined,
@@ -260,6 +265,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]           = useState<User | null>(null);
   const [currentTeam, setCurrentTeam] = useState<Team | null>(null);
+  const [currentTeams, setCurrentTeams] = useState<Team[]>([]);
   const [loading, setLoading]     = useState(true);
 
   /* Load the profile + team for a given auth user */
@@ -284,18 +290,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileData = fallbackProfile;
       }
 
-      /* Find team membership */
-      let teamId: string | null = null;
+      /* Find ALL team memberships (multi-group support) */
       const membershipSnap = await getDocs(
-        query(
-          collection(db, "team_members"),
-          where("userId", "==", authId),
-          limit(1)
-        )
+        query(collection(db, "team_members"), where("userId", "==", authId))
       );
-      if (!membershipSnap.empty) {
-        teamId = membershipSnap.docs[0].data().teamId as string;
-      }
+      const memberTeamIdsSet = new Set(
+        membershipSnap.docs.map((d) => d.data().teamId as string)
+      );
+      let teamId: string | null = membershipSnap.docs.length > 0
+        ? (membershipSnap.docs[0].data().teamId as string)
+        : null;
 
       /* For admins: auto-enroll in all teams they administer (self-healing).
        * This covers teams created before this feature, or when the admin was
@@ -304,15 +308,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (profileData.roles ?? []).includes("admin") ||
         profileData.role === "admin";
       if (isAdminUser) {
-        const [adminTeamsSnap, existingMembershipsSnap] = await Promise.all([
-          getDocs(query(collection(db, "teams"), where("adminId", "==", authId))),
-          getDocs(query(collection(db, "team_members"), where("userId", "==", authId))),
-        ]);
-        const memberTeamIds = new Set(
-          existingMembershipsSnap.docs.map((d) => d.data().teamId as string)
+        const adminTeamsSnap = await getDocs(
+          query(collection(db, "teams"), where("adminId", "==", authId))
         );
         for (const teamDoc of adminTeamsSnap.docs) {
-          if (!memberTeamIds.has(teamDoc.id)) {
+          if (!memberTeamIdsSet.has(teamDoc.id)) {
             await setDoc(doc(db, "team_members", `${teamDoc.id}_${authId}`), {
               teamId: teamDoc.id,
               userId: authId,
@@ -322,6 +322,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await updateDoc(doc(db, "teams", teamDoc.id), {
               memberIds: arrayUnion(authId),
             });
+            memberTeamIdsSet.add(teamDoc.id);
           }
           if (!teamId) {
             teamId = teamDoc.id;
@@ -329,16 +330,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      /* Load all team documents for this user */
+      const allTeamIds = [...memberTeamIdsSet];
+      const teamSnaps = await Promise.all(
+        allTeamIds.map((tid) => getDoc(doc(db, "teams", tid)))
+      );
+      const loadedTeams = teamSnaps
+        .filter((s) => s.exists())
+        .map((s) => toTeam(s.id, s.data() as DbTeam));
+
+      setCurrentTeams(loadedTeams);
+
       const u: User = {
         ...toUser(authId, profileData, email),
         teamId,
+        teamIds: allTeamIds,
       };
 
       setUser(u);
 
       if (teamId) {
-        const teamSnap = await getDoc(doc(db, "teams", teamId));
-        if (teamSnap.exists()) setCurrentTeam(toTeam(teamId, teamSnap.data() as DbTeam));
+        const primaryTeam = loadedTeams.find((t) => t.id === teamId) ?? null;
+        setCurrentTeam(primaryTeam);
       } else {
         setCurrentTeam(null);
       }
@@ -581,6 +594,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth);
     setUser(null);
     setCurrentTeam(null);
+    setCurrentTeams([]);
   };
 
   /* ── joinTeam (for users who already have an account) ── */
@@ -628,18 +642,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await updateDoc(doc(db, "profiles", user.id), { childName });
     }
 
+    const newTeam = toTeam(teamId, teamData);
+
     const updatedUser: User = {
       ...user,
-      teamId,
+      /* Keep existing primary team; only set if the user had none yet */
+      teamId: user.teamId ?? teamId,
+      /* Add to all team memberships */
+      teamIds: [...new Set([...user.teamIds, teamId])],
       ...(childName ? { childName } : {}),
     };
     setUser(updatedUser);
-    setCurrentTeam(toTeam(teamId, teamData));
+
+    /* Update cached teams list */
+    setCurrentTeams((prev) => {
+      const alreadyIn = prev.some((t) => t.id === teamId);
+      return alreadyIn ? prev : [...prev, newTeam];
+    });
+    /* Set primary team if the user didn't have one */
+    if (!currentTeam) {
+      setCurrentTeam(newTeam);
+    }
+
     return true;
   };
 
   /* ── getMyTeam (synchronous, cached) ── */
   const getMyTeam = (): Team | null => currentTeam;
+
+  /* ── getMyTeams (synchronous, cached) – multi-group support ── */
+  const getMyTeams = (): Team[] => currentTeams;
 
   /* ── getAllTeams (for admin page) ── */
   const getAllTeams = async (): Promise<Team[]> => {
@@ -785,6 +817,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         joinTeam,
         getMyTeam,
+        getMyTeams,
         getAllTeams,
         createTeam,
         updateClubLogo,
