@@ -16,6 +16,7 @@ import {
   deleteDoc,
   updateDoc,
   arrayRemove,
+  arrayUnion,
   addDoc,
   onSnapshot,
 } from "firebase/firestore";
@@ -95,6 +96,15 @@ export default function AdminPage() {
   const [logoUrlSaving, setLogoUrlSaving] = useState(false);
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+
+  // Invite user by email state
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteTeamId, setInviteTeamId] = useState("");
+  const [inviteRole, setInviteRole] = useState<UserRole>("player");
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
   const loadTeams = useCallback(async (adminId: string) => {
     /* Fetch all teams belonging to this admin */
@@ -324,6 +334,29 @@ export default function AdminPage() {
         roles: newRoles,
         role: primary,
       });
+
+      // Auto-enroll in all teams if the member is being given the "admin" role
+      if (checked && role === "admin" && user && teams) {
+        for (const t of teams) {
+          const memberDocId = `${t.id}_${member.id}`;
+          const memberDocRef = doc(db, "team_members", memberDocId);
+          const existing = await getDoc(memberDocRef);
+          if (!existing.exists()) {
+            await import("firebase/firestore").then(({ setDoc }) =>
+              setDoc(memberDocRef, {
+                teamId: t.id,
+                userId: member.id,
+                role: "admin",
+                joinedAt: new Date().toISOString(),
+              })
+            );
+            await updateDoc(doc(db, "teams", t.id), {
+              memberIds: arrayUnion(member.id),
+            });
+          }
+        }
+      }
+
       setTeams((prev) =>
         prev
           ? prev.map((t) => ({
@@ -338,6 +371,45 @@ export default function AdminPage() {
       alert("Det gick inte att ändra rollen. Försök igen.");
     } finally {
       setChangingRole(null);
+    }
+  };
+
+  const handleInviteUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim() || !inviteName.trim() || !user) return;
+    setInviteBusy(true);
+    setInviteError(null);
+    setInviteSuccess(null);
+    try {
+      const res = await fetch("/api/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inviteEmail.trim().toLowerCase(),
+          name: inviteName.trim(),
+          teamId: inviteTeamId || undefined,
+          role: inviteRole,
+          adminId: user.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setInviteError(data.error ?? "Något gick fel. Försök igen.");
+      } else {
+        setInviteSuccess(
+          `✓ Inbjudan skickad till ${inviteEmail.trim()}. Användaren kan nu logga in via länken i mailet.`
+        );
+        setInviteEmail("");
+        setInviteName("");
+        setInviteTeamId("");
+        setInviteRole("player");
+        // Reload teams to show new member
+        if (user) loadTeams(user.id);
+      }
+    } catch {
+      setInviteError("Nätverksfel. Kontrollera anslutningen och försök igen.");
+    } finally {
+      setInviteBusy(false);
     }
   };
 
@@ -967,6 +1039,222 @@ export default function AdminPage() {
               ))}
           </ul>
         )}
+      </div>
+
+      {/* Invite user by email */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
+        <h2 className="font-bold text-slate-900 mb-1">✉️ Bjud in användare via e-post</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Skapa ett konto för en ny användare direkt. Personen får ett mail med en länk för att
+          sätta sitt eget lösenord.
+        </p>
+        <form onSubmit={handleInviteUser} className="space-y-3">
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Namn</label>
+              <input
+                type="text"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                placeholder="Personens namn"
+                required
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-slate-600 block mb-1">E-post</label>
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="epost@exempel.se"
+                required
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Roll</label>
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as UserRole)}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              >
+                <option value="player">🏃 Spelare</option>
+                <option value="parent">👪 Förälder</option>
+                <option value="assistant">👋 Assistent</option>
+                <option value="coach">🎽 Coach</option>
+                <option value="admin">🏛 Admin</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Lag (valfritt)</label>
+              <select
+                value={inviteTeamId}
+                onChange={(e) => setInviteTeamId(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              >
+                <option value="">— Inget lag —</option>
+                {(teams ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {inviteError && (
+            <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">{inviteError}</p>
+          )}
+          {inviteSuccess && (
+            <p className="text-emerald-600 text-sm bg-emerald-50 px-3 py-2 rounded-xl">{inviteSuccess}</p>
+          )}
+          <button
+            type="submit"
+            disabled={inviteBusy || !inviteEmail.trim() || !inviteName.trim()}
+            className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors"
+          >
+            {inviteBusy ? "Skickar inbjudan…" : "✉️ Skicka inbjudan"}
+          </button>
+        </form>
+      </div>
+
+      {/* User register – all members across all teams */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
+        <h2 className="font-bold text-slate-900 mb-1">👥 Användarregister</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Alla medlemmar i {user.clubName ?? "föreningen"} – du kan redigera deras grupptillhörighet och roller direkt här.
+        </p>
+        {teams === null ? (
+          <p className="text-slate-400 text-sm">Laddar…</p>
+        ) : (teams ?? []).length === 0 ? (
+          <p className="text-slate-400 text-sm">Inga lag registrerade ännu.</p>
+        ) : (() => {
+          // Collect all unique members across teams
+          const allMembers = new Map<string, { member: ProfileRow; teamIds: string[] }>();
+          (teams ?? []).forEach((t) => {
+            t.members.forEach((m) => {
+              const existing = allMembers.get(m.id);
+              if (existing) {
+                existing.teamIds.push(t.id);
+              } else {
+                allMembers.set(m.id, { member: m, teamIds: [t.id] });
+              }
+            });
+          });
+          const memberList = [...allMembers.values()];
+          if (memberList.length === 0) {
+            return <p className="text-slate-400 text-sm">Inga medlemmar ännu.</p>;
+          }
+          return (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs font-semibold text-slate-500 border-b border-slate-100">
+                    <th className="pb-2 pr-4">Namn</th>
+                    <th className="pb-2 pr-4">Roller</th>
+                    <th className="pb-2">Lag</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {memberList
+                    .sort((a, b) => a.member.name.localeCompare(b.member.name, "sv"))
+                    .map(({ member, teamIds }) => (
+                      <tr key={member.id} className="hover:bg-slate-50">
+                        <td className="py-2 pr-4">
+                          <span className="font-medium text-slate-800">{member.name}</span>
+                          {member.child_name && (
+                            <span className="text-xs text-slate-400 block">
+                              Förälder till {member.child_name}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <div
+                            className={`flex flex-wrap gap-x-3 gap-y-1 ${changingRole === member.id ? "opacity-50 pointer-events-none" : ""}`}
+                          >
+                            {ALL_ROLES.map((r) => {
+                              const isChecked = member.roles.includes(r);
+                              const isLast = isChecked && member.roles.length === 1;
+                              return (
+                                <label
+                                  key={r}
+                                  title={isLast ? "Minst en roll krävs" : undefined}
+                                  className={`flex items-center gap-1 text-xs cursor-pointer select-none ${isLast ? "opacity-60" : ""}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={changingRole === member.id || isLast}
+                                    onChange={(e) => toggleRole(member, r, e.target.checked)}
+                                    className="accent-orange-500 w-3.5 h-3.5 cursor-pointer"
+                                  />
+                                  <span className="text-slate-600">{roleLabel[r]}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </td>
+                        <td className="py-2">
+                          <div className="flex flex-wrap gap-1">
+                            {(teams ?? []).map((t) => {
+                              const isInTeam = teamIds.includes(t.id);
+                              return (
+                                <button
+                                  key={t.id}
+                                  title={isInTeam ? `Ta bort från ${t.name}` : `Lägg till i ${t.name}`}
+                                  onClick={async () => {
+                                    if (isInTeam) {
+                                      // Remove from team
+                                      if (!confirm(`Ta bort ${member.name} från ${t.name}?`)) return;
+                                      try {
+                                        await deleteDoc(doc(db, "team_members", `${t.id}_${member.id}`));
+                                        await updateDoc(doc(db, "teams", t.id), {
+                                          memberIds: arrayRemove(member.id),
+                                        });
+                                        if (user) loadTeams(user.id);
+                                      } catch {
+                                        alert("Kunde inte ta bort. Försök igen.");
+                                      }
+                                    } else {
+                                      // Add to team
+                                      try {
+                                        const memberDocRef = doc(db, "team_members", `${t.id}_${member.id}`);
+                                        await import("firebase/firestore").then(({ setDoc }) =>
+                                          setDoc(memberDocRef, {
+                                            teamId: t.id,
+                                            userId: member.id,
+                                            role: member.roles[0],
+                                            joinedAt: new Date().toISOString(),
+                                          })
+                                        );
+                                        await updateDoc(doc(db, "teams", t.id), {
+                                          memberIds: arrayUnion(member.id),
+                                        });
+                                        if (user) loadTeams(user.id);
+                                      } catch {
+                                        alert("Kunde inte lägga till. Försök igen.");
+                                      }
+                                    }
+                                  }}
+                                  className={`text-xs px-2 py-0.5 rounded-full font-semibold transition-colors ${
+                                    isInTeam
+                                      ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                      : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                  }`}
+                                >
+                                  {t.name} {isInTeam ? "✓" : "+"}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
