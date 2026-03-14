@@ -8,24 +8,10 @@ import { useUnreadCount } from "../hooks/useUnreadCount";
 import { roleEmoji } from "../../lib/roleLabels";
 import { getSport } from "../../lib/sports";
 
-const basketYearLinks = [
-  { href: "/ar1", label: "År 1", sub: "≤7 år" },
-  { href: "/ar2", label: "År 2", sub: "8 år" },
-  { href: "/ar3", label: "År 3", sub: "9 år" },
-];
-
-function getSportYearLinks(sportId: string) {
-  if (sportId === "basket") return basketYearLinks;
-  return [
-    { href: `/${sportId}/ar1`, label: "År 1", sub: "≤7 år" },
-    { href: `/${sportId}/ar2`, label: "År 2", sub: "8 år" },
-    { href: `/${sportId}/ar3`, label: "År 3", sub: "9 år" },
-  ];
-}
-
 const mainLinks = [
   { href: "/taktik", label: "Taktiktavla" },
   { href: "/kalender", label: "Kalender" },
+  { href: "/traningsdatabas", label: "📚 Träningsdatabas" },
   { href: "/statistik", label: "Statistik" },
   { href: "/videor", label: "Videor" },
 ];
@@ -38,7 +24,6 @@ export default function Navbar() {
 
   const sportId = user?.sport ?? "basket";
   const sport = getSport(sportId);
-  const yearLinks = getSportYearLinks(sportId);
   const sportHome = sportId === "basket" ? "/basket" : `/${sportId}`;
 
   /* Club logo: from admin's own profile or from the team they belong to */
@@ -104,39 +89,12 @@ export default function Navbar() {
             <>
               <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
 
-              {/* Year pill buttons */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                {yearLinks.map(({ href, label, sub }) => {
-                  const isActive = pathname === href;
-                  return (
-                    <Link
-                      key={href}
-                      href={href}
-                      className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap ${
-                        isActive
-                          ? "bg-orange-500 text-white shadow-sm"
-                          : "bg-slate-700/60 text-slate-300 hover:bg-slate-700 hover:text-white"
-                      }`}
-                    >
-                      {label}
-                      <span
-                        className={`text-xs ${
-                          isActive ? "text-orange-100/80" : "text-slate-500"
-                        }`}
-                      >
-                        {sub}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-
-              <span className="h-5 w-px bg-slate-700 shrink-0" aria-hidden="true" />
-
               {/* Main nav links */}
               <div className="flex items-stretch shrink-0">
                 {mainLinks.map(({ href, label }) => {
-                  const isActive = pathname === href;
+                  const isActive =
+                    pathname === href ||
+                    (href === "/traningsdatabas" && /\/ar[123]$/.test(pathname));
                   return (
                     <Link
                       key={href}
