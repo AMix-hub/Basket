@@ -26,7 +26,7 @@ Du hittar alla värden i [Firebase Console](https://console.firebase.google.com)
    ```bash
    npm install -g firebase-tools
    firebase login
-   firebase deploy --only firestore:rules
+   firebase deploy --only firestore:rules,storage
    ```
 6. Lägg till din Vercel-domän som auktoriserad i Firebase:
    Gå till **Authentication → Settings → Authorized domains** och klicka **Add domain**.
