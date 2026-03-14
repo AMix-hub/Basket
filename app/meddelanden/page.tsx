@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAuth, User } from "../context/AuthContext";
+import type { Team } from "../context/AuthContext";
 import {
   collection,
   query,
@@ -44,8 +45,11 @@ function formatTime(iso: string): string {
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function MeddelandenPage() {
-  const { user, getMyTeam } = useAuth();
-  const team = getMyTeam();
+  const { user } = useAuth();
+
+  const [allUserTeams, setAllUserTeams]   = useState<Team[]>([]);
+  const [activeTeamId, setActiveTeamId]   = useState<string | null>(null);
+  const activeTeam = allUserTeams.find((t) => t.id === activeTeamId) ?? null;
 
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [messages, setMessages]       = useState<Message[]>([]);
@@ -55,12 +59,48 @@ export default function MeddelandenPage() {
   const [queryError, setQueryError]   = useState<string | null>(null);
   const bottomRef                     = useRef<HTMLDivElement>(null);
 
-  /* ── Load team members ── */
+  /* ── Load all teams the user belongs to ── */
   useEffect(() => {
-    if (!team || !user) return;
+    if (!user) return;
     (async () => {
       const memberSnap = await getDocs(
-        query(collection(db, "team_members"), where("teamId", "==", team.id))
+        query(collection(db, "team_members"), where("userId", "==", user.id))
+      );
+      const teamIds = memberSnap.docs.map((d) => d.data().teamId as string);
+      if (teamIds.length === 0) { setAllUserTeams([]); return; }
+
+      const teamPromises = teamIds.map((id) => getDoc(doc(db, "teams", id)));
+      const teamSnaps = await Promise.all(teamPromises);
+      const teams: Team[] = teamSnaps
+        .filter((s) => s.exists())
+        .map((s) => {
+          const t = s.data()!;
+          return {
+            id: s.id,
+            name: t.name as string,
+            ageGroup: t.ageGroup as string,
+            coachId: (t.coachId as string) ?? "",
+            adminId: t.adminId as string,
+            clubName: (t.clubName as string) ?? "",
+            sport: ((t.sport as string) ?? "basket") as import("../../lib/sports").SportId,
+            memberIds: (t.memberIds as string[]) ?? [],
+            inviteCode: (t.inviteCode as string) ?? "",
+            parentInviteCode: (t.parentInviteCode as string) ?? "",
+            playerInviteCode: (t.playerInviteCode as string) ?? "",
+          } as Team;
+        });
+      setAllUserTeams(teams);
+      setActiveTeamId((prev) => prev ?? (teams.length > 0 ? teams[0].id : null));
+    })();
+  }, [user]);
+
+  /* ── Load team members for the active team ── */
+  useEffect(() => {
+    if (!activeTeam || !user) return;
+    setTeamMembers([]);
+    (async () => {
+      const memberSnap = await getDocs(
+        query(collection(db, "team_members"), where("teamId", "==", activeTeam.id))
       );
 
       const ids = memberSnap.docs
@@ -86,23 +126,24 @@ export default function MeddelandenPage() {
                 p.roles && (p.roles as string[]).length > 0
                   ? (p.roles as string[])
                   : [p.role as string],
-              teamId: team.id,
+              teamId: activeTeam.id,
               childName: p.childName as string | undefined,
               createdAt: "",
             } as User;
           })
       );
     })();
-  }, [team, user]);
+  }, [activeTeam, user]);
 
-  /* ── Load + subscribe to messages ── */
+  /* ── Load + subscribe to messages for all user's teams ── */
   useEffect(() => {
-    if (!team) return;
+    if (allUserTeams.length === 0) return;
 
-    const q = query(
-      collection(db, "messages"),
-      where("teamId", "==", team.id)
-    );
+    // Firestore `in` operator supports at most 30 values
+    const teamIds = allUserTeams.map((t) => t.id).slice(0, 30);
+    const q = teamIds.length === 1
+      ? query(collection(db, "messages"), where("teamId", "==", teamIds[0]))
+      : query(collection(db, "messages"), where("teamId", "in", teamIds));
 
     const unsubscribe = onSnapshot(
       q,
@@ -133,12 +174,13 @@ export default function MeddelandenPage() {
     );
 
     return () => unsubscribe();
-  }, [team]);
+  }, [allUserTeams]);
 
   /* ── Mark visible messages as read ── */
   useEffect(() => {
-    if (!user || !team) return;
+    if (!user || !activeTeam) return;
     const toMark = messages.filter((m) => {
+      if (m.teamId !== activeTeam.id) return false;
       const isInThread =
         selected === "team"
           ? m.recipientId === null
@@ -153,15 +195,16 @@ export default function MeddelandenPage() {
       await updateDoc(doc(db, "messages", m.id), { readBy: newReadBy });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, messages.length, user?.id, team?.id]);
+  }, [selected, activeTeamId, messages.length, user?.id]);
 
   /* ── Auto-scroll to bottom ── */
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, selected]);
 
-  /* ── Thread messages ── */
+  /* ── Thread messages (scoped to active team) ── */
   const threadMessages = messages.filter((m) => {
+    if (m.teamId !== activeTeam?.id) return false;
     if (selected === "team") return m.recipientId === null;
     return (
       (m.senderId === user?.id && m.recipientId === selected) ||
@@ -170,9 +213,15 @@ export default function MeddelandenPage() {
   });
 
   /* ── Unread counts ── */
-  const unreadTeam = messages.filter(
-    (m) => m.recipientId === null && m.senderId !== user?.id && !m.readBy.includes(user?.id ?? "")
-  ).length;
+  // Per-team unread team chat messages
+  const unreadForTeam = (teamId: string) =>
+    messages.filter(
+      (m) =>
+        m.teamId === teamId &&
+        m.recipientId === null &&
+        m.senderId !== user?.id &&
+        !m.readBy.includes(user?.id ?? "")
+    ).length;
 
   const unreadDM = (memberId: string) =>
     messages.filter(
@@ -181,9 +230,9 @@ export default function MeddelandenPage() {
 
   /* ── Send message ── */
   const sendMessage = async () => {
-    if (!draft.trim() || !user || !team) return;
+    if (!draft.trim() || !user || !activeTeam) return;
     const msg = {
-      teamId:      team.id,
+      teamId:      activeTeam.id,
       senderId:    user.id,
       senderName:  user.name,
       recipientId: selected === "team" ? null : selected,
@@ -214,7 +263,7 @@ export default function MeddelandenPage() {
 
   const threadTitle =
     selected === "team"
-      ? `💬 Lagchatt – ${team?.name ?? "Laget"}`
+      ? `💬 Lagchatt – ${activeTeam?.name ?? "Laget"}`
       : `✉️ ${selectedMember?.name ?? "Direktmeddelande"}`;
 
   /* ── Not logged in ── */
@@ -234,7 +283,7 @@ export default function MeddelandenPage() {
   }
 
   /* ── No team ── */
-  if (!team) {
+  if (user && allUserTeams.length === 0) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
@@ -262,19 +311,38 @@ export default function MeddelandenPage() {
       >
         {/* Sidebar */}
         <div className="w-full shrink-0 flex flex-col gap-1 overflow-y-auto max-h-36 md:w-56 md:max-h-none">
-          <button
-            onClick={() => setSelected("team")}
-            className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left w-full ${
-              selected === "team" ? "bg-orange-500 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            <span className="flex items-center gap-2 truncate"><span>💬</span><span className="truncate">Lagchatt</span></span>
-            {unreadTeam > 0 && selected !== "team" && (
-              <span className="ml-1 shrink-0 text-xs font-bold bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
-                {unreadTeam > 9 ? "9+" : unreadTeam}
-              </span>
-            )}
-          </button>
+          {/* Team chats – one per team the user belongs to */}
+          {allUserTeams.length > 1 && (
+            <p className="text-xs text-slate-400 font-semibold px-1 pb-0.5 uppercase tracking-wide">
+              Lagchattar
+            </p>
+          )}
+          {allUserTeams.map((t) => {
+            const isActiveTeamChat = activeTeamId === t.id && selected === "team";
+            const teamUnread = unreadForTeam(t.id);
+            return (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setActiveTeamId(t.id);
+                  setSelected("team");
+                }}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left w-full ${
+                  isActiveTeamChat ? "bg-orange-500 text-white" : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span className="flex items-center gap-2 truncate">
+                  <span>💬</span>
+                  <span className="truncate">{allUserTeams.length > 1 ? t.name : "Lagchatt"}</span>
+                </span>
+                {teamUnread > 0 && !isActiveTeamChat && (
+                  <span className="ml-1 shrink-0 text-xs font-bold bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                    {teamUnread > 9 ? "9+" : teamUnread}
+                  </span>
+                )}
+              </button>
+            );
+          })}
 
           {teamMembers.length > 0 && (
             <p className="text-xs text-slate-400 font-semibold px-1 pt-2 pb-0.5 uppercase tracking-wide">
@@ -316,7 +384,7 @@ export default function MeddelandenPage() {
           <div className="px-4 py-3 border-b border-slate-100 shrink-0">
             <p className="font-bold text-slate-900 text-sm">{threadTitle}</p>
             {selected === "team" && (
-              <p className="text-xs text-slate-400 mt-0.5">Alla i {team.name} ser dessa meddelanden</p>
+              <p className="text-xs text-slate-400 mt-0.5">Alla i {activeTeam?.name ?? "laget"} ser dessa meddelanden</p>
             )}
           </div>
 
@@ -384,7 +452,7 @@ export default function MeddelandenPage() {
               />
               <button
                 onClick={sendMessage}
-                disabled={!draft.trim()}
+                disabled={!draft.trim() || !activeTeam}
                 className="shrink-0 w-10 h-10 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
                 aria-label="Skicka"
               >

@@ -7,7 +7,6 @@ import {
   where,
   onSnapshot,
   addDoc,
-  deleteDoc,
   doc,
   writeBatch,
 } from "firebase/firestore";
@@ -22,8 +21,20 @@ interface Player {
   number: number;
 }
 
+interface SubActivity {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface SessionNote {
+  subActivities: SubActivity[];
+  comment: string;
+}
+
 interface TrainingSession {
   id: string;
+  teamId?: string;
   date: string; // YYYY-MM-DD
   title: string;
   type: "träning" | "match";
@@ -32,6 +43,8 @@ interface TrainingSession {
   hallId?: string;
   hallName?: string;
   recurringGroupId?: string;
+  planYear?: number;
+  planSessionNumber?: number;
 }
 
 interface Hall {
@@ -168,6 +181,24 @@ export default function KalenderPage() {
   const [cancelReason, setCancelReason] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
 
+  // Delete scope for recurring sessions
+  const [deleteScope, setDeleteScope] = useState<"single" | "all" | "specific">("single");
+  const [selectedDeleteIds, setSelectedDeleteIds] = useState<Set<string>>(new Set());
+
+  // Edit session modal
+  const [editingSession, setEditingSession] = useState<TrainingSession | null>(null);
+  const [editScope, setEditScope] = useState<"single" | "all" | "specific">("single");
+  const [editTitle, setEditTitle] = useState("");
+  const [editType, setEditType] = useState<"träning" | "match">("träning");
+  const [editTime, setEditTime] = useState("");
+  const [editEndTime, setEditEndTime] = useState("");
+  const [editHallId, setEditHallId] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
+  const [selectedEditIds, setSelectedEditIds] = useState<Set<string>>(new Set());
+
+  // Session notes (exercises linked to plan sessions)
+  const [sessionNotes, setSessionNotes] = useState<Record<string, SessionNote>>({});
+
   // Load players & attendance from localStorage
   useEffect(() => {
     const p = localStorage.getItem(PLAYERS_KEY);
@@ -221,29 +252,61 @@ export default function KalenderPage() {
     return () => unsub();
   }, [user, team]);
 
-  // Subscribe to Firestore sessions for this team
+  // Subscribe to Firestore sessions for this team (or all teams when "__all__" is selected)
   useEffect(() => {
+    const mapSession = (d: import("firebase/firestore").QueryDocumentSnapshot): TrainingSession => ({
+      id: d.id,
+      teamId: (d.data().teamId as string | undefined) ?? undefined,
+      date: d.data().date as string,
+      title: d.data().title as string,
+      type: d.data().type as "träning" | "match",
+      time: d.data().time as string,
+      endTime: (d.data().endTime as string | undefined) ?? undefined,
+      hallId: (d.data().hallId as string | undefined) ?? undefined,
+      hallName: (d.data().hallName as string | undefined) ?? undefined,
+      recurringGroupId: (d.data().recurringGroupId as string | undefined) ?? undefined,
+      planYear: (d.data().planYear as number | undefined) ?? undefined,
+      planSessionNumber: (d.data().planSessionNumber as number | undefined) ?? undefined,
+    });
+
+    if (selectedTeamId === "__all__" && allTeams.length > 0) {
+      // Firestore `in` operator supports at most 30 values
+      const teamIds = allTeams.map((t) => t.id).slice(0, 30);
+      const q = query(collection(db, "sessions"), where("teamId", "in", teamIds));
+      const unsubscribe = onSnapshot(q, (snap) => {
+        setSessions(snap.docs.map(mapSession));
+      });
+      return () => unsubscribe();
+    }
+
     if (!team) {
       setSessions([]);
       return;
     }
     const q = query(collection(db, "sessions"), where("teamId", "==", team.id));
     const unsubscribe = onSnapshot(q, (snap) => {
-      const loaded: TrainingSession[] = snap.docs.map((d) => ({
-        id: d.id,
-        date: d.data().date as string,
-        title: d.data().title as string,
-        type: d.data().type as "träning" | "match",
-        time: d.data().time as string,
-        endTime: (d.data().endTime as string | undefined) ?? undefined,
-        hallId: (d.data().hallId as string | undefined) ?? undefined,
-        hallName: (d.data().hallName as string | undefined) ?? undefined,
-        recurringGroupId:
-          (d.data().recurringGroupId as string | undefined) ?? undefined,
-      }));
-      setSessions(loaded);
+      setSessions(snap.docs.map(mapSession));
     });
     return () => unsubscribe();
+  }, [team, selectedTeamId, allTeams]);
+
+  // Subscribe to session_notes so we can show linked exercises in the calendar
+  useEffect(() => {
+    if (!team) { setSessionNotes({}); return; }
+    const q = query(collection(db, "session_notes"), where("teamId", "==", team.id));
+    const unsub = onSnapshot(q, (snap) => {
+      const loaded: Record<string, SessionNote> = {};
+      snap.docs.forEach((d) => {
+        const planYear = d.data().planYear as number;
+        const sessionNumber = d.data().sessionNumber as number;
+        loaded[`${planYear}_${sessionNumber}`] = {
+          subActivities: (d.data().subActivities as SubActivity[]) ?? [],
+          comment: (d.data().comment as string) ?? "",
+        };
+      });
+      setSessionNotes(loaded);
+    });
+    return () => unsub();
   }, [team]);
 
   const savePlayers = (updated: Player[]) => {
@@ -338,57 +401,153 @@ export default function KalenderPage() {
   const requestDeleteSession = (s: TrainingSession) => {
     setCancellingSession(s);
     setCancelReason("");
+    setDeleteScope("single");
+    setSelectedDeleteIds(new Set([s.id]));
   };
 
   const confirmDelete = async () => {
-    if (!cancellingSession || !team || !user) return;
-    if (!cancelReason.trim()) return; // reason is mandatory
+    if (!cancellingSession || !user) return;
+    if (!cancelReason.trim()) return;
     setCancelBusy(true);
+
+    // Resolve which team to notify
+    const notifyTeam =
+      allTeams.find((t) => t.id === cancellingSession.teamId) ?? team;
+
     try {
-      await deleteDoc(doc(db, "sessions", cancellingSession.id));
-      const updatedAtt = attendance.filter(
-        (a) => a.sessionId !== cancellingSession.id
-      );
-      saveAttendance(updatedAtt);
-      if (selectedSession?.id === cancellingSession.id) setSelectedSession(null);
+      // Determine which session IDs to delete based on scope
+      let idsToDelete: string[];
+      if (deleteScope === "all" && cancellingSession.recurringGroupId) {
+        idsToDelete = sessions
+          .filter((s) => s.recurringGroupId === cancellingSession.recurringGroupId)
+          .map((s) => s.id);
+      } else if (deleteScope === "specific") {
+        idsToDelete = [...selectedDeleteIds];
+      } else {
+        idsToDelete = [cancellingSession.id];
+      }
 
-      // Post cancellation message to team chat (reason is always required now)
-      const dateLabel = new Date(
-        cancellingSession.date + "T12:00:00"
-      ).toLocaleDateString("sv-SE", {
-        weekday: "long",
-        month: "long",
-        day: "numeric",
-      });
-      await addDoc(collection(db, "messages"), {
-        teamId: team.id,
-        senderId: user.id,
-        senderName: user.name,
-        recipientId: null,
-        text: `⚠️ ${cancellingSession.title} (${dateLabel} ${cancellingSession.time}) är inställt. Anledning: ${cancelReason.trim()}`,
-        sentAt: new Date().toISOString(),
-        readBy: [user.id],
-      });
+      // Delete in Firestore batches (max 500 per batch)
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < idsToDelete.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        idsToDelete.slice(i, i + BATCH_SIZE).forEach((id) =>
+          batch.delete(doc(db, "sessions", id))
+        );
+        await batch.commit();
+      }
 
-      // Send push notification + email to all team members via API route.
-      // This is fire-and-forget (non-blocking) — UI doesn't wait for it.
-      fetch("/api/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId: team.id,
-          sessionTitle: cancellingSession.title,
-          sessionDate: cancellingSession.date,
-          sessionTime: cancellingSession.time,
-          reason: cancelReason.trim(),
-        }),
-      }).catch((err) => {
-        console.warn("[notify] Push/email notification failed:", err);
-      });
+      // Clean up local attendance
+      const deletedSet = new Set(idsToDelete);
+      saveAttendance(attendance.filter((a) => !deletedSet.has(a.sessionId)));
+      if (selectedSession && deletedSet.has(selectedSession.id)) setSelectedSession(null);
+
+      // Post cancellation message to team chat (only if we have a team)
+      if (notifyTeam) {
+        const dateLabel = new Date(
+          cancellingSession.date + "T12:00:00"
+        ).toLocaleDateString("sv-SE", {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        });
+        const countNote = idsToDelete.length > 1 ? ` (${idsToDelete.length} pass)` : "";
+        await addDoc(collection(db, "messages"), {
+          teamId: notifyTeam.id,
+          senderId: user.id,
+          senderName: user.name,
+          recipientId: null,
+          text: `⚠️ ${cancellingSession.title}${countNote} (${dateLabel} ${cancellingSession.time}) är inställt. Anledning: ${cancelReason.trim()}`,
+          sentAt: new Date().toISOString(),
+          readBy: [user.id],
+        });
+
+        // Send push notification + email (fire-and-forget)
+        fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teamId: notifyTeam.id,
+            sessionTitle: cancellingSession.title,
+            sessionDate: cancellingSession.date,
+            sessionTime: cancellingSession.time,
+            reason: cancelReason.trim(),
+          }),
+        }).catch((err) => {
+          console.warn("[notify] Push/email notification failed:", err);
+        });
+      }
     } finally {
       setCancelBusy(false);
       setCancellingSession(null);
       setCancelReason("");
+      setDeleteScope("single");
+      setSelectedDeleteIds(new Set());
+    }
+  };
+
+  /* ── Edit session ── */
+  const requestEditSession = (s: TrainingSession) => {
+    setEditingSession(s);
+    setEditTitle(s.title);
+    setEditType(s.type);
+    setEditTime(s.time);
+    setEditEndTime(s.endTime ?? "");
+    setEditHallId(s.hallId ?? "");
+    setEditScope("single");
+    setSelectedEditIds(new Set([s.id]));
+  };
+
+  const confirmEdit = async () => {
+    if (!editingSession || !user) return;
+    setEditBusy(true);
+    try {
+      let idsToEdit: string[];
+      if (editScope === "all" && editingSession.recurringGroupId) {
+        idsToEdit = sessions
+          .filter((s) => s.recurringGroupId === editingSession.recurringGroupId)
+          .map((s) => s.id);
+      } else if (editScope === "specific") {
+        idsToEdit = [...selectedEditIds];
+      } else {
+        idsToEdit = [editingSession.id];
+      }
+
+      const selectedHall = halls.find((h) => h.id === editHallId);
+      const updates: Record<string, unknown> = {
+        title: editTitle.trim(),
+        type: editType,
+        time: editTime,
+        endTime: editEndTime || null,
+        hallId: selectedHall?.id ?? null,
+        hallName: selectedHall?.name ?? null,
+      };
+
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < idsToEdit.length; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        idsToEdit.slice(i, i + BATCH_SIZE).forEach((id) =>
+          batch.update(doc(db, "sessions", id), updates)
+        );
+        await batch.commit();
+      }
+
+      // Update selectedSession if it was edited
+      if (selectedSession && idsToEdit.includes(selectedSession.id)) {
+        setSelectedSession({
+          ...selectedSession,
+          title: editTitle.trim(),
+          type: editType,
+          time: editTime,
+          endTime: editEndTime || undefined,
+          hallId: selectedHall?.id,
+          hallName: selectedHall?.name,
+        });
+      }
+
+      setEditingSession(null);
+    } finally {
+      setEditBusy(false);
     }
   };
 
@@ -529,6 +688,14 @@ export default function KalenderPage() {
   const sessionsOnDate = (date: string) =>
     sessions.filter((s) => s.date === date);
 
+  // Pre-compute recurring group sessions to avoid repeated filter calls in render
+  const deletingGroupSessions = cancellingSession?.recurringGroupId
+    ? sessions.filter((s) => s.recurringGroupId === cancellingSession.recurringGroupId)
+    : [];
+  const editingGroupSessions = editingSession?.recurringGroupId
+    ? sessions.filter((s) => s.recurringGroupId === editingSession.recurringGroupId)
+    : [];
+
   /* ── Not logged in ── */
   if (!user) {
     return (
@@ -548,12 +715,68 @@ export default function KalenderPage() {
       {/* Cancellation modal */}
       {cancellingSession && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-slate-900 mb-1">Ställ in pass</h3>
             <p className="text-sm text-slate-500 mb-1">
               Vill du ställa in{" "}
               <strong>{cancellingSession.title}</strong>?
             </p>
+
+            {/* Recurring scope selector */}
+            {cancellingSession.recurringGroupId && (
+              <div className="mb-3 space-y-1.5">
+                <p className="text-xs font-semibold text-slate-600">Vilka pass ska ställas in?</p>
+                {(["single", "all", "specific"] as const).map((scope) => (
+                  <label key={scope} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="radio"
+                      name="deleteScope"
+                      value={scope}
+                      checked={deleteScope === scope}
+                      onChange={() => {
+                        setDeleteScope(scope);
+                        if (scope === "single") setSelectedDeleteIds(new Set([cancellingSession.id]));
+                        if (scope === "all") setSelectedDeleteIds(new Set(deletingGroupSessions.map((s) => s.id)));
+                        if (scope === "specific") setSelectedDeleteIds(new Set([cancellingSession.id]));
+                      }}
+                      className="accent-red-500"
+                    />
+                    {scope === "single" && "Bara detta pass"}
+                    {scope === "all" && `Alla återkommande pass (${deletingGroupSessions.length} st)`}
+                    {scope === "specific" && "Välj specifika pass"}
+                  </label>
+                ))}
+
+                {/* Specific selection list */}
+                {deleteScope === "specific" && (
+                  <div className="mt-2 max-h-40 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                    {deletingGroupSessions
+                      .slice()
+                      .sort((a, b) => a.date.localeCompare(b.date))
+                      .map((s) => (
+                        <label key={s.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50 text-xs">
+                          <input
+                            type="checkbox"
+                            checked={selectedDeleteIds.has(s.id)}
+                            onChange={(e) => {
+                              const next = new Set(selectedDeleteIds);
+                              if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
+                              setSelectedDeleteIds(next);
+                            }}
+                            className="accent-red-500"
+                          />
+                          <span>
+                            {new Date(s.date + "T12:00:00").toLocaleDateString("sv-SE", {
+                              weekday: "short", day: "numeric", month: "short",
+                            })} {s.time}
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <p className="text-xs text-red-600 font-medium mb-3">
               * Anledning är obligatorisk – laget meddelas via chatten.
             </p>
@@ -569,17 +792,155 @@ export default function KalenderPage() {
                 onClick={() => {
                   setCancellingSession(null);
                   setCancelReason("");
+                  setDeleteScope("single");
+                  setSelectedDeleteIds(new Set());
                 }}
                 className="flex-1 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Avbryt
               </button>
               <button
-                disabled={cancelBusy || !cancelReason.trim()}
+                disabled={cancelBusy || !cancelReason.trim() || (deleteScope === "specific" && selectedDeleteIds.size === 0)}
                 onClick={confirmDelete}
                 className="flex-1 py-2 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-50 transition-colors"
               >
                 {cancelBusy ? "…" : "Ställ in"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit session modal */}
+      {editingSession && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-900 mb-3">Redigera pass</h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Titel</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">Typ</label>
+                <select
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value as "träning" | "match")}
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                >
+                  <option value="träning">Träning</option>
+                  <option value="match">Match</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Starttid</label>
+                  <input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Sluttid</label>
+                  <input
+                    type="time"
+                    value={editEndTime}
+                    onChange={(e) => setEditEndTime(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+              </div>
+              {halls.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Hall</label>
+                  <select
+                    value={editHallId}
+                    onChange={(e) => setEditHallId(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  >
+                    <option value="">🏟 Ingen hall</option>
+                    {halls.map((h) => (
+                      <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Recurring scope */}
+              {editingSession.recurringGroupId && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold text-slate-600">Vilka pass ska uppdateras?</p>
+                  {(["single", "all", "specific"] as const).map((scope) => (
+                    <label key={scope} className="flex items-center gap-2 cursor-pointer text-sm">
+                      <input
+                        type="radio"
+                        name="editScope"
+                        value={scope}
+                        checked={editScope === scope}
+                        onChange={() => {
+                          setEditScope(scope);
+                          if (scope === "single") setSelectedEditIds(new Set([editingSession.id]));
+                          if (scope === "all") setSelectedEditIds(new Set(editingGroupSessions.map((s) => s.id)));
+                          if (scope === "specific") setSelectedEditIds(new Set([editingSession.id]));
+                        }}
+                        className="accent-orange-500"
+                      />
+                      {scope === "single" && "Bara detta pass"}
+                      {scope === "all" && `Alla återkommande pass (${editingGroupSessions.length} st)`}
+                      {scope === "specific" && "Välj specifika pass"}
+                    </label>
+                  ))}
+                  {editScope === "specific" && (
+                    <div className="mt-2 max-h-40 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100">
+                      {editingGroupSessions
+                        .slice()
+                        .sort((a, b) => a.date.localeCompare(b.date))
+                        .map((s) => (
+                          <label key={s.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-50 text-xs">
+                            <input
+                              type="checkbox"
+                              checked={selectedEditIds.has(s.id)}
+                              onChange={(e) => {
+                                const next = new Set(selectedEditIds);
+                                if (e.target.checked) { next.add(s.id); } else { next.delete(s.id); }
+                                setSelectedEditIds(next);
+                              }}
+                              className="accent-orange-500"
+                            />
+                            <span>
+                              {new Date(s.date + "T12:00:00").toLocaleDateString("sv-SE", {
+                                weekday: "short", day: "numeric", month: "short",
+                              })} {s.time}
+                            </span>
+                          </label>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setEditingSession(null)}
+                className="flex-1 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                disabled={editBusy || !editTitle.trim() || (editScope === "specific" && selectedEditIds.size === 0)}
+                onClick={confirmEdit}
+                className="flex-1 py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
+              >
+                {editBusy ? "Sparar…" : "Spara"}
               </button>
             </div>
           </div>
@@ -613,6 +974,7 @@ export default function KalenderPage() {
                 }}
                 className="px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
               >
+                <option value="__all__">🏢 Alla lag</option>
                 {allTeams.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.ageGroup})
@@ -779,18 +1141,20 @@ export default function KalenderPage() {
               )}
               {sessionsOnDate(selectedDate).map((s) => {
                 const summary = attendanceSummary(s.id);
+                const note = s.planYear && s.planSessionNumber
+                  ? sessionNotes[`${s.planYear}_${s.planSessionNumber}`]
+                  : undefined;
+                const isExpanded = selectedSession?.id === s.id;
                 return (
                   <div
                     key={s.id}
                     className={`mb-2 p-3 rounded-xl border cursor-pointer transition-all ${
-                      selectedSession?.id === s.id
+                      isExpanded
                         ? "border-orange-400 bg-orange-50"
                         : "border-slate-200 hover:border-orange-300"
                     }`}
                     onClick={() =>
-                      setSelectedSession(
-                        selectedSession?.id === s.id ? null : s
-                      )
+                      setSelectedSession(isExpanded ? null : s)
                     }
                   >
                     <div className="flex items-center justify-between">
@@ -822,25 +1186,70 @@ export default function KalenderPage() {
                         )}
                       </div>
                       {canEdit && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            requestDeleteSession(s);
-                          }}
-                          className="text-slate-400 hover:text-red-500 transition-colors text-sm"
-                        >
-                          ✕
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              requestEditSession(s);
+                            }}
+                            className="text-slate-400 hover:text-orange-500 transition-colors text-sm px-1"
+                            title="Redigera"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              requestDeleteSession(s);
+                            }}
+                            className="text-slate-400 hover:text-red-500 transition-colors text-sm"
+                            title="Ställ in"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       )}
                     </div>
                     <p className="font-semibold text-sm text-slate-800 mt-1">
                       {s.title}
                     </p>
+                    {s.planSessionNumber && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Pass {s.planSessionNumber}{s.planYear ? ` · År ${s.planYear}` : ""}
+                      </p>
+                    )}
                     {players.length > 0 && (
                       <p className="text-xs text-slate-400 mt-1">
                         {summary.present}✓ {summary.absent}✗ {summary.sick}🤒
                         av {players.length}
                       </p>
+                    )}
+
+                    {/* Linked exercises (shown when session is expanded) */}
+                    {isExpanded && note && (note.subActivities.length > 0 || note.comment) && (
+                      <div className="mt-2 border-t border-orange-200 pt-2 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                        {note.comment && (
+                          <div className="bg-blue-50 rounded-lg px-2.5 py-1.5">
+                            <p className="text-xs font-semibold text-blue-600 mb-0.5">💬 Tränarkommentar</p>
+                            <p className="text-xs text-slate-600 leading-relaxed">{note.comment}</p>
+                          </div>
+                        )}
+                        {note.subActivities.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-slate-500 mb-1">🏋️ Övningar ({note.subActivities.length})</p>
+                            <div className="space-y-1">
+                              {note.subActivities.map((sub) => (
+                                <div key={sub.id} className="bg-white rounded-lg px-2.5 py-1.5 border border-orange-100">
+                                  <p className="text-xs font-semibold text-slate-700">{sub.name}</p>
+                                  {sub.description && (
+                                    <p className="text-xs text-slate-500 leading-relaxed">{sub.description}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );

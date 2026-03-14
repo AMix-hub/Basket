@@ -40,6 +40,12 @@ interface TrainingFreePeriod {
   adminId: string;
 }
 
+interface Hall {
+  id: string;
+  name: string;
+  adminId: string;
+}
+
 function toYMD(d: Date) {
   return d.toISOString().slice(0, 10);
 }
@@ -108,10 +114,12 @@ export default function SeasonPage({ plan }: Props) {
   const [schedWeekday, setSchedWeekday] = useState(1);
   const [schedTime, setSchedTime] = useState("17:00");
   const [schedEndTime, setSchedEndTime] = useState("18:30");
+  const [schedHallId, setSchedHallId] = useState("");
   const [schedBusy, setSchedBusy] = useState(false);
   const [schedDone, setSchedDone] = useState(false);
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [freePeriods, setFreePeriods] = useState<TrainingFreePeriod[]>([]);
+  const [halls, setHalls] = useState<Hall[]>([]);
 
   useEffect(() => {
     if (!team) return;
@@ -177,7 +185,21 @@ export default function SeasonPage({ plan }: Props) {
       );
     });
     return () => unsub();
-  }, [user?.id, user?.roles, team?.adminId]);
+  }, [user?.id, user?.roles, team?.adminId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!user) return;
+    const adminId = user.roles.includes("admin") ? user.id : team?.adminId;
+    if (!adminId) return;
+    const q = query(collection(db, "halls"), where("adminId", "==", adminId));
+    const unsub = onSnapshot(q, (snap) => {
+      setHalls(snap.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name as string,
+        adminId: d.data().adminId as string,
+      })));
+    });
+    return () => unsub();
+  }, [user?.id, user?.roles, team?.adminId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getNoteDocId = (sessionNumber: number) =>
     `${team?.id}_${plan.year}_${sessionNumber}`;
@@ -248,6 +270,10 @@ export default function SeasonPage({ plan }: Props) {
     setSchedBusy(true);
     try {
       const dates = generateSeasonDates(schedStartDate, schedWeekday, plan.sessions.length, freePeriods);
+      const selectedHall = halls.find((h) => h.id === schedHallId);
+      const hallFields = selectedHall
+        ? { hallId: selectedHall.id, hallName: selectedHall.name }
+        : {};
       const BATCH_SIZE = 500;
       const batchPromises: Promise<void>[] = [];
       const groupId = crypto.randomUUID();
@@ -263,6 +289,7 @@ export default function SeasonPage({ plan }: Props) {
             type: "träning",
             time: schedTime,
             endTime: schedEndTime || null,
+            ...hallFields,
             createdBy: user.id,
             planYear: plan.year,
             planSessionNumber: session.number,
@@ -374,6 +401,21 @@ export default function SeasonPage({ plan }: Props) {
                       />
                     </div>
                   </div>
+                  {halls.length > 0 && (
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">Arena / Hall</label>
+                      <select
+                        value={schedHallId}
+                        onChange={(e) => setSchedHallId(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                      >
+                        <option value="">🏟 Välj hall (valfritt)</option>
+                        {halls.map((h) => (
+                          <option key={h.id} value={h.id}>{h.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   {previewDates.length > 0 && (
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
                       <p className="text-xs font-semibold text-blue-700 mb-1">
