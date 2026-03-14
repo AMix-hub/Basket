@@ -36,8 +36,8 @@ function SportIQLogo() {
     <Image
       src="/sportiq-logo.png"
       alt="SportIQ"
-      width={40}
-      height={40}
+      width={50}
+      height={50}
       className="rounded-full object-cover"
     />
   );
@@ -93,8 +93,8 @@ export default function Navbar() {
                 <Image
                   src={clubLogoUrl}
                   alt="Klubblogga"
-                  width={40}
-                  height={40}
+                  width={50}
+                  height={50}
                   className="rounded-full object-cover"
                 />
               ) : (
@@ -103,7 +103,7 @@ export default function Navbar() {
             ) : (
               <SportIQLogo />
             )}
-            <span className="text-lg font-bold tracking-tight">
+            <span className="text-xl font-extrabold tracking-tight">
               {user ? sport.name : "SportIQ"}
             </span>
             {user && clubName && (
