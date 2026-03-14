@@ -13,6 +13,7 @@ import {
   getDocs,
   doc,
   getDoc,
+  setDoc,
   deleteDoc,
   updateDoc,
   arrayRemove,
@@ -342,14 +343,12 @@ export default function AdminPage() {
           const memberDocRef = doc(db, "team_members", memberDocId);
           const existing = await getDoc(memberDocRef);
           if (!existing.exists()) {
-            await import("firebase/firestore").then(({ setDoc }) =>
-              setDoc(memberDocRef, {
-                teamId: t.id,
-                userId: member.id,
-                role: "admin",
-                joinedAt: new Date().toISOString(),
-              })
-            );
+            await setDoc(memberDocRef, {
+              teamId: t.id,
+              userId: member.id,
+              role: "admin",
+              joinedAt: new Date().toISOString(),
+            });
             await updateDoc(doc(db, "teams", t.id), {
               memberIds: arrayUnion(member.id),
             });
@@ -1219,14 +1218,12 @@ export default function AdminPage() {
                                       // Add to team
                                       try {
                                         const memberDocRef = doc(db, "team_members", `${t.id}_${member.id}`);
-                                        await import("firebase/firestore").then(({ setDoc }) =>
-                                          setDoc(memberDocRef, {
-                                            teamId: t.id,
-                                            userId: member.id,
-                                            role: member.roles[0],
-                                            joinedAt: new Date().toISOString(),
-                                          })
-                                        );
+                                        await setDoc(memberDocRef, {
+                                          teamId: t.id,
+                                          userId: member.id,
+                                          role: member.roles[0],
+                                          joinedAt: new Date().toISOString(),
+                                        });
                                         await updateDoc(doc(db, "teams", t.id), {
                                           memberIds: arrayUnion(member.id),
                                         });

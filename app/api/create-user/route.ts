@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
             <p>Hej ${name},</p>
             <p>Du har blivit inbjuden till appen. Klicka på länken nedan för att sätta ditt lösenord och aktivera ditt konto:</p>
             <p><a href="${resetLink}">${resetLink}</a></p>
-            <p>Länken är giltig i 1 timme.</p>
+            <p>Länken är giltig i en begränsad tid (Firebase standard).</p>
             <p>Välkommen!</p>
           `,
         },
