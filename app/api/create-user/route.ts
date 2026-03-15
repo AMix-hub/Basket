@@ -95,6 +95,8 @@ export async function POST(req: NextRequest) {
         roles: [role],
         role,
         teamId: teamId ?? null,
+        // Link the user to the inviting admin so the admin's registry shows them
+        adminId: adminId ?? null,
         createdAt: new Date().toISOString(),
       });
     }
