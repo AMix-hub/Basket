@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import {
   collection,
   query,
@@ -1490,6 +1491,11 @@ export default function KalenderPage() {
                     {s.planSessionNumber && (
                       <p className="text-xs text-slate-400 mt-0.5">
                         Pass {s.planSessionNumber}{s.planYear ? ` · År ${s.planYear}` : ""}
+                        {!isExpanded && note && note.subActivities.length > 0 && (
+                          <span className="ml-2 inline-flex items-center gap-0.5 text-orange-500 font-semibold">
+                            🏋️ {note.subActivities.length} övning{note.subActivities.length !== 1 ? "ar" : ""}
+                          </span>
+                        )}
                       </p>
                     )}
                     {players.length > 0 && (
@@ -1522,6 +1528,14 @@ export default function KalenderPage() {
                               ))}
                             </div>
                           </div>
+                        )}
+                        {s.planYear && (
+                          <Link
+                            href={`/ar${s.planYear}`}
+                            className="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline mt-1"
+                          >
+                            📋 Gå till träningspass {s.planSessionNumber} →
+                          </Link>
                         )}
                       </div>
                     )}

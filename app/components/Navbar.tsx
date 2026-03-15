@@ -42,8 +42,10 @@ export default function Navbar() {
     user?.roles.includes("parent")
       ? [{ href: "/familj", label: "👪 Min sida" }]
       : user?.roles.includes("admin")
-      ? [{ href: "/admin", label: "🏛 Admin" }, { href: "/dev", label: "🛠 Utveckling" }]
-      : user?.roles.some((r) => ["coach", "assistant", "player"].includes(r))
+      ? [{ href: "/admin", label: "🏛 Admin" }, { href: "/registret", label: "👥 Registret" }, { href: "/dev", label: "🛠 Utveckling" }]
+      : user?.roles.some((r) => ["coach"].includes(r))
+      ? [{ href: "/lag", label: `${sport.emoji} Laget` }, { href: "/registret", label: "👥 Registret" }]
+      : user?.roles.some((r) => ["assistant", "player"].includes(r))
       ? [{ href: "/lag", label: `${sport.emoji} Laget` }]
       : [];
 
