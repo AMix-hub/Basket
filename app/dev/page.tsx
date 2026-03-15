@@ -42,6 +42,7 @@ export default function DevPage() {
   const [filter, setFilter] = useState<DevItemCategory | "all">("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [editCategory, setEditCategory] = useState<DevItemCategory>("idea");
 
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
@@ -106,21 +107,32 @@ export default function DevPage() {
     if (item.done) return;
     setEditingId(item.id);
     setEditText(item.text);
+    setEditCategory(item.category);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditText("");
+    setEditCategory("idea");
   };
 
   const saveEdit = async (item: DevItem) => {
     const trimmed = editText.trim();
-    if (!trimmed || trimmed === item.text.trim()) {
+    if (!trimmed) {
+      cancelEdit();
+      return;
+    }
+    const textChanged = trimmed !== item.text.trim();
+    const categoryChanged = editCategory !== item.category;
+    if (!textChanged && !categoryChanged) {
       cancelEdit();
       return;
     }
     try {
-      await updateDoc(doc(db, "dev_items", item.id), { text: trimmed });
+      await updateDoc(doc(db, "dev_items", item.id), {
+        text: trimmed,
+        category: editCategory,
+      });
       cancelEdit();
     } catch {
       alert("Det gick inte att spara. Försök igen.");
@@ -166,8 +178,10 @@ export default function DevPage() {
   const noEditProps = {
     editing: false as const,
     editText: "",
+    editCategory: "idea" as DevItemCategory,
     onEditStart: () => {},
     onEditChange: () => {},
+    onEditCategoryChange: () => {},
     onEditSave: () => {},
     onEditCancel: () => {},
   };
@@ -264,8 +278,10 @@ export default function DevPage() {
                       onDelete={() => removeItem(item)}
                       editing={editingId === item.id}
                       editText={editText}
+                      editCategory={editCategory}
                       onEditStart={() => startEdit(item)}
                       onEditChange={setEditText}
+                      onEditCategoryChange={setEditCategory}
                       onEditSave={() => saveEdit(item)}
                       onEditCancel={cancelEdit}
                     />
@@ -310,8 +326,10 @@ function ItemRow({
   onDelete,
   editing,
   editText,
+  editCategory,
   onEditStart,
   onEditChange,
+  onEditCategoryChange,
   onEditSave,
   onEditCancel,
 }: {
@@ -320,8 +338,10 @@ function ItemRow({
   onDelete: () => void;
   editing: boolean;
   editText: string;
+  editCategory: DevItemCategory;
   onEditStart: () => void;
   onEditChange: (val: string) => void;
+  onEditCategoryChange: (val: DevItemCategory) => void;
   onEditSave: () => void;
   onEditCancel: () => void;
 }) {
@@ -342,7 +362,23 @@ function ItemRow({
       </button>
       <div className="flex-1 min-w-0">
         {editing ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <select
+              value={editCategory}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "idea" || val === "change" || val === "todo") {
+                  onEditCategoryChange(val);
+                }
+              }}
+              className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
+            >
+              {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
+                <option key={cat} value={cat}>
+                  {categoryConfig[cat].emoji} {categoryConfig[cat].label}
+                </option>
+              ))}
+            </select>
             <input
               type="text"
               value={editText}
@@ -354,18 +390,20 @@ function ItemRow({
               autoFocus
               className="flex-1 border border-orange-300 rounded-lg px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-300"
             />
-            <button
-              onClick={onEditSave}
-              className="px-2 py-1 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-            >
-              Spara
-            </button>
-            <button
-              onClick={onEditCancel}
-              className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
-            >
-              Avbryt
-            </button>
+            <div className="flex gap-1 shrink-0">
+              <button
+                onClick={onEditSave}
+                className="px-2 py-1 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                Spara
+              </button>
+              <button
+                onClick={onEditCancel}
+                className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Avbryt
+              </button>
+            </div>
           </div>
         ) : (
           <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-800"}`}>
