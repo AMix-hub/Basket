@@ -141,6 +141,8 @@ interface DbProfile {
   email?: string;
   /** FCM token for device push notifications (updated on every login). */
   fcmToken?: string | null;
+  /** ID of the admin who administers this user (set at registration). */
+  adminId?: string | null;
 }
 
 interface DbTeam {
@@ -534,6 +536,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       coachInviteCode: role === "admin"  ? generateCode()      : null,
       sport:           sport ?? "basket",
       createdAt:       new Date().toISOString(),
+      // Link non-admin users back to their admin so the admin's registry shows them
+      adminId:         role === "admin"  ? null
+                       : (invitingAdminId ?? teamFromCode?.data.adminId ?? null),
     };
     await setDoc(doc(db, "profiles", userId), newProfile);
 

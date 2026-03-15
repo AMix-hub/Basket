@@ -99,6 +99,36 @@ export default function RegistretPage() {
         })
       );
 
+      // For admins: also include users linked directly via adminId in their profile.
+      // This covers users who were invited by the admin but not assigned to a team.
+      if (isAdmin) {
+        const directProfilesSnap = await getDocs(
+          query(collection(db, "profiles"), where("adminId", "==", user.id))
+        );
+        const existingMemberIds = new Set(
+          results.flatMap((t) => t.members.map((m) => m.id))
+        );
+        const unassigned: ProfileRow[] = [];
+        directProfilesSnap.docs.forEach((s) => {
+          if (!existingMemberIds.has(s.id)) {
+            const d = s.data();
+            unassigned.push({
+              id: s.id,
+              name: d.name as string,
+              roles:
+                d.roles && (d.roles as string[]).length > 0
+                  ? (d.roles as string[])
+                  : [d.role as string],
+              child_name: (d.childName as string | null) ?? null,
+            });
+          }
+        });
+        if (unassigned.length > 0) {
+          // Add unassigned members as a virtual group so they appear in allMembersForAdmin
+          results.push({ id: "__unassigned__", name: "", members: unassigned });
+        }
+      }
+
       // Sort teams by name
       results.sort((a, b) => a.name.localeCompare(b.name, "sv"));
       setTeamData(results);
@@ -145,10 +175,12 @@ export default function RegistretPage() {
     teamData.forEach((t) => {
       t.members.forEach((m) => {
         const existing = map.get(m.id);
+        // Skip the virtual "__unassigned__" group's empty name
+        const teamName = t.id === "__unassigned__" ? null : t.name;
         if (existing) {
-          existing.teamNames.push(t.name);
+          if (teamName) existing.teamNames.push(teamName);
         } else {
-          map.set(m.id, { member: m, teamNames: [t.name] });
+          map.set(m.id, { member: m, teamNames: teamName ? [teamName] : [] });
         }
       });
     });
@@ -183,7 +215,7 @@ export default function RegistretPage() {
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
           <h2 className="font-bold text-slate-900 mb-1">👥 Användarregister</h2>
           <p className="text-slate-500 text-sm mb-4">
-            {allMembersForAdmin.length} unika medlemmar i {teamData.length} lag.
+            {allMembersForAdmin.length} unika medlemmar i {teamData.filter((t) => t.id !== "__unassigned__").length} lag.
           </p>
           {allMembersForAdmin.length === 0 ? (
             <p className="text-slate-400 text-sm">Inga medlemmar registrerade ännu.</p>
