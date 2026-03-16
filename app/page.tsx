@@ -1,6 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { SPORTS } from "../lib/sports";
+import { useAuth } from "./context/AuthContext";
+import DashboardHome from "./components/DashboardHome";
 
 const colorMap: Record<string, {
   border: string; tagBg: string; linkColor: string; iconBg: string;
@@ -88,6 +92,22 @@ const features = [
 ];
 
 export default function Home() {
+  const { user, loading } = useAuth();
+
+  /* Show dashboard when authenticated */
+  if (!loading && user) {
+    return <DashboardHome />;
+  }
+
+  /* Loading state */
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-64">
+        <span className="text-slate-500">Laddar…</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-20">
 
