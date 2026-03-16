@@ -77,7 +77,7 @@ export default function SportOverviewPage({
           <Link
             key={s.year}
             href={`/${sportSlug}/${s.href}`}
-            className={`group block bg-white rounded-2xl border border-t-4 ${s.accentColor} border-slate-100 p-6 shadow-sm card-hover`}
+            className={`group block bg-[#111827] rounded-2xl border border-white/8 hover:border-white/15 p-6 card-hover transition-all duration-200`}
           >
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">{s.icon}</span>
@@ -85,18 +85,18 @@ export default function SportOverviewPage({
                 <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${s.tagBg}`}>
                   År {s.year}
                 </span>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                <p className="text-sm font-semibold text-slate-200 mt-0.5">
                   {s.ageGroup}
                 </p>
               </div>
             </div>
 
-            <p className="text-slate-500 text-sm leading-relaxed mb-5">{s.description}</p>
+            <p className="text-slate-400 text-sm leading-relaxed mb-5">{s.description}</p>
 
             <ul className="space-y-1.5 mb-5">
               {s.highlights.map((h) => (
-                <li key={h} className="flex items-center gap-2 text-sm text-slate-600">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
+                <li key={h} className="flex items-center gap-2 text-sm text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0" />
                   {h}
                 </li>
               ))}
@@ -104,33 +104,33 @@ export default function SportOverviewPage({
 
             <div className={`text-sm font-semibold flex items-center gap-1 ${s.linkColor} transition-colors`}>
               Visa säsongsplan
-              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+              <span className="transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>
         ))}
       </div>
 
       {/* Info section */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-900 mb-6">
+      <div className="bg-[#111827] border border-white/8 rounded-2xl p-8">
+        <h2 className="text-xl font-bold text-white mb-6">
           Hur använder man den här sidan?
         </h2>
-        <div className="grid sm:grid-cols-3 gap-6 text-sm text-slate-600">
+        <div className="grid sm:grid-cols-3 gap-6 text-sm text-slate-400">
           <div className="flex gap-4">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-xl shrink-0 text-sky-400">
               📅
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Välj säsongsår</p>
+              <p className="font-semibold text-slate-200 mb-1">Välj säsongsår</p>
               <p>Välj rätt år baserat på barnens åldersgrupp.</p>
             </div>
           </div>
           <div className="flex gap-4">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-xl shrink-0 text-emerald-400">
               📝
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Följ pass för pass</p>
+              <p className="font-semibold text-slate-200 mb-1">Följ pass för pass</p>
               <p>
                 Varje träningspass har tydliga övningar med instruktioner och
                 tips.
@@ -138,11 +138,11 @@ export default function SportOverviewPage({
             </div>
           </div>
           <div className="flex gap-4">
-            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-xl shrink-0 text-violet-400">
               🎯
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Anpassa fritt</p>
+              <p className="font-semibold text-slate-200 mb-1">Anpassa fritt</p>
               <p>
                 Passen är förslag – anpassa gärna efter din grupps behov och
                 nivå.

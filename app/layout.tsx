@@ -26,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="sv">
-      <body className="antialiased bg-slate-50 text-slate-900">
+      <body className="antialiased bg-[#0f172a] text-slate-100">
         <AuthProvider>
           <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
         </AuthProvider>
