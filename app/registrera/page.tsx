@@ -56,7 +56,7 @@ export default function RegisterPage() {
     setBusy(false);
 
     if (result === null) {
-      router.push(`/${sport}`);
+      router.push("/");
     } else if (result === "CONFIRM_EMAIL") {
       setEmailSent(true);
     } else {
