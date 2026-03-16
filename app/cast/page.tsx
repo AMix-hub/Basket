@@ -36,6 +36,7 @@ interface Drawing {
   y1: number;
   x2: number;
   y2: number;
+  points?: { x: number; y: number }[];
 }
 
 interface LiveState {
@@ -48,11 +49,24 @@ interface LiveState {
   animationStartTime: string | null;
 }
 
-/* ─── Court dimensions ────────────────────────────────────────── */
-const W = 380;
-const H = 510;
-const SOURCE_W = 760;
-const SOURCE_H = 460;
+/* ─── Court dimensions (landscape, matching main tactic board) ── */
+const CW = 760;
+const CH = 460;
+const BX = 20, BY = 20, BW = 720, BH = 420;
+const MCX = BX + BW / 2;
+const MCY = BY + BH / 2;
+const LBX = 60;
+const RBX = 700;
+const PAINT_D = 155;
+const PAINT_H = 74;
+const L_FT_X = BX + PAINT_D;
+const R_FT_X = BX + BW - PAINT_D;
+const FT_R = 55;
+const TP3_Y1 = 63;
+const TP3_Y2 = 397;
+const TP3_R = 181;
+const L_TP3_X = 130;
+const R_TP3_X = 630;
 const ANIMATION_DURATION = 1600;
 
 /* ─── Animation helpers ──────────────────────────────────────── */
@@ -87,25 +101,8 @@ function buildArrowPlayerMap(
   return map;
 }
 
-/* ─── SVG sub-components ────────────────────────────────────── */
-function ArrowMarker() {
-  return (
-    <defs>
-      <marker
-        id="arrowhead"
-        markerWidth="8"
-        markerHeight="6"
-        refX="7"
-        refY="3"
-        orient="auto"
-      >
-        <polygon points="0 0, 8 3, 0 6" fill="#facc15" />
-      </marker>
-    </defs>
-  );
-}
-
-function DrawingMarkers() {
+/* ─── SVG marker defs ────────────────────────────────────────── */
+function CastMarkerDefs() {
   return (
     <defs>
       <marker id="cast-ah-y" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
@@ -119,34 +116,44 @@ function DrawingMarkers() {
 }
 
 function BasketballCourt() {
-  const lp = { stroke: "rgba(255,255,255,0.85)", strokeWidth: 2, fill: "none" };
+  const lp = { stroke: "rgba(255,255,255,0.88)", strokeWidth: 2, fill: "none" };
   return (
     <g>
-      <rect x={0} y={0} width={W} height={H} fill="#c87428" />
-      <rect x={10} y={10} width={360} height={490} {...lp} />
-      <line x1={10} y1={255} x2={370} y2={255} {...lp} />
-      <circle cx={190} cy={255} r={42} {...lp} />
-      <circle cx={190} cy={255} r={3} fill="rgba(255,255,255,0.85)" />
-      {/* Top basket */}
-      <rect x={110} y={10} width={160} height={165} {...lp} fill="rgba(255,255,255,0.08)" />
-      <line x1={110} y1={175} x2={270} y2={175} {...lp} />
-      <path d="M 110 175 A 80 80 0 0 0 270 175" {...lp} />
-      <path d="M 165 10 A 40 40 0 0 0 215 10" {...lp} />
-      <line x1={155} y1={32} x2={225} y2={32} stroke="rgba(255,255,255,0.85)" strokeWidth={3} />
-      <circle cx={190} cy={45} r={14} {...lp} />
-      <path d="M 15 150 A 185 185 0 0 1 365 150" {...lp} />
-      <line x1={15} y1={10} x2={15} y2={150} {...lp} />
-      <line x1={365} y1={10} x2={365} y2={150} {...lp} />
-      {/* Bottom basket */}
-      <rect x={110} y={335} width={160} height={165} {...lp} fill="rgba(255,255,255,0.08)" />
-      <line x1={110} y1={335} x2={270} y2={335} {...lp} />
-      <path d="M 110 335 A 80 80 0 0 1 270 335" {...lp} />
-      <path d="M 165 500 A 40 40 0 0 1 215 500" {...lp} />
-      <line x1={155} y1={478} x2={225} y2={478} stroke="rgba(255,255,255,0.85)" strokeWidth={3} />
-      <circle cx={190} cy={465} r={14} {...lp} />
-      <path d="M 365 360 A 185 185 0 0 1 15 360" {...lp} />
-      <line x1={15} y1={500} x2={15} y2={360} {...lp} />
-      <line x1={365} y1={500} x2={365} y2={360} {...lp} />
+      <rect x={0} y={0} width={CW} height={CH} fill="#c8803a" />
+      {Array.from({ length: 14 }, (_, i) => (
+        <line key={i} x1={0} y1={22 + i * 31} x2={CW} y2={22 + i * 31}
+          stroke="rgba(155,85,15,0.22)" strokeWidth={1} />
+      ))}
+      <rect x={BX} y={BY} width={BW} height={BH} {...lp} />
+      <line x1={MCX} y1={BY} x2={MCX} y2={BY + BH} {...lp} />
+      <circle cx={MCX} cy={MCY} r={55} {...lp} />
+      <circle cx={MCX} cy={MCY} r={3} fill="rgba(255,255,255,0.88)" />
+      {/* Left basket */}
+      <rect x={BX} y={MCY - PAINT_H} width={PAINT_D} height={PAINT_H * 2}
+        {...lp} fill="rgba(255,255,255,0.07)" />
+      <line x1={L_FT_X} y1={MCY - PAINT_H} x2={L_FT_X} y2={MCY + PAINT_H} {...lp} />
+      <path d={`M ${L_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 1 ${L_FT_X} ${MCY + FT_R}`} {...lp} />
+      <path d={`M ${L_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 0 ${L_FT_X} ${MCY + FT_R}`}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={2} fill="none" strokeDasharray="8 5" />
+      <line x1={BX + 22} y1={MCY - 27} x2={BX + 22} y2={MCY + 27}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={3} />
+      <circle cx={LBX} cy={MCY} r={11} {...lp} />
+      <line x1={BX} y1={TP3_Y1} x2={L_TP3_X} y2={TP3_Y1} {...lp} />
+      <line x1={BX} y1={TP3_Y2} x2={L_TP3_X} y2={TP3_Y2} {...lp} />
+      <path d={`M ${L_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 1 ${L_TP3_X} ${TP3_Y2}`} {...lp} />
+      {/* Right basket */}
+      <rect x={BX + BW - PAINT_D} y={MCY - PAINT_H} width={PAINT_D} height={PAINT_H * 2}
+        {...lp} fill="rgba(255,255,255,0.07)" />
+      <line x1={R_FT_X} y1={MCY - PAINT_H} x2={R_FT_X} y2={MCY + PAINT_H} {...lp} />
+      <path d={`M ${R_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 0 ${R_FT_X} ${MCY + FT_R}`} {...lp} />
+      <path d={`M ${R_FT_X} ${MCY - FT_R} A ${FT_R} ${FT_R} 0 0 1 ${R_FT_X} ${MCY + FT_R}`}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={2} fill="none" strokeDasharray="8 5" />
+      <line x1={BX + BW - 22} y1={MCY - 27} x2={BX + BW - 22} y2={MCY + 27}
+        stroke="rgba(255,255,255,0.88)" strokeWidth={3} />
+      <circle cx={RBX} cy={MCY} r={11} {...lp} />
+      <line x1={BX + BW} y1={TP3_Y1} x2={R_TP3_X} y2={TP3_Y1} {...lp} />
+      <line x1={BX + BW} y1={TP3_Y2} x2={R_TP3_X} y2={TP3_Y2} {...lp} />
+      <path d={`M ${R_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 0 ${R_TP3_X} ${TP3_Y2}`} {...lp} />
     </g>
   );
 }
@@ -283,49 +290,72 @@ function CastBoard() {
   /* ─── Main cast view ─────────────────────────────────────────── */
   return (
     <div className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden">
-      {/* Court — sized to fill the screen while preserving the aspect ratio */}
+      {/* Court — sized to fill the screen while preserving the landscape aspect ratio */}
       <div
         style={{
-          width: "min(100vw, calc(100vh * 380 / 510))",
-          height: "min(100vh, calc(100vw * 510 / 380))",
+          width: "min(100vw, calc(100vh * 760 / 460))",
+          height: "min(100vh, calc(100vw * 460 / 760))",
         }}
       >
         <svg
-          viewBox={`0 0 ${W} ${H}`}
+          viewBox={`0 0 ${CW} ${CH}`}
           className="w-full h-full"
           style={{ display: "block" }}
         >
-          <ArrowMarker />
-          <DrawingMarkers />
+          <CastMarkerDefs />
           <BasketballCourt />
 
           {/* Zone drawings (rendered behind other elements) */}
           {drawings.filter(d => d.type === "zone").map(d => {
-            const x = Math.min(d.x1, d.x2) * (W / SOURCE_W);
-            const y = Math.min(d.y1, d.y2) * (H / SOURCE_H);
-            const w = Math.abs(d.x2 - d.x1) * (W / SOURCE_W);
-            const h = Math.abs(d.y2 - d.y1) * (H / SOURCE_H);
+            const x = Math.min(d.x1, d.x2);
+            const y = Math.min(d.y1, d.y2);
+            const w = Math.abs(d.x2 - d.x1);
+            const h = Math.abs(d.y2 - d.y1);
             return <rect key={d.id} x={x} y={y} width={w} height={h} fill={d.color} stroke="none" />;
           })}
           {/* Other drawings */}
           {drawings.filter(d => d.type !== "zone").map(d => {
-            const sx = W / SOURCE_W, sy = H / SOURCE_H;
             if (d.type === "arrow") {
-              return <line key={d.id} x1={d.x1*sx} y1={d.y1*sy} x2={d.x2*sx} y2={d.y2*sy}
-                stroke={d.color} strokeWidth={3} strokeLinecap="round" markerEnd="url(#cast-ah-y)" />;
+              if (d.points && d.points.length >= 2) {
+                const path = d.points.reduce((acc, pt, i) => {
+                  if (i === 0) return `M ${pt.x} ${pt.y}`;
+                  if (i < d.points!.length - 1) {
+                    const mx = (pt.x + d.points![i + 1].x) / 2;
+                    const my = (pt.y + d.points![i + 1].y) / 2;
+                    return `${acc} Q ${pt.x} ${pt.y} ${mx} ${my}`;
+                  }
+                  return `${acc} L ${pt.x} ${pt.y}`;
+                }, "");
+                return <path key={d.id} d={path} stroke={d.color} strokeWidth={2.5}
+                  fill="none" strokeLinecap="round" strokeLinejoin="round" markerEnd="url(#cast-ah-y)" />;
+              }
+              return <line key={d.id} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
+                stroke={d.color} strokeWidth={2.5} strokeLinecap="round" markerEnd="url(#cast-ah-y)" />;
             }
             if (d.type === "dashed") {
-              return <line key={d.id} x1={d.x1*sx} y1={d.y1*sy} x2={d.x2*sx} y2={d.y2*sy}
-                stroke={d.color} strokeWidth={3} strokeLinecap="round" strokeDasharray="12 6" markerEnd="url(#cast-ah-g)" />;
+              if (d.points && d.points.length >= 2) {
+                const path = d.points.reduce((acc, pt, i) => {
+                  if (i === 0) return `M ${pt.x} ${pt.y}`;
+                  if (i < d.points!.length - 1) {
+                    const mx = (pt.x + d.points![i + 1].x) / 2;
+                    const my = (pt.y + d.points![i + 1].y) / 2;
+                    return `${acc} Q ${pt.x} ${pt.y} ${mx} ${my}`;
+                  }
+                  return `${acc} L ${pt.x} ${pt.y}`;
+                }, "");
+                return <path key={d.id} d={path} stroke={d.color} strokeWidth={2.5}
+                  fill="none" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="9 5" markerEnd="url(#cast-ah-g)" />;
+              }
+              return <line key={d.id} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2}
+                stroke={d.color} strokeWidth={2.5} strokeLinecap="round" strokeDasharray="12 6" markerEnd="url(#cast-ah-g)" />;
             }
             if (d.type === "circle") {
-              const avgScale = (sx + sy) / 2;
-              const r = Math.sqrt((d.x2 - d.x1) ** 2 + (d.y2 - d.y1) ** 2) * avgScale;
-              return <circle key={d.id} cx={d.x1*sx} cy={d.y1*sy} r={r} stroke={d.color} strokeWidth={2.5} fill="none" />;
+              const r = Math.sqrt((d.x2 - d.x1) ** 2 + (d.y2 - d.y1) ** 2);
+              return <circle key={d.id} cx={d.x1} cy={d.y1} r={r} stroke={d.color} strokeWidth={2.5} fill="none" />;
             }
             if (d.type === "rect") {
-              const rx = Math.min(d.x1, d.x2) * sx, ry = Math.min(d.y1, d.y2) * sy;
-              const rw = Math.abs(d.x2 - d.x1) * sx, rh = Math.abs(d.y2 - d.y1) * sy;
+              const rx = Math.min(d.x1, d.x2), ry = Math.min(d.y1, d.y2);
+              const rw = Math.abs(d.x2 - d.x1), rh = Math.abs(d.y2 - d.y1);
               return <rect key={d.id} x={rx} y={ry} width={rw} height={rh} stroke={d.color} strokeWidth={2.5} fill="none" />;
             }
             return null;
@@ -341,7 +371,7 @@ function CastBoard() {
               y2={a.y2}
               stroke="#facc15"
               strokeWidth={2.5}
-              markerEnd="url(#arrowhead)"
+              markerEnd="url(#cast-ah-y)"
               strokeLinecap="round"
             />
           ))}
@@ -356,7 +386,6 @@ function CastBoard() {
               : p.team === "away" ? "#2563eb"
               : p.type === "O" ? "#16a34a"
               : "#dc2626";
-            const label = p.number != null ? String(p.number) : (p.type ?? "");
             if (isBall) {
               return (
                 <g key={p.id} transform={`translate(${cx},${cy})`}>
@@ -370,12 +399,7 @@ function CastBoard() {
             }
             return (
               <g key={p.id} transform={`translate(${cx},${cy})`}>
-                <circle
-                  r={18}
-                  fill={fill}
-                  stroke="white"
-                  strokeWidth={2}
-                />
+                <circle r={18} fill={fill} stroke="white" strokeWidth={2} />
                 <text
                   textAnchor="middle"
                   dominantBaseline="central"
@@ -383,8 +407,15 @@ function CastBoard() {
                   fontSize={16}
                   fontWeight="bold"
                 >
-                  {label}
+                  {p.number != null ? String(p.number) : ""}
                 </text>
+                {p.name && (
+                  <>
+                    <text y={31} textAnchor="middle" fill="rgba(0,0,0,0.75)" stroke="rgba(0,0,0,0.75)"
+                      strokeWidth={2.5} strokeLinejoin="round" fontSize={9} fontWeight="bold">{p.name}</text>
+                    <text y={31} textAnchor="middle" fill="white" fontSize={9} fontWeight="bold">{p.name}</text>
+                  </>
+                )}
               </g>
             );
           })}

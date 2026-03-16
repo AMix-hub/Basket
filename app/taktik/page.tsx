@@ -87,6 +87,7 @@ const ANIM_MS = 1200;
 const HOME_NAMES = ["PG", "SG", "SF", "PF", "C"];
 const MIN_SHAPE_DIST = 5;
 const MIN_LINE_DIST  = 10;
+const FULLSCREEN_TOOLBAR_HEIGHT = 56; // px reserved for toolbar row in fullscreen
 
 const TACTICAL_ROLES = [
   "Ball Handler",
@@ -982,8 +983,11 @@ export default function TaktikPage() {
         </div>
       )}
 
+      {/* Fullscreen container — wraps toolbar + court so tools remain visible in fullscreen */}
+      <div ref={boardRef} className={isFullscreen ? "bg-black flex flex-col w-full h-full" : "flex flex-col gap-3"}>
+
       {/* Toolbar */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className={`flex flex-wrap gap-2 items-center${isFullscreen ? " px-2 py-2" : ""}`}>
         {TOOLS.map(({ id, label, bg, title }) => (
           <button key={id} title={title}
             onClick={() => !isPlaying && setTool(id)}
@@ -1016,16 +1020,16 @@ export default function TaktikPage() {
       </div>
 
       {/* Main content */}
-      <div className="flex gap-3 flex-col xl:flex-row">
+      <div className={`flex gap-3${isFullscreen ? " flex-1 overflow-hidden" : " flex-col xl:flex-row"}`}>
 
         {/* Court */}
-        <div ref={boardRef} className={`flex-1 min-w-0 relative${isFullscreen ? " bg-black flex items-center justify-center" : ""}`}>
+        <div className={`flex-1 min-w-0 relative${isFullscreen ? " flex items-center justify-center" : ""}`}>
           <div className={`overflow-hidden${isFullscreen ? " w-full" : " bg-white rounded-2xl border border-slate-200 shadow-sm"}`}>
             <svg
               ref={svgRef}
               viewBox={`0 0 ${CW} ${CH}`}
               className={`w-full select-none touch-none ${svgCursor}`}
-              style={{ maxHeight: isFullscreen ? "100dvh" : "65vh" }}
+              style={{ maxHeight: isFullscreen ? `calc(100dvh - ${FULLSCREEN_TOOLBAR_HEIGHT}px)` : "65vh" }}
               onPointerDown={handleSVGPointerDown}
               onPointerMove={handleSVGPointerMove}
               onPointerUp={handleSVGPointerUp}
@@ -1088,8 +1092,8 @@ export default function TaktikPage() {
           )}
         </div>
 
-        {/* Right panel */}
-        {showRight && (
+        {/* Right panel — hidden in fullscreen */}
+        {!isFullscreen && showRight && (
           <div className="w-full xl:w-72 shrink-0">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="flex border-b border-slate-100">
@@ -1208,6 +1212,8 @@ export default function TaktikPage() {
           </div>
         )}
       </div>
+
+      </div>{/* end fullscreen container */}
 
       {/* Timeline */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
