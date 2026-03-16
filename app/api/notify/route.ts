@@ -20,16 +20,14 @@
  *   500 { error: string }                   – server error
  *
  * Dependencies:
+ *   • SENDGRID_API_KEY env var (server-side, never exposed to browser)
+ *   • SENDGRID_FROM env var – verified sender address in SendGrid
  *   • FIREBASE_SERVICE_ACCOUNT env var (server-side, never exposed to browser)
- *   • Firebase Admin SDK (firebase-admin npm package)
- *   • Optional: Firebase Trigger Email extension installed in your project
- *     (https://extensions.dev/extensions/firebase/firestore-send-email)
- *     for the email side to actually send.  Without it the `mail` documents
- *     are written but never dispatched.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminMessaging, adminDb } from "../../../lib/firebaseAdmin";
+import { sendEmail } from "../../../lib/sendgrid";
 
 export async function POST(req: NextRequest) {
   /* ── 1. Parse + validate request body ── */
@@ -158,7 +156,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  /* ── 7. Write mail documents (Firebase Trigger Email extension) ── */
+  /* ── 7. Send e-mails directly via SendGrid ── */
   let emailed = 0;
   const emailRecipients = profiles
     .map((p) => p.email)
@@ -177,18 +175,11 @@ export async function POST(req: NextRequest) {
     `.trim();
 
     try {
-      await adminDb.collection("mail").add({
-        to: emailRecipients,
-        message: {
-          subject: mailSubject,
-          html: mailHtml,
-        },
-        createdAt: new Date().toISOString(),
-        teamId,
-      });
+      await sendEmail({ to: emailRecipients, subject: mailSubject, html: mailHtml });
       emailed = emailRecipients.length;
-    } catch {
-      // Non-fatal: email extension may not be installed
+    } catch (emailErr) {
+      // Non-fatal: push notifications were already sent
+      console.error("[notify] Failed to send cancellation e-mail:", emailErr);
     }
   }
 

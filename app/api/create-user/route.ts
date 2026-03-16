@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "../../../lib/firebaseAdmin";
+import { sendEmail } from "../../../lib/sendgrid";
 
 export async function POST(req: NextRequest) {
   /* ── 1. Parse + validate request body ── */
@@ -167,19 +168,17 @@ export async function POST(req: NextRequest) {
         // Fallback: keep the original Firebase action URL
       }
 
-      // If Firebase Trigger Email extension is configured, queue an email
-      await adminDb.collection("mail").add({
+      // Send welcome email directly via SendGrid
+      await sendEmail({
         to: email,
-        message: {
-          subject: "Välkommen – sätt ditt lösenord",
-          html: `
-            <p>Hej ${name},</p>
-            <p>Du har blivit inbjuden till appen. Klicka på länken nedan för att sätta ditt lösenord och aktivera ditt konto:</p>
-            <p><a href="${setPasswordUrl}">${setPasswordUrl}</a></p>
-            <p>Länken är giltig i en begränsad tid (Firebase standard).</p>
-            <p>Välkommen!</p>
-          `,
-        },
+        subject: "Välkommen – sätt ditt lösenord",
+        html: `
+          <p>Hej ${name},</p>
+          <p>Du har blivit inbjuden till appen. Klicka på länken nedan för att sätta ditt lösenord och aktivera ditt konto:</p>
+          <p><a href="${setPasswordUrl}">${setPasswordUrl}</a></p>
+          <p>Länken är giltig i en begränsad tid (Firebase standard).</p>
+          <p>Välkommen!</p>
+        `,
       });
     } catch (emailErr) {
       // Non-fatal: user is created, just the email failed
