@@ -2,7 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Miljövariabler / Environment Variables
 
-Det här projektet använder [Firebase](https://firebase.google.com) som backend (Authentication + Firestore) och kräver sju miljövariabler för att fungera:
+Det här projektet använder [Firebase](https://firebase.google.com) som backend (Authentication + Firestore) och kräver följande miljövariabler för att fungera:
 
 | Variabel | Beskrivning |
 |---|---|
@@ -14,6 +14,9 @@ Det här projektet använder [Firebase](https://firebase.google.com) som backend
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase Messaging Sender ID |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Firebase App ID |
 | `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` | Firebase Analytics mätnings-ID (valfritt) |
+| `FIREBASE_SERVICE_ACCOUNT` | Service account JSON (stringifierat) för Firebase Admin SDK – behövs för push-notiser |
+| `SENDGRID_API_KEY` | SendGrid API-nyckel för e-postutskick (börjar med `SG.`) |
+| `SENDGRID_FROM` | Avsändaradress för utgående e-post, t.ex. `no-reply@sport-iq.se` |
 
 Du hittar alla värden i [Firebase Console](https://console.firebase.google.com) under **Project Settings → General → Your apps**.
 
@@ -50,6 +53,21 @@ Firebase använder `authDomain` för OAuth-omdirigeringar (popup/redirect-flöde
 > **Tips:** Utan Firebase Hosting på `sport-iq.se` fungerar popup-baserade inloggningsflöden ändå,
 > men redirect-baserade flöden kräver att domänen är kopplad till Firebase Hosting.
 
+### Konfigurera SendGrid (e-post)
+
+Appen skickar e-post direkt via [SendGrid](https://sendgrid.com) – inga Firebase-tillägg behövs.
+
+1. Skapa ett gratis konto på [sendgrid.com](https://sendgrid.com)
+2. Gå till **Settings → API Keys → Create API Key**, välj behörighet **Mail Send**, och kopiera nyckeln (börjar med `SG.`)
+3. Verifiera din avsändaradress (eller domän) under **Settings → Sender Authentication → Single Sender Verification**
+4. Lägg till i Vercel (se nedan) eller `.env.local`:
+   ```
+   SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxxxxx
+   SENDGRID_FROM=no-reply@sport-iq.se
+   ```
+
+> **OBS:** `SENDGRID_API_KEY` ska aldrig committas – lägg den bara i Vercel-miljön eller `.env.local`.
+
 ### Driftsättning via Vercel (rekommenderat)
 
 Om du kör projektet via **GitHub + Vercel** behöver du **inte** köra några lokala kommandon.
@@ -57,7 +75,7 @@ Lägg istället till variablerna direkt i Vercel-dashboarden:
 
 1. Gå till ditt projekt på [vercel.com](https://vercel.com)
 2. Välj **Settings → Environment Variables**
-3. Lägg till alla variabler ovan med dina riktiga värden, inklusive `NEXT_PUBLIC_BASE_URL=https://sport-iq.se`
+3. Lägg till alla variabler ovan med dina riktiga värden, inklusive `NEXT_PUBLIC_BASE_URL=https://sport-iq.se`, `SENDGRID_API_KEY` och `SENDGRID_FROM`
 4. Lägg till din anpassade domän under **Settings → Domains** i Vercel
 5. Gör en ny deploy (eller tryck **Redeploy**) – Vercel hämtar automatiskt värdena
 
