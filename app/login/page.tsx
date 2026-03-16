@@ -16,11 +16,10 @@ export default function LoginPage() {
   const [loginAttempted, setLoginAttempted] = useState(false);
 
   // After a successful login the auth state updates asynchronously.
-  // Redirect once the user object is populated with their sport.
+  // Redirect to the dashboard once the user object is populated.
   useEffect(() => {
     if (loginAttempted && !loading && user) {
-      const sport = user.sport ?? "basket";
-      router.push(`/${sport}`);
+      router.push("/");
     }
   }, [loginAttempted, loading, user, router]);
 
