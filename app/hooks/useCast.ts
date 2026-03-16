@@ -3,11 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface CastState {
-  /** True when at least one secondary display is detected as available. */
+  /** True when at least one secondary display is detected as available, or when the fallback (new-tab) mode is active. */
   isAvailable: boolean;
   /** True when a presentation session is currently active. */
   isPresenting: boolean;
-  /** Open the cast URL on an external display (Chromecast, AirPlay display, secondary monitor). */
+  /** Open the cast URL on an external display (Chromecast, AirPlay display, secondary monitor).
+   *  On browsers that do not support the Presentation API (e.g. most mobile browsers) the cast
+   *  URL is opened in a new tab instead, allowing the user to cast via their device's built-in
+   *  screen-mirroring feature (AirPlay, Google Cast, etc.). */
   startCast: () => Promise<void>;
   /** Terminate the active presentation. */
   stopCast: () => void;
@@ -24,6 +27,10 @@ export interface CastState {
  * automatically shows its native Cast icon in the address bar whenever a
  * compatible device (Chromecast, etc.) is on the local network.
  *
+ * On browsers that do not support the Presentation API (e.g. Safari on iOS/iPadOS,
+ * Firefox on Android) the button is still shown and falls back to opening the cast
+ * URL in a new tab so the user can use the device's native screen-mirroring.
+ *
  * @param castUrl  Absolute URL to open on the receiver screen.
  *                 Pass `null` while the URL is not yet known (e.g. before auth).
  */
@@ -33,14 +40,25 @@ export function useCast(castUrl: string | null): CastState {
 
   const requestRef = useRef<PresentationRequest | null>(null);
   const connectionRef = useRef<PresentationConnection | null>(null);
+  /** Kept in sync with `castUrl` so the fallback `startCast` can read the latest value. */
+  const castUrlRef = useRef<string | null>(castUrl);
+
+  useEffect(() => {
+    castUrlRef.current = castUrl;
+  }, [castUrl]);
 
   /* ─── Register as default request and watch availability ─────── */
   useEffect(() => {
-    if (
-      !castUrl ||
-      typeof window === "undefined" ||
-      !("PresentationRequest" in window)
-    ) {
+    if (!castUrl || typeof window === "undefined") {
+      setIsAvailable(false);
+      return;
+    }
+
+    /* ── Fallback for browsers without Presentation API (most mobile browsers) ── */
+    if (!("PresentationRequest" in window)) {
+      /* Still expose the button so the user can open the cast page in a new
+       * tab and use their device's native screen-mirroring (AirPlay, Cast, …). */
+      setIsAvailable(true);
       return;
     }
 
@@ -89,7 +107,13 @@ export function useCast(castUrl: string | null): CastState {
 
   /* ─── Start a presentation session ───────────────────────────── */
   const startCast = useCallback(async () => {
-    if (!requestRef.current) return;
+    /* Fallback: Presentation API not available — open cast URL in a new tab. */
+    if (!requestRef.current) {
+      if (castUrlRef.current) {
+        window.open(castUrlRef.current, "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
     try {
       const connection = await requestRef.current.start();
       connectionRef.current = connection;
