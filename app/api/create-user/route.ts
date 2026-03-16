@@ -21,7 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "../../../lib/firebaseAdmin";
-import { sendEmail } from "../../../lib/sendgrid";
+import { sendEmail } from "../../../lib/email";
 
 export async function POST(req: NextRequest) {
   /* ── 1. Parse + validate request body ── */
