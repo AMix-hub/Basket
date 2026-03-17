@@ -108,9 +108,15 @@ service cloud.firestore {
     }
 
     // ─── attendance ───────────────────────────────────────────────
+    // Coaches and above can read/write all attendance.
+    // Any signed-in team member can write their own attendance entry (RSVP).
     match /attendance/{docId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && isCoachOrAbove();
+      allow write: if isSignedIn() && (
+        isCoachOrAbove() ||
+        // Players can write their own RSVP (playerId must match their uid)
+        request.resource.data.playerId == request.auth.uid
+      );
     }
 
     // ─── tactics ─────────────────────────────────────────────────

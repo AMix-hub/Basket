@@ -10,10 +10,16 @@ import {
   addDoc,
   doc,
   writeBatch,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
+import { autoTag, TAG_LABELS, TAG_COLORS } from "../../lib/exerciseTags";
+import { year1Plan } from "../data/year1";
+import { year2Plan } from "../data/year2";
+import { year3Plan } from "../data/year3";
+import type { Session as PlanSession } from "../data/types";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Player {
@@ -127,9 +133,20 @@ function getRecurringDates(startDate: string, endDate: string, weekday: number):
   return result;
 }
 
-/* ─── Local storage keys (players & attendance stay local) ── */
+/** Look up a plan session by year and session number */
+function getPlanSession(planYear: number, sessionNumber: number): PlanSession | null {
+  const plans: Record<number, { sessions: PlanSession[] }> = {
+    1: year1Plan,
+    2: year2Plan,
+    3: year3Plan,
+  };
+  const plan = plans[planYear];
+  if (!plan) return null;
+  return plan.sessions.find((s) => s.number === sessionNumber) ?? null;
+}
+
+/* ─── Local storage key (players stay local) ── */
 const PLAYERS_KEY = "basketball_players";
-const ATTENDANCE_KEY = "basketball_attendance";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function KalenderPage() {
@@ -209,12 +226,10 @@ export default function KalenderPage() {
   // Ref for the selected date panel – used to scroll into view when date is selected
   const dateListRef = useRef<HTMLDivElement>(null);
 
-  // Load players & attendance from localStorage
+  // Load players from localStorage (players stay local; attendance moves to Firestore)
   useEffect(() => {
     const p = localStorage.getItem(PLAYERS_KEY);
     if (p) setPlayers(JSON.parse(p));
-    const a = localStorage.getItem(ATTENDANCE_KEY);
-    if (a) setAttendance(JSON.parse(a));
   }, []);
 
   // For admins: load all teams so they can switch between teams in the calendar
@@ -332,14 +347,25 @@ export default function KalenderPage() {
     return () => unsub();
   }, [team]);
 
+  // Subscribe to Firestore attendance for the current team's sessions
+  useEffect(() => {
+    if (!team) { setAttendance([]); return; }
+    const q = query(collection(db, "attendance"), where("teamId", "==", team.id));
+    const unsub = onSnapshot(q, (snap) => {
+      setAttendance(
+        snap.docs.map((d) => ({
+          sessionId: d.data().sessionId as string,
+          playerId: d.data().playerId as string,
+          status: d.data().status as AttendanceStatus,
+        }))
+      );
+    });
+    return () => unsub();
+  }, [team]);
+
   const savePlayers = (updated: Player[]) => {
     setPlayers(updated);
     localStorage.setItem(PLAYERS_KEY, JSON.stringify(updated));
-  };
-
-  const saveAttendance = (updated: Attendance[]) => {
-    setAttendance(updated);
-    localStorage.setItem(ATTENDANCE_KEY, JSON.stringify(updated));
   };
 
   /* ── Navigation ── */
@@ -466,9 +492,22 @@ export default function KalenderPage() {
         await batch.commit();
       }
 
-      // Clean up local attendance
+      // Clean up Firestore attendance for deleted sessions
       const deletedSet = new Set(idsToDelete);
-      saveAttendance(attendance.filter((a) => !deletedSet.has(a.sessionId)));
+      const attendanceToDelete = attendance.filter((a) => deletedSet.has(a.sessionId));
+      if (attendanceToDelete.length > 0) {
+        const attendanceBatchSize = 500;
+        for (let i = 0; i < attendanceToDelete.length; i += attendanceBatchSize) {
+          const abatch = writeBatch(db);
+          attendanceToDelete.slice(i, i + attendanceBatchSize).forEach((a) => {
+            abatch.delete(doc(db, "attendance", `${a.sessionId}_${a.playerId}`));
+          });
+          // Non-critical: attendance cleanup failure doesn't block session deletion
+          await abatch.commit().catch((err) => {
+            console.warn("[attendance cleanup] batch delete failed:", err);
+          });
+        }
+      }
       if (selectedSession && deletedSet.has(selectedSession.id)) setSelectedSession(null);
 
       // Post cancellation message to team chat (only if we have a team)
@@ -592,15 +631,32 @@ export default function KalenderPage() {
     );
   };
 
-  const setPlayerAttendance = (
+  const setPlayerAttendance = async (
     sessionId: string,
     playerId: string,
     status: AttendanceStatus
   ) => {
-    const filtered = attendance.filter(
-      (a) => !(a.sessionId === sessionId && a.playerId === playerId)
-    );
-    saveAttendance([...filtered, { sessionId, playerId, status }]);
+    if (!team) return;
+    const docId = `${sessionId}_${playerId}`;
+    try {
+      await setDoc(doc(db, "attendance", docId), {
+        sessionId,
+        playerId,
+        status,
+        teamId: team.id,
+        updatedBy: user?.id ?? "",
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn("[attendance] Firestore write failed, falling back to local:", err);
+      // Optimistic local fallback
+      setAttendance((prev) => {
+        const filtered = prev.filter(
+          (a) => !(a.sessionId === sessionId && a.playerId === playerId)
+        );
+        return [...filtered, { sessionId, playerId, status }];
+      });
+    }
   };
 
   /* ── Player management ── */
@@ -716,6 +772,31 @@ export default function KalenderPage() {
 
   const sessionsOnDate = (date: string) =>
     sessions.filter((s) => s.date === date);
+
+  /* ── Send 24h reminder push notification ── */
+  const [sendingReminder, setSendingReminder] = useState<string | null>(null);
+
+  const sendReminder = async (s: TrainingSession) => {
+    if (!team || sendingReminder) return;
+    setSendingReminder(s.id);
+    try {
+      await fetch("/api/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teamId: team.id,
+          sessionTitle: s.title,
+          sessionDate: s.date,
+          sessionTime: s.time,
+          message: `📣 Påminnelse: ${s.title} är ${new Date(s.date + "T12:00:00").toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" })} kl. ${s.time}. Glöm inte att dyka upp!`,
+        }),
+      });
+    } catch (err) {
+      console.warn("[reminder] notification failed:", err);
+    } finally {
+      setSendingReminder(null);
+    }
+  };
 
   // Pre-compute recurring group sessions to avoid repeated filter calls in render
   const deletingGroupSessions = cancellingSession?.recurringGroupId
@@ -1496,6 +1577,12 @@ export default function KalenderPage() {
                             🏋️ {note.subActivities.length} övning{note.subActivities.length !== 1 ? "ar" : ""}
                           </span>
                         )}
+                        {!isExpanded && s.planYear && s.planSessionNumber && (() => {
+                          const ps = getPlanSession(s.planYear, s.planSessionNumber);
+                          return ps ? (
+                            <span className="ml-2 text-slate-400">· {ps.activities.length} planövningar</span>
+                          ) : null;
+                        })()}
                       </p>
                     )}
                     {players.length > 0 && (
@@ -1505,21 +1592,64 @@ export default function KalenderPage() {
                       </p>
                     )}
 
-                    {/* Linked exercises (shown when session is expanded) */}
-                    {isExpanded && note && (note.subActivities.length > 0 || note.comment) && (
-                      <div className="mt-2 border-t border-orange-200 pt-2 space-y-1.5" onClick={(e) => e.stopPropagation()}>
-                        {note.comment && (
+                    {/* Expanded session detail: plan exercises + notes + reminder */}
+                    {isExpanded && (
+                      <div className="mt-2 border-t border-orange-200 pt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+
+                        {/* Tränarkommentar */}
+                        {note?.comment && (
                           <div className="bg-blue-50 rounded-lg px-2.5 py-1.5">
                             <p className="text-xs font-semibold text-blue-600 mb-0.5">💬 Tränarkommentar</p>
                             <p className="text-xs text-slate-600 leading-relaxed">{note.comment}</p>
                           </div>
                         )}
-                        {note.subActivities.length > 0 && (
+
+                        {/* Plan exercises from exercise bank */}
+                        {s.planYear && s.planSessionNumber && (() => {
+                          const ps = getPlanSession(s.planYear, s.planSessionNumber);
+                          if (!ps) return null;
+                          return (
+                            <div>
+                              <p className="text-xs font-semibold text-slate-500 mb-1.5">
+                                📋 Planövningar ({ps.activities.length})
+                              </p>
+                              <div className="space-y-1.5">
+                                {ps.activities.map((act, idx) => {
+                                  const tags = autoTag(act);
+                                  return (
+                                    <div key={idx} className="bg-white rounded-lg px-2.5 py-2 border border-orange-100">
+                                      <div className="flex items-start justify-between gap-1 mb-0.5">
+                                        <p className="text-xs font-semibold text-slate-700">{act.name}</p>
+                                        <div className="flex gap-1 flex-wrap shrink-0">
+                                          {tags.slice(0, 2).map((tag) => (
+                                            <span key={tag} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TAG_COLORS[tag]}`}>
+                                              {TAG_LABELS[tag]}
+                                            </span>
+                                          ))}
+                                          {act.durationMinutes && (
+                                            <span className="text-xs text-slate-400">⏱{act.durationMinutes}m</span>
+                                          )}
+                                          {act.intensityLevel && (
+                                            <span className="text-xs text-slate-400">{"🔥".repeat(act.intensityLevel)}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{act.description}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Coach-added sub-activities */}
+                        {note && note.subActivities.length > 0 && (
                           <div>
-                            <p className="text-xs font-semibold text-slate-500 mb-1">🏋️ Övningar ({note.subActivities.length})</p>
+                            <p className="text-xs font-semibold text-slate-500 mb-1">🏋️ Tillagda övningar ({note.subActivities.length})</p>
                             <div className="space-y-1">
                               {note.subActivities.map((sub) => (
-                                <div key={sub.id} className="bg-white rounded-lg px-2.5 py-1.5 border border-orange-100">
+                                <div key={sub.id} className="bg-white rounded-lg px-2.5 py-1.5 border border-blue-100">
                                   <p className="text-xs font-semibold text-slate-700">{sub.name}</p>
                                   {sub.description && (
                                     <p className="text-xs text-slate-500 leading-relaxed">{sub.description}</p>
@@ -1529,14 +1659,31 @@ export default function KalenderPage() {
                             </div>
                           </div>
                         )}
-                        {s.planYear && (
-                          <Link
-                            href={`/ar${s.planYear}`}
-                            className="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline mt-1"
-                          >
-                            📋 Gå till träningspass {s.planSessionNumber} →
-                          </Link>
-                        )}
+
+                        {/* Action links */}
+                        <div className="flex items-center gap-2 pt-1 flex-wrap">
+                          {s.planYear && (
+                            <Link
+                              href={`/ar${s.planYear}`}
+                              className="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:text-orange-700 hover:underline"
+                            >
+                              📋 Se träningsplan →
+                            </Link>
+                          )}
+                          {canEdit && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sendReminder(s);
+                              }}
+                              disabled={sendingReminder === s.id}
+                              className="ml-auto flex items-center gap-1 text-xs font-semibold px-2.5 py-1 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+                              title="Skicka påminnelse till laget"
+                            >
+                              {sendingReminder === s.id ? "…" : "🔔 Skicka påminnelse"}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1669,6 +1816,69 @@ export default function KalenderPage() {
                 </div>
               );
             })()}
+
+          {/* Smart exercise recommendations based on session tags (AI-recommendation) */}
+          {selectedSession && selectedSession.planYear && selectedSession.planSessionNumber && (() => {
+            const ps = getPlanSession(selectedSession.planYear, selectedSession.planSessionNumber);
+            if (!ps) return null;
+            // Collect tags from all plan activities
+            const allTags = new Set(ps.activities.flatMap((a) => autoTag(a)));
+            if (allTags.size === 0) return null;
+            // Find exercises from OTHER sessions that share those tags (recommendations)
+            const allPlans = [year1Plan, year2Plan, year3Plan];
+            const recommended = allPlans
+              .flatMap((plan) =>
+                plan.sessions
+                  .filter((sess) => sess.number !== selectedSession.planSessionNumber || plan.year !== selectedSession.planYear)
+                  .flatMap((sess) =>
+                    sess.activities
+                      .filter((act) => autoTag(act).some((t) => allTags.has(t)))
+                      .slice(0, 1)
+                      .map((act) => ({ ...act, planYear: plan.year, sessionNumber: sess.number, sessionTitle: sess.title }))
+                  )
+              )
+              .slice(0, 3);
+            if (recommended.length === 0) return null;
+            return (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">🤖</span>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">AI-rekommendationer</h3>
+                    <p className="text-xs text-slate-500">
+                      Liknande övningar från övningsbanken
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {recommended.map((rec, i) => {
+                    const tags = autoTag(rec);
+                    return (
+                      <div key={i} className="p-2.5 rounded-xl border border-slate-200 bg-slate-50">
+                        <div className="flex items-start justify-between gap-1 mb-0.5">
+                          <p className="text-xs font-semibold text-slate-700">{rec.name}</p>
+                          <div className="flex gap-1 shrink-0">
+                            {tags.slice(0, 1).map((tag) => (
+                              <span key={tag} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TAG_COLORS[tag]}`}>
+                                {TAG_LABELS[tag]}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-400">År {rec.planYear} · {rec.sessionTitle}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Link
+                  href="/traningsdatabas"
+                  className="flex items-center gap-1 text-xs font-semibold text-orange-600 hover:underline mt-3"
+                >
+                  📚 Fler övningar i övningsbanken →
+                </Link>
+              </div>
+            );
+          })()}
 
           {/* Player panel */}
           {showPlayerPanel && (
