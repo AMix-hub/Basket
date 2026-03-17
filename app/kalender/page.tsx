@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   collection,
@@ -156,9 +156,10 @@ export default function KalenderPage() {
   // For admins/coaches with multiple teams, allow selecting which team to view/add to
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  // Resolved team: search in allTeams (admins) and myTeams (coaches) then fall back to default
   const myTeams = getMyTeams();
-  const team = [...allTeams, ...myTeams].find((t) => t.id === selectedTeamId) ?? defaultTeam;
+  // Resolved team: search in allTeams (admins) and myTeams (coaches) then fall back to default
+  const allKnownTeams = useMemo(() => [...allTeams, ...myTeams], [allTeams, myTeams]);
+  const team = allKnownTeams.find((t) => t.id === selectedTeamId) ?? defaultTeam;
 
   const canEdit =
     user?.roles.some((r) => r === "coach" || r === "admin" || r === "assistant") ?? false;
@@ -1160,7 +1161,7 @@ export default function KalenderPage() {
                 <option value="__all__">🏢 Alla lag</option>
                 {allTeams.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} ({t.ageGroup})
+                    {t.name}{t.ageGroup ? ` (${t.ageGroup})` : ""}
                   </option>
                 ))}
               </select>
