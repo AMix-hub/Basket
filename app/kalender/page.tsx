@@ -150,7 +150,7 @@ const PLAYERS_KEY = "basketball_players";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function KalenderPage() {
-  const { user, getMyTeam, getAllTeams, getMyTeams } = useAuth();
+  const { user, loading, getMyTeam, getAllTeams, getMyTeams } = useAuth();
   const defaultTeam = getMyTeam();
 
   // For admins with multiple teams, allow selecting which team to view/add to
@@ -860,13 +860,22 @@ export default function KalenderPage() {
     ? sessions.filter((s) => s.recurringGroupId === editingSession.recurringGroupId)
     : [];
 
+  /* ── Loading ── */
+  if (loading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <span className="text-slate-400">Laddar…</span>
+      </div>
+    );
+  }
+
   /* ── Not logged in ── */
   if (!user) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <p className="text-4xl mb-3">📅</p>
-          <p className="text-slate-600 mb-4">
+          <p className="text-slate-400 mb-4">
             Du behöver logga in för att se kalendern.
           </p>
         </div>
@@ -1116,7 +1125,7 @@ export default function KalenderPage() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">📅</span>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
               Kalender & Närvaro
             </h1>
           </div>
@@ -1136,7 +1145,7 @@ export default function KalenderPage() {
                   setSelectedSession(null);
                   setSelectedDate(null);
                 }}
-                className="px-3 py-1.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                className="px-3 py-1.5 text-sm border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-slate-700 text-slate-100"
               >
                 <option value="__all__">🏢 Alla lag</option>
                 {allTeams.map((t) => (
@@ -1496,9 +1505,9 @@ export default function KalenderPage() {
         <div className="w-full lg:w-80 shrink-0 space-y-4">
           {/* Selected date panel */}
           {selectedDate && (
-            <div ref={dateListRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+            <div ref={dateListRef} className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-slate-900">
+                <h3 className="font-bold text-slate-100">
                   {new Date(selectedDate + "T12:00:00").toLocaleDateString(
                     "sv-SE",
                     {
@@ -1555,8 +1564,8 @@ export default function KalenderPage() {
                     key={s.id}
                     className={`mb-2 p-3 rounded-xl border cursor-pointer transition-all ${
                       isExpanded
-                        ? "border-orange-400 bg-orange-50"
-                        : "border-slate-200 hover:border-orange-300"
+                        ? "border-orange-400 bg-orange-500/20"
+                        : "border-slate-600 hover:border-orange-400"
                     }`}
                     onClick={() =>
                       setSelectedSession(isExpanded ? null : s)
@@ -1590,7 +1599,7 @@ export default function KalenderPage() {
                           </span>
                         )}
                         {showTeamName && (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
                             👥 {sessionTeam.name}
                           </span>
                         )}
@@ -1620,7 +1629,7 @@ export default function KalenderPage() {
                         </div>
                       )}
                     </div>
-                    <p className="font-semibold text-sm text-slate-800 mt-1">
+                    <p className="font-semibold text-sm text-slate-200 mt-1">
                       {s.title}
                     </p>
                     {s.planSessionNumber && (
@@ -1657,9 +1666,9 @@ export default function KalenderPage() {
 
                         {/* Tränarkommentar */}
                         {note?.comment && (
-                          <div className="bg-blue-50 rounded-lg px-2.5 py-1.5">
-                            <p className="text-xs font-semibold text-blue-600 mb-0.5">💬 Tränarkommentar</p>
-                            <p className="text-xs text-slate-600 leading-relaxed">{note.comment}</p>
+                          <div className="bg-blue-900/30 rounded-lg px-2.5 py-1.5">
+                            <p className="text-xs font-semibold text-blue-400 mb-0.5">💬 Tränarkommentar</p>
+                            <p className="text-xs text-slate-300 leading-relaxed">{note.comment}</p>
                           </div>
                         )}
 
@@ -1676,9 +1685,9 @@ export default function KalenderPage() {
                                 {ps.activities.map((act, idx) => {
                                   const tags = autoTag(act);
                                   return (
-                                    <div key={idx} className="bg-white rounded-lg px-2.5 py-2 border border-orange-100">
+                                    <div key={idx} className="bg-slate-700 rounded-lg px-2.5 py-2 border border-orange-800/40">
                                       <div className="flex items-start justify-between gap-1 mb-0.5">
-                                        <p className="text-xs font-semibold text-slate-700">{act.name}</p>
+                                        <p className="text-xs font-semibold text-slate-200">{act.name}</p>
                                         <div className="flex gap-1 flex-wrap shrink-0">
                                           {tags.slice(0, 2).map((tag) => (
                                             <span key={tag} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TAG_COLORS[tag]}`}>
@@ -1693,7 +1702,7 @@ export default function KalenderPage() {
                                           )}
                                         </div>
                                       </div>
-                                      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{act.description}</p>
+                                      <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">{act.description}</p>
                                     </div>
                                   );
                                 })}
@@ -1708,12 +1717,12 @@ export default function KalenderPage() {
                             <p className="text-xs font-semibold text-slate-500 mb-1">🏋️ Tillagda övningar ({note.subActivities.length})</p>
                             <div className="space-y-1">
                               {note.subActivities.map((sub) => (
-                                <div key={sub.id} className="bg-white rounded-lg px-2.5 py-1.5 border border-blue-100">
+                                <div key={sub.id} className="bg-slate-700 rounded-lg px-2.5 py-1.5 border border-blue-800/40">
                                   <div className="flex items-start justify-between gap-1">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-semibold text-slate-700">{sub.name}</p>
+                                      <p className="text-xs font-semibold text-slate-200">{sub.name}</p>
                                       {sub.description && (
-                                        <p className="text-xs text-slate-500 leading-relaxed">{sub.description}</p>
+                                        <p className="text-xs text-slate-400 leading-relaxed">{sub.description}</p>
                                       )}
                                     </div>
                                     {canEdit && (
@@ -1829,8 +1838,8 @@ export default function KalenderPage() {
 
           {/* Attendance panel */}
           {selectedSession && players.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-              <h3 className="font-bold text-slate-900 mb-1">Närvaro</h3>
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
+              <h3 className="font-bold text-slate-100 mb-1">Närvaro</h3>
               <p className="text-sm text-slate-500 mb-3">
                 {selectedSession.title}
               </p>
@@ -1840,7 +1849,7 @@ export default function KalenderPage() {
                   return (
                     <div key={p.id} className="flex items-center gap-2">
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-slate-800">
+                        <span className="text-sm font-medium text-slate-200">
                           #{p.number} {p.name}
                         </span>
                       </div>
@@ -1863,7 +1872,7 @@ export default function KalenderPage() {
                               className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${
                                 current === status
                                   ? `${cfg.bg} ${cfg.text} ring-1 ring-current`
-                                  : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                                  : "bg-slate-700 text-slate-400 hover:bg-slate-600"
                               }`}
                             >
                               {status === "present"
@@ -1884,7 +1893,7 @@ export default function KalenderPage() {
               {(() => {
                 const s = attendanceSummary(selectedSession.id);
                 return (
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex gap-4 text-xs">
+                  <div className="mt-3 pt-3 border-t border-slate-700 flex gap-4 text-xs">
                     <span className="text-emerald-600 font-semibold">
                       ✓ {s.present} Närvarande
                     </span>
@@ -1915,11 +1924,11 @@ export default function KalenderPage() {
               const suggestions = getDrillSuggestions(presentCount);
               if (suggestions.length === 0) return null;
               return (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+                <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-lg">💡</span>
                     <div>
-                      <h3 className="font-bold text-slate-900 text-sm">
+                      <h3 className="font-bold text-slate-100 text-sm">
                         Övningsförslag
                       </h3>
                       <p className="text-xs text-slate-500">
@@ -1934,7 +1943,7 @@ export default function KalenderPage() {
                         className={`p-3 rounded-xl border ${drill.color}`}
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold px-2 py-0.5 bg-white/70 rounded-full">
+                          <span className="text-xs font-bold px-2 py-0.5 bg-slate-900/50 rounded-full">
                             {drill.badge}
                           </span>
                           <span className="text-sm font-semibold">
@@ -1972,11 +1981,11 @@ export default function KalenderPage() {
               .slice(0, 3);
             if (recommended.length === 0) return null;
             return (
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+              <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-lg">🤖</span>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">AI-rekommendationer</h3>
+                    <h3 className="font-bold text-slate-100 text-sm">AI-rekommendationer</h3>
                     <p className="text-xs text-slate-500">
                       Liknande övningar från övningsbanken
                     </p>
@@ -1986,9 +1995,9 @@ export default function KalenderPage() {
                   {recommended.map((rec, i) => {
                     const tags = autoTag(rec);
                     return (
-                      <div key={i} className="p-2.5 rounded-xl border border-slate-200 bg-slate-50">
+                      <div key={i} className="p-2.5 rounded-xl border border-slate-700 bg-slate-700">
                         <div className="flex items-start justify-between gap-1 mb-0.5">
-                          <p className="text-xs font-semibold text-slate-700">{rec.name}</p>
+                          <p className="text-xs font-semibold text-slate-200">{rec.name}</p>
                           <div className="flex gap-1 shrink-0">
                             {tags.slice(0, 1).map((tag) => (
                               <span key={tag} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TAG_COLORS[tag]}`}>
@@ -2014,8 +2023,8 @@ export default function KalenderPage() {
 
           {/* Player panel */}
           {showPlayerPanel && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-              <h3 className="font-bold text-slate-900 mb-3">Spelarlistan</h3>
+            <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
+              <h3 className="font-bold text-slate-100 mb-3">Spelarlistan</h3>
               {canEdit && (
                 <div className="flex gap-2 mb-2">
                   <input
@@ -2051,12 +2060,12 @@ export default function KalenderPage() {
                   {players.map((p) => (
                     <li
                       key={p.id}
-                      className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2"
+                      className="flex items-center gap-2 bg-slate-700 rounded-xl px-3 py-2"
                     >
-                      <span className="text-xs font-bold text-slate-500 w-8">
+                      <span className="text-xs font-bold text-slate-400 w-8">
                         #{p.number}
                       </span>
-                      <span className="flex-1 text-sm font-medium text-slate-800">
+                      <span className="flex-1 text-sm font-medium text-slate-200">
                         {p.name}
                       </span>
                       {canEdit && (
