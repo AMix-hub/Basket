@@ -214,8 +214,14 @@ export default function KalenderPage() {
   const [editBusy, setEditBusy] = useState(false);
   const [selectedEditIds, setSelectedEditIds] = useState<Set<string>>(new Set());
 
-  // Session notes (exercises linked to plan sessions)
+  // Session notes (exercises linked to plan sessions or directly to a calendar session)
   const [sessionNotes, setSessionNotes] = useState<Record<string, SessionNote>>({});
+
+  // Inline exercise-add form state (per calendar session ID)
+  const [calExerciseName, setCalExerciseName] = useState<Record<string, string>>({});
+  const [calExerciseDesc, setCalExerciseDesc] = useState<Record<string, string>>({});
+  const [addingExerciseFor, setAddingExerciseFor] = useState<string | null>(null);
+  const [savingCalExercise, setSavingCalExercise] = useState<string | null>(null);
 
   // Create activity modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -328,19 +334,27 @@ export default function KalenderPage() {
     return () => unsubscribe();
   }, [team, selectedTeamId, allTeams]);
 
-  // Subscribe to session_notes so we can show linked exercises in the calendar
+  // Subscribe to session_notes so we can show linked exercises in the calendar.
+  // Notes are keyed by `${planYear}_${sessionNumber}` for plan-linked sessions, or
+  // `session_${sessionId}` for standalone calendar sessions.
   useEffect(() => {
     if (!team) { setSessionNotes({}); return; }
     const q = query(collection(db, "session_notes"), where("teamId", "==", team.id));
     const unsub = onSnapshot(q, (snap) => {
       const loaded: Record<string, SessionNote> = {};
       snap.docs.forEach((d) => {
-        const planYear = d.data().planYear as number;
-        const sessionNumber = d.data().sessionNumber as number;
-        loaded[`${planYear}_${sessionNumber}`] = {
+        const planYear = d.data().planYear as number | null;
+        const sessionNumber = d.data().sessionNumber as number | null;
+        const sessionId = d.data().sessionId as string | null;
+        const note: SessionNote = {
           subActivities: (d.data().subActivities as SubActivity[]) ?? [],
           comment: (d.data().comment as string) ?? "",
         };
+        if (planYear && sessionNumber) {
+          loaded[`${planYear}_${sessionNumber}`] = note;
+        } else if (sessionId) {
+          loaded[`session_${sessionId}`] = note;
+        }
       });
       setSessionNotes(loaded);
     });
@@ -796,6 +810,46 @@ export default function KalenderPage() {
     } finally {
       setSendingReminder(null);
     }
+  };
+
+  /* ── Inline exercise management for calendar sessions ── */
+  const addCalendarExercise = async (sessionId: string) => {
+    if (!team || !user) return;
+    const name = (calExerciseName[sessionId] ?? "").trim();
+    const description = (calExerciseDesc[sessionId] ?? "").trim();
+    if (!name) return;
+    setSavingCalExercise(sessionId);
+    try {
+      const docId = `session_${sessionId}`;
+      const existing = sessionNotes[`session_${sessionId}`] ?? { subActivities: [], comment: "" };
+      const newSub: SubActivity = { id: crypto.randomUUID(), name, description };
+      await setDoc(doc(db, "session_notes", docId), {
+        teamId: team.id,
+        sessionId,
+        subActivities: [...existing.subActivities, newSub],
+        comment: existing.comment,
+        updatedAt: new Date().toISOString(),
+      });
+      setCalExerciseName((prev) => ({ ...prev, [sessionId]: "" }));
+      setCalExerciseDesc((prev) => ({ ...prev, [sessionId]: "" }));
+      setAddingExerciseFor(null);
+    } finally {
+      setSavingCalExercise(null);
+    }
+  };
+
+  const deleteCalendarExercise = async (sessionId: string, subId: string) => {
+    if (!team || !user) return;
+    const docId = `session_${sessionId}`;
+    const existing = sessionNotes[`session_${sessionId}`];
+    if (!existing) return;
+    await setDoc(doc(db, "session_notes", docId), {
+      teamId: team.id,
+      sessionId,
+      subActivities: existing.subActivities.filter((sub) => sub.id !== subId),
+      comment: existing.comment,
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   // Pre-compute recurring group sessions to avoid repeated filter calls in render
@@ -1491,7 +1545,7 @@ export default function KalenderPage() {
                 const summary = attendanceSummary(s.id);
                 const note = s.planYear && s.planSessionNumber
                   ? sessionNotes[`${s.planYear}_${s.planSessionNumber}`]
-                  : undefined;
+                  : sessionNotes[`session_${s.id}`];
                 const isExpanded = selectedSession?.id === s.id;
                 // Find team name for multi-team view
                 const sessionTeam = s.teamId ? allTeams.find((t) => t.id === s.teamId) : null;
@@ -1585,6 +1639,11 @@ export default function KalenderPage() {
                         })()}
                       </p>
                     )}
+                    {!s.planSessionNumber && !isExpanded && note && note.subActivities.length > 0 && (
+                      <p className="text-xs text-orange-500 font-semibold mt-0.5">
+                        🏋️ {note.subActivities.length} övning{note.subActivities.length !== 1 ? "ar" : ""}
+                      </p>
+                    )}
                     {players.length > 0 && (
                       <p className="text-xs text-slate-400 mt-1">
                         {summary.present}✓ {summary.absent}✗ {summary.sick}🤒
@@ -1650,13 +1709,86 @@ export default function KalenderPage() {
                             <div className="space-y-1">
                               {note.subActivities.map((sub) => (
                                 <div key={sub.id} className="bg-white rounded-lg px-2.5 py-1.5 border border-blue-100">
-                                  <p className="text-xs font-semibold text-slate-700">{sub.name}</p>
-                                  {sub.description && (
-                                    <p className="text-xs text-slate-500 leading-relaxed">{sub.description}</p>
-                                  )}
+                                  <div className="flex items-start justify-between gap-1">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-semibold text-slate-700">{sub.name}</p>
+                                      {sub.description && (
+                                        <p className="text-xs text-slate-500 leading-relaxed">{sub.description}</p>
+                                      )}
+                                    </div>
+                                    {canEdit && (
+                                      <button
+                                        onClick={() => {
+                                          if (s.planYear && s.planSessionNumber) {
+                                            // handled by SeasonPage; no-op here
+                                          } else {
+                                            deleteCalendarExercise(s.id, sub.id);
+                                          }
+                                        }}
+                                        className="text-slate-300 hover:text-red-500 transition-colors text-xs shrink-0 ml-1"
+                                        title="Ta bort övning"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                             </div>
+                          </div>
+                        )}
+
+                        {/* Inline add-exercise form (training sessions only) */}
+                        {canEdit && s.type === "träning" && !s.planYear && (
+                          <div className="border-t border-orange-100 pt-2">
+                            {addingExerciseFor === s.id ? (
+                              <div className="space-y-2">
+                                <p className="text-xs font-semibold text-slate-600">➕ Lägg till övning</p>
+                                <input
+                                  type="text"
+                                  value={calExerciseName[s.id] ?? ""}
+                                  onChange={(e) =>
+                                    setCalExerciseName((prev) => ({ ...prev, [s.id]: e.target.value }))
+                                  }
+                                  placeholder="Övningens namn..."
+                                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                />
+                                <textarea
+                                  value={calExerciseDesc[s.id] ?? ""}
+                                  onChange={(e) =>
+                                    setCalExerciseDesc((prev) => ({ ...prev, [s.id]: e.target.value }))
+                                  }
+                                  placeholder="Beskrivning (valfritt)..."
+                                  rows={2}
+                                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                                />
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => setAddingExerciseFor(null)}
+                                    className="flex-1 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                  >
+                                    Avbryt
+                                  </button>
+                                  <button
+                                    disabled={
+                                      savingCalExercise === s.id ||
+                                      !(calExerciseName[s.id] ?? "").trim()
+                                    }
+                                    onClick={() => addCalendarExercise(s.id)}
+                                    className="flex-1 py-1.5 rounded-xl bg-orange-500 text-white text-xs font-semibold hover:bg-orange-600 disabled:opacity-40"
+                                  >
+                                    {savingCalExercise === s.id ? "Sparar…" : "Spara övning"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setAddingExerciseFor(s.id)}
+                                className="text-xs text-orange-600 hover:text-orange-800 font-semibold flex items-center gap-1"
+                              >
+                                🏋️ + Lägg till övning
+                              </button>
+                            )}
                           </div>
                         )}
 
