@@ -105,7 +105,7 @@ interface AuthContextType {
   /**
    * Admin creates a new team. Returns null on success, or a Swedish error string.
    */
-  createTeam: (teamName: string, ageGroup: string) => Promise<string | null>;
+  createTeam: (teamName: string, ageGroup?: string) => Promise<string | null>;
   /**
    * Admin uploads a club logo image. Returns null on success, or a Swedish error string.
    */
@@ -687,7 +687,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /* ── createTeam (admin creates a new team) ── */
   const createTeam = async (
     teamName: string,
-    ageGroup: string
+    ageGroup: string = ""
   ): Promise<string | null> => {
     if (!user) return "Du måste vara inloggad för att skapa lag.";
     if (!user.roles.includes("admin")) return "Endast admins kan skapa lag.";

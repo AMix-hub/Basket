@@ -85,7 +85,6 @@ export default function AdminPage() {
 
   // Create team form state
   const [newTeamName, setNewTeamName] = useState("");
-  const [newAgeGroup, setNewAgeGroup] = useState("≤7 år");
   const [creatingTeam, setCreatingTeam] = useState(false);
   const [createTeamError, setCreateTeamError] = useState<string | null>(null);
 
@@ -470,12 +469,11 @@ export default function AdminPage() {
     if (!newTeamName.trim()) return;
     setCreatingTeam(true);
     setCreateTeamError(null);
-    const err = await createTeam(newTeamName.trim(), newAgeGroup);
+    const err = await createTeam(newTeamName.trim());
     if (err) {
       setCreateTeamError(err);
     } else {
       setNewTeamName("");
-      setNewAgeGroup("≤7 år");
       // onSnapshot listener will automatically refresh the teams list
     }
     setCreatingTeam(false);
@@ -718,25 +716,14 @@ export default function AdminPage() {
           Som admin kan du skapa lag direkt. Bjud sedan in en coach med coach-inbjudningskoden ovan, eller dela lagkoderna nedan med spelare och föräldrar.
         </p>
         <form onSubmit={handleCreateTeam} className="space-y-3">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newTeamName}
-              onChange={(e) => setNewTeamName(e.target.value)}
-              placeholder="Lagets namn, t.ex. Röda Laget U9"
-              required
-              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-            <select
-              value={newAgeGroup}
-              onChange={(e) => setNewAgeGroup(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-            >
-              <option value="≤7 år">≤7 år (År 1)</option>
-              <option value="8 år">8 år (År 2)</option>
-              <option value="9 år">9 år (År 3)</option>
-            </select>
-          </div>
+          <input
+            type="text"
+            value={newTeamName}
+            onChange={(e) => setNewTeamName(e.target.value)}
+            placeholder="Lagets namn, t.ex. Röda Laget U9"
+            required
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+          />
           {createTeamError && (
             <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
               {createTeamError}
