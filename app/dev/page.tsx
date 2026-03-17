@@ -28,6 +28,15 @@ interface DevItem {
   doneAt?: string;
 }
 
+interface DevComment {
+  id: string;
+  itemId: string;
+  text: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
 const categoryConfig: Record<DevItemCategory, { label: string; emoji: string; color: string }> = {
   idea:   { label: "Idé",      emoji: "💡", color: "bg-yellow-50 border-yellow-200 text-yellow-800" },
   change: { label: "Ändring",  emoji: "🔧", color: "bg-blue-50 border-blue-200 text-blue-800" },
@@ -54,6 +63,12 @@ export default function DevPage() {
   const [editCategory, setEditCategory] = useState<DevItemCategory>("idea");
   const [editPriority, setEditPriority] = useState<DevItemPriority>("medium");
 
+  // Comments
+  const [comments, setComments] = useState<DevComment[]>([]);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
+  const [newCommentText, setNewCommentText] = useState<Record<string, string>>({});
+  const [addingComment, setAddingComment] = useState<string | null>(null);
+
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
 
@@ -74,6 +89,62 @@ export default function DevPage() {
     });
     return () => unsub();
   }, [user]);
+
+  // Load comments for all dev items
+  useEffect(() => {
+    if (!user?.roles.includes("admin")) return;
+    const q = query(collection(db, "dev_item_comments"), orderBy("createdAt", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setComments(
+        snap.docs.map((d) => ({
+          id: d.id,
+          itemId: d.data().itemId as string,
+          text: d.data().text as string,
+          authorId: d.data().authorId as string,
+          authorName: d.data().authorName as string,
+          createdAt: d.data().createdAt as string,
+        }))
+      );
+    });
+    return () => unsub();
+  }, [user]);
+
+  const addComment = async (itemId: string) => {
+    const text = (newCommentText[itemId] ?? "").trim();
+    if (!text || !user) return;
+    setAddingComment(itemId);
+    try {
+      await addDoc(collection(db, "dev_item_comments"), {
+        itemId,
+        text,
+        authorId: user.id,
+        authorName: user.name,
+        createdAt: new Date().toISOString(),
+      });
+      setNewCommentText((prev) => ({ ...prev, [itemId]: "" }));
+    } catch {
+      alert("Det gick inte att lägga till kommentaren. Försök igen.");
+    } finally {
+      setAddingComment(null);
+    }
+  };
+
+  const deleteComment = async (commentId: string) => {
+    try {
+      await deleteDoc(doc(db, "dev_item_comments", commentId));
+    } catch {
+      alert("Det gick inte att ta bort kommentaren. Försök igen.");
+    }
+  };
+
+  const toggleComments = (itemId: string) => {
+    setExpandedComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  };
 
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,19 +264,6 @@ export default function DevPage() {
     .sort((a, b) => priorityConfig[a.priority].order - priorityConfig[b.priority].order);
   const done    = filtered.filter((i) => i.done);
 
-  const noEditProps = {
-    editing: false as const,
-    editText: "",
-    editCategory: "idea" as DevItemCategory,
-    editPriority: "medium" as DevItemPriority,
-    onEditStart: () => {},
-    onEditChange: () => {},
-    onEditCategoryChange: () => {},
-    onEditPriorityChange: () => {},
-    onEditSave: () => {},
-    onEditCancel: () => {},
-  };
-
   return (
     <div>
       {/* Header */}
@@ -301,24 +359,38 @@ export default function DevPage() {
                   Att göra ({pending.length})
                 </h3>
                 <ul className="space-y-2">
-                  {pending.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      onToggle={() => toggleDone(item)}
-                      onDelete={() => removeItem(item)}
-                      editing={editingId === item.id}
-                      editText={editText}
-                      editCategory={editCategory}
-                      editPriority={editPriority}
-                      onEditStart={() => startEdit(item)}
-                      onEditChange={setEditText}
-                      onEditCategoryChange={setEditCategory}
-                      onEditPriorityChange={setEditPriority}
-                      onEditSave={() => saveEdit(item)}
-                      onEditCancel={cancelEdit}
-                    />
-                  ))}
+                  {pending.map((item) => {
+                    const itemComments = comments.filter((c) => c.itemId === item.id);
+                    return (
+                      <ItemRow
+                        key={item.id}
+                        item={item}
+                        onToggle={() => toggleDone(item)}
+                        onDelete={() => removeItem(item)}
+                        editing={editingId === item.id}
+                        editText={editText}
+                        editCategory={editCategory}
+                        editPriority={editPriority}
+                        onEditStart={() => startEdit(item)}
+                        onEditChange={setEditText}
+                        onEditCategoryChange={setEditCategory}
+                        onEditPriorityChange={setEditPriority}
+                        onEditSave={() => saveEdit(item)}
+                        onEditCancel={cancelEdit}
+                        comments={itemComments}
+                        commentsExpanded={expandedComments.has(item.id)}
+                        onToggleComments={() => toggleComments(item.id)}
+                        newCommentText={newCommentText[item.id] ?? ""}
+                        onNewCommentChange={(v) =>
+                          setNewCommentText((prev) => ({ ...prev, [item.id]: v }))
+                        }
+                        onAddComment={() => addComment(item.id)}
+                        addingComment={addingComment === item.id}
+                        onDeleteComment={deleteComment}
+                        currentUserId={user.id}
+                      />
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -330,15 +402,38 @@ export default function DevPage() {
                   Klart ({done.length})
                 </h3>
                 <ul className="space-y-2">
-                  {done.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      onToggle={() => toggleDone(item)}
-                      onDelete={() => removeItem(item)}
-                      {...noEditProps}
-                    />
-                  ))}
+                  {done.map((item) => {
+                    const itemComments = comments.filter((c) => c.itemId === item.id);
+                    return (
+                      <ItemRow
+                        key={item.id}
+                        item={item}
+                        onToggle={() => toggleDone(item)}
+                        onDelete={() => removeItem(item)}
+                        editing={false}
+                        editText=""
+                        editCategory="idea"
+                        editPriority="medium"
+                        onEditStart={() => {}}
+                        onEditChange={() => {}}
+                        onEditCategoryChange={() => {}}
+                        onEditPriorityChange={() => {}}
+                        onEditSave={() => {}}
+                        onEditCancel={() => {}}
+                        comments={itemComments}
+                        commentsExpanded={expandedComments.has(item.id)}
+                        onToggleComments={() => toggleComments(item.id)}
+                        newCommentText={newCommentText[item.id] ?? ""}
+                        onNewCommentChange={(v) =>
+                          setNewCommentText((prev) => ({ ...prev, [item.id]: v }))
+                        }
+                        onAddComment={() => addComment(item.id)}
+                        addingComment={addingComment === item.id}
+                        onDeleteComment={deleteComment}
+                        currentUserId={user.id}
+                      />
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -367,6 +462,15 @@ function ItemRow({
   onEditPriorityChange,
   onEditSave,
   onEditCancel,
+  comments,
+  commentsExpanded,
+  onToggleComments,
+  newCommentText,
+  onNewCommentChange,
+  onAddComment,
+  addingComment,
+  onDeleteComment,
+  currentUserId,
 }: {
   item: DevItem;
   onToggle: () => void;
@@ -381,126 +485,197 @@ function ItemRow({
   onEditPriorityChange: (val: DevItemPriority) => void;
   onEditSave: () => void;
   onEditCancel: () => void;
+  comments: DevComment[];
+  commentsExpanded: boolean;
+  onToggleComments: () => void;
+  newCommentText: string;
+  onNewCommentChange: (val: string) => void;
+  onAddComment: () => void;
+  addingComment: boolean;
+  onDeleteComment: (id: string) => void;
+  currentUserId: string;
 }) {
   const cat = categoryConfig[item.category];
   const prio = priorityConfig[item.priority];
 
   return (
-    <li className="flex items-start gap-3">
-      <button
-        onClick={onToggle}
-        aria-label={item.done ? "Markera som inte klart" : "Markera som klart"}
-        className={`mt-0.5 w-5 h-5 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
-          item.done
-            ? "bg-emerald-500 border-emerald-500 text-white"
-            : "border-slate-300 hover:border-emerald-400"
-        }`}
-      >
-        {item.done && <span className="text-xs leading-none">✓</span>}
-      </button>
-      <div className="flex-1 min-w-0">
-        {editing ? (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-            <select
-              value={editCategory}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === "idea" || val === "change" || val === "todo") {
-                  onEditCategoryChange(val);
-                }
-              }}
-              className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
-            >
-              {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
-                <option key={cat} value={cat}>
-                  {categoryConfig[cat].emoji} {categoryConfig[cat].label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={editPriority}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === "high" || val === "medium" || val === "low") {
-                  onEditPriorityChange(val);
-                }
-              }}
-              className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
-            >
-              {(Object.keys(priorityConfig) as DevItemPriority[]).map((p) => (
-                <option key={p} value={p}>
-                  {priorityConfig[p].emoji} {priorityConfig[p].label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              value={editText}
-              onChange={(e) => onEditChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onEditSave();
-                if (e.key === "Escape") onEditCancel();
-              }}
-              autoFocus
-              className="flex-1 border border-orange-300 rounded-lg px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-300"
-            />
-            <div className="flex gap-1 shrink-0">
-              <button
-                onClick={onEditSave}
-                className="px-2 py-1 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+    <li className="border border-slate-100 rounded-xl overflow-hidden">
+      <div className="flex items-start gap-3 p-3">
+        <button
+          onClick={onToggle}
+          aria-label={item.done ? "Markera som inte klart" : "Markera som klart"}
+          className={`mt-0.5 w-5 h-5 shrink-0 rounded border-2 flex items-center justify-center transition-colors ${
+            item.done
+              ? "bg-emerald-500 border-emerald-500 text-white"
+              : "border-slate-300 hover:border-emerald-400"
+          }`}
+        >
+          {item.done && <span className="text-xs leading-none">✓</span>}
+        </button>
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <select
+                value={editCategory}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "idea" || val === "change" || val === "todo") {
+                    onEditCategoryChange(val);
+                  }
+                }}
+                className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
               >
-                Spara
-              </button>
-              <button
-                onClick={onEditCancel}
-                className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
+                  <option key={cat} value={cat}>
+                    {categoryConfig[cat].emoji} {categoryConfig[cat].label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={editPriority}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "high" || val === "medium" || val === "low") {
+                    onEditPriorityChange(val);
+                  }
+                }}
+                className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
               >
-                Avbryt
-              </button>
+                {(Object.keys(priorityConfig) as DevItemPriority[]).map((p) => (
+                  <option key={p} value={p}>
+                    {priorityConfig[p].emoji} {priorityConfig[p].label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={editText}
+                onChange={(e) => onEditChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onEditSave();
+                  if (e.key === "Escape") onEditCancel();
+                }}
+                autoFocus
+                className="flex-1 border border-orange-300 rounded-lg px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-300"
+              />
+              <div className="flex gap-1 shrink-0">
+                <button
+                  onClick={onEditSave}
+                  className="px-2 py-1 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                >
+                  Spara
+                </button>
+                <button
+                  onClick={onEditCancel}
+                  className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                  Avbryt
+                </button>
+              </div>
             </div>
+          ) : (
+            <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-800"}`}>
+              {item.text}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
+              {cat.emoji} {cat.label}
+            </span>
+            {!item.done && (
+              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${prio.color}`}>
+                {prio.emoji} {prio.label}
+              </span>
+            )}
+            <span className="text-xs text-slate-400">
+              {new Date(item.createdAt).toLocaleDateString("sv-SE")}
+            </span>
+            {item.done && item.doneAt && (
+              <span className="text-xs text-emerald-600">
+                ✓ Klar {new Date(item.doneAt).toLocaleDateString("sv-SE")}
+              </span>
+            )}
+            <button
+              onClick={onToggleComments}
+              className="text-xs text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1"
+            >
+              💬 {comments.length > 0 ? comments.length : ""} Kommentarer
+              <span>{commentsExpanded ? "▲" : "▼"}</span>
+            </button>
           </div>
-        ) : (
-          <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-800"}`}>
-            {item.text}
-          </p>
-        )}
-        <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
-            {cat.emoji} {cat.label}
-          </span>
-          {!item.done && (
-            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${prio.color}`}>
-              {prio.emoji} {prio.label}
-            </span>
+        </div>
+        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+          {!item.done && !editing && (
+            <button
+              onClick={onEditStart}
+              aria-label="Redigera"
+              className="text-slate-300 hover:text-orange-500 transition-colors text-sm"
+            >
+              ✏️
+            </button>
           )}
-          <span className="text-xs text-slate-400">
-            {new Date(item.createdAt).toLocaleDateString("sv-SE")}
-          </span>
-          {item.done && item.doneAt && (
-            <span className="text-xs text-emerald-600">
-              ✓ Klar {new Date(item.doneAt).toLocaleDateString("sv-SE")}
-            </span>
-          )}
+          <button
+            onClick={onDelete}
+            aria-label="Ta bort"
+            className="text-slate-300 hover:text-red-500 transition-colors text-sm"
+          >
+            ✕
+          </button>
         </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0 mt-0.5">
-        {!item.done && !editing && (
-          <button
-            onClick={onEditStart}
-            aria-label="Redigera"
-            className="text-slate-300 hover:text-orange-500 transition-colors text-sm"
-          >
-            ✏️
-          </button>
-        )}
-        <button
-          onClick={onDelete}
-          aria-label="Ta bort"
-          className="text-slate-300 hover:text-red-500 transition-colors text-sm"
-        >
-          ✕
-        </button>
-      </div>
+
+      {/* Comments section */}
+      {commentsExpanded && (
+        <div className="border-t border-slate-100 bg-slate-50 px-3 py-3">
+          {comments.length > 0 ? (
+            <ul className="space-y-2 mb-3">
+              {comments.map((comment) => (
+                <li key={comment.id} className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-semibold text-slate-700">
+                        {comment.authorName}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {new Date(comment.createdAt).toLocaleDateString("sv-SE")}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-700">{comment.text}</p>
+                  </div>
+                  {comment.authorId === currentUserId && (
+                    <button
+                      onClick={() => onDeleteComment(comment.id)}
+                      aria-label="Ta bort kommentar"
+                      className="text-slate-300 hover:text-red-400 transition-colors text-xs mt-0.5 shrink-0"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-slate-400 mb-3">Inga kommentarer ännu.</p>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newCommentText}
+              onChange={(e) => onNewCommentChange(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onAddComment()}
+              placeholder="Skriv en kommentar…"
+              className="flex-1 px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-300 bg-white"
+            />
+            <button
+              onClick={onAddComment}
+              disabled={addingComment || !newCommentText.trim()}
+              className="px-3 py-1.5 text-xs font-semibold bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 shrink-0"
+            >
+              {addingComment ? "…" : "Kommentera"}
+            </button>
+          </div>
+        </div>
+      )}
     </li>
   );
 }

@@ -213,5 +213,39 @@ service cloud.firestore {
         isTeamMember(resource.data.teamId) &&
         isCoachOrAbove();
     }
+
+    // ─── player_groups ────────────────────────────────────────────
+    // Groups of players within a team. Readable by all team members;
+    // creatable/updatable/deletable by coaches and admins.
+    match /player_groups/{groupId} {
+      allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
+      allow create: if isSignedIn() &&
+        isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+      allow update: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
+        isCoachOrAbove();
+      allow delete: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
+        isCoachOrAbove();
+    }
+
+    // ─── dev_items ────────────────────────────────────────────────
+    // Development tracking items. Accessible only to admins.
+    match /dev_items/{itemId} {
+      allow read, write: if isSignedIn() && userRole() == 'admin';
+    }
+
+    // ─── dev_item_comments ────────────────────────────────────────
+    // Comments on development items. Only admins can read/write.
+    match /dev_item_comments/{commentId} {
+      allow read: if isSignedIn() && userRole() == 'admin';
+      allow create: if isSignedIn() &&
+        userRole() == 'admin' &&
+        request.resource.data.authorId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        userRole() == 'admin' &&
+        resource.data.authorId == request.auth.uid;
+    }
   }
 }

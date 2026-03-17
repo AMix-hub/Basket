@@ -12,6 +12,12 @@ import {
   getDocs,
   doc,
   getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 
@@ -20,6 +26,13 @@ interface ProfileRow {
   name: string;
   roles: string[];
   child_name: string | null;
+}
+
+interface PlayerGroup {
+  id: string;
+  teamId: string;
+  name: string;
+  memberIds: string[];
 }
 
 export default function LagPage() {
@@ -35,6 +48,12 @@ export default function LagPage() {
   const [joinSuccess, setJoinSuccess] = useState(false);
   // Which team panels are expanded
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+
+  // Player groups
+  const [groupsByTeam, setGroupsByTeam] = useState<Record<string, PlayerGroup[]>>({});
+  const [newGroupName, setNewGroupName] = useState<Record<string, string>>({});
+  const [addingGroup, setAddingGroup] = useState<string | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   /* Load team members for each team */
   useEffect(() => {
@@ -75,6 +94,29 @@ export default function LagPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams.map((t) => t.id).join(",")]); // re-run when team IDs change
 
+  /* Subscribe to player groups for all teams */
+  useEffect(() => {
+    if (teams.length === 0) return;
+    const unsubscribers: (() => void)[] = [];
+    teams.forEach((team: Team) => {
+      const q = query(collection(db, "player_groups"), where("teamId", "==", team.id));
+      const unsub = onSnapshot(q, (snap) => {
+        setGroupsByTeam((prev) => ({
+          ...prev,
+          [team.id]: snap.docs.map((d) => ({
+            id: d.id,
+            teamId: d.data().teamId as string,
+            name: d.data().name as string,
+            memberIds: (d.data().memberIds as string[]) ?? [],
+          })),
+        }));
+      });
+      unsubscribers.push(unsub);
+    });
+    return () => unsubscribers.forEach((u) => u());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teams.map((t) => t.id).join(",")]);
+
   const copyToClipboard = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -98,6 +140,54 @@ export default function LagPage() {
     } else {
       setJoinError("Ogiltig kod. Kontrollera att du skrivit rätt.");
     }
+  };
+
+  const createGroup = async (teamId: string) => {
+    const name = (newGroupName[teamId] ?? "").trim();
+    if (!name) return;
+    setAddingGroup(teamId);
+    try {
+      await addDoc(collection(db, "player_groups"), {
+        teamId,
+        name,
+        memberIds: [],
+        createdAt: new Date().toISOString(),
+      });
+      setNewGroupName((prev) => ({ ...prev, [teamId]: "" }));
+    } catch {
+      alert("Det gick inte att skapa gruppen. Försök igen.");
+    } finally {
+      setAddingGroup(null);
+    }
+  };
+
+  const deleteGroup = async (groupId: string) => {
+    if (!confirm("Ta bort gruppen?")) return;
+    try {
+      await deleteDoc(doc(db, "player_groups", groupId));
+    } catch {
+      alert("Det gick inte att ta bort gruppen. Försök igen.");
+    }
+  };
+
+  const toggleGroupMember = async (group: PlayerGroup, memberId: string) => {
+    const isMember = group.memberIds.includes(memberId);
+    try {
+      await updateDoc(doc(db, "player_groups", group.id), {
+        memberIds: isMember ? arrayRemove(memberId) : arrayUnion(memberId),
+      });
+    } catch {
+      alert("Det gick inte att uppdatera gruppmedlemmar. Försök igen.");
+    }
+  };
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
   };
 
   const toggleTeam = (teamId: string) => {
@@ -164,10 +254,12 @@ export default function LagPage() {
       {/* Team cards */}
       {teams.map((team: Team) => {
         const members = membersByTeam[team.id] ?? [];
+        const groups = groupsByTeam[team.id] ?? [];
         const isExpanded = expandedTeams.has(team.id);
         const isCoach = user.roles.includes("coach") && team.coachId === user.id;
         const isAdmin = user.roles.includes("admin") && team.adminId === user.id;
         const canSeeInvites = isCoach || isAdmin;
+        const canManageGroups = isCoach || isAdmin;
 
         return (
           <div key={team.id} className="mb-4">
@@ -272,6 +364,126 @@ export default function LagPage() {
                         </li>
                       ))}
                     </ul>
+                  )}
+                </div>
+
+                {/* Player groups */}
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+                  <h3 className="font-bold text-slate-900 mb-3">
+                    Träningsgrupper ({groups.length})
+                  </h3>
+                  <p className="text-slate-500 text-sm mb-4">
+                    Spelare kan vara med i flera grupper samtidigt.
+                  </p>
+
+                  {groups.length === 0 && !canManageGroups && (
+                    <p className="text-slate-400 text-sm">Inga grupper skapade ännu.</p>
+                  )}
+
+                  {groups.length > 0 && (
+                    <div className="space-y-2 mb-4">
+                      {groups.map((group) => {
+                        const isGroupExpanded = expandedGroups.has(group.id);
+                        const groupMembers = members.filter((m) =>
+                          group.memberIds.includes(m.id)
+                        );
+                        return (
+                          <div key={group.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                            <button
+                              onClick={() => toggleGroup(group.id)}
+                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">👥</span>
+                                <span className="font-semibold text-sm text-slate-800">
+                                  {group.name}
+                                </span>
+                                <span className="text-xs text-slate-500">
+                                  ({groupMembers.length} spelare)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {canManageGroups && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteGroup(group.id);
+                                    }}
+                                    className="text-slate-300 hover:text-red-500 transition-colors text-xs px-1"
+                                    aria-label="Ta bort grupp"
+                                  >
+                                    ✕
+                                  </button>
+                                )}
+                                <span className="text-slate-400 text-xs">
+                                  {isGroupExpanded ? "▲" : "▼"}
+                                </span>
+                              </div>
+                            </button>
+                            {isGroupExpanded && (
+                              <div className="px-4 py-3 space-y-2">
+                                {members.length === 0 ? (
+                                  <p className="text-slate-400 text-xs">Inga lagmedlemmar att lägga till.</p>
+                                ) : (
+                                  <ul className="space-y-1.5">
+                                    {members.map((m) => {
+                                      const inGroup = group.memberIds.includes(m.id);
+                                      return (
+                                        <li key={m.id} className="flex items-center gap-3">
+                                          {canManageGroups ? (
+                                            <label className="flex items-center gap-3 cursor-pointer flex-1">
+                                              <input
+                                                type="checkbox"
+                                                checked={inGroup}
+                                                onChange={() => toggleGroupMember(group, m.id)}
+                                                className="accent-orange-500 w-4 h-4 shrink-0"
+                                              />
+                                              <span className="text-sm text-slate-800">{m.name}</span>
+                                              <span className="text-xs text-slate-400">
+                                                {m.roles
+                                                  .map((r) => roleLabel[r as keyof typeof roleLabel] ?? r)
+                                                  .join(", ")}
+                                              </span>
+                                            </label>
+                                          ) : (
+                                            inGroup && (
+                                              <span className="text-sm text-slate-800">{m.name}</span>
+                                            )
+                                          )}
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Create new group (coach/admin only) */}
+                  {canManageGroups && (
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        type="text"
+                        value={newGroupName[team.id] ?? ""}
+                        onChange={(e) =>
+                          setNewGroupName((prev) => ({ ...prev, [team.id]: e.target.value }))
+                        }
+                        onKeyDown={(e) => e.key === "Enter" && createGroup(team.id)}
+                        placeholder="Namn på ny grupp…"
+                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
+                      />
+                      <button
+                        onClick={() => createGroup(team.id)}
+                        disabled={addingGroup === team.id || !(newGroupName[team.id] ?? "").trim()}
+                        className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 transition-colors disabled:opacity-50 shrink-0"
+                      >
+                        {addingGroup === team.id ? "…" : "+ Skapa"}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
