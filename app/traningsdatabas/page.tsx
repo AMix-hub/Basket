@@ -103,6 +103,19 @@ export default function TraningsdatabasPage() {
 
   const showExerciseBank = activeTag !== null || searchQuery.trim() !== "";
 
+  if (user?.roles.some((r) => ["player", "parent"].includes(r))) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-4xl mb-3">🔒</p>
+          <p className="text-slate-600">
+            Den här sidan är inte tillgänglig för spelare och föräldrar.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Hero */}
