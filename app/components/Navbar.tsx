@@ -35,8 +35,6 @@ export default function Navbar() {
 
   const sportId = user?.sport ?? "basket";
   const sport = getSport(sportId);
-  const sportHome = sportId === "basket" ? "/basket" : `/${sportId}`;
-
   /* Club logo: from admin's own profile or from the team they belong to */
   const team = getMyTeam();
   const clubLogoUrl = user?.clubLogoUrl ?? team?.clubLogoUrl ?? null;
@@ -101,7 +99,7 @@ export default function Navbar() {
           {/* ── LEFT: Logo / Brand ── */}
           <div className="flex-shrink-0">
             <Link
-              href={user ? sportHome : "/"}
+              href="/"
               className="flex items-center gap-2 text-white hover:text-orange-400 transition-colors"
             >
               {user ? (
