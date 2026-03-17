@@ -5,16 +5,17 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
+import type { UserRole } from "../context/AuthContext";
 import { useUnreadCount } from "../hooks/useUnreadCount";
 import { roleEmoji } from "../../lib/roleLabels";
 import { getSport } from "../../lib/sports";
 
-const mainLinks = [
-  { href: "/taktik", label: "Taktiktavla" },
-  { href: "/kalender", label: "Kalender" },
-  { href: "/traningsdatabas", label: "Träningsdatabas" },
-  { href: "/statistik", label: "Statistik" },
-  { href: "/videor", label: "Videor" },
+const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }[] = [
+  { href: "/taktik", label: "Taktiktavla", restrictedRoles: [] },
+  { href: "/kalender", label: "Kalender", restrictedRoles: [] },
+  { href: "/traningsdatabas", label: "Träningsdatabas", restrictedRoles: ["player", "parent"] },
+  { href: "/statistik", label: "Statistik", restrictedRoles: ["player", "parent"] },
+  { href: "/videor", label: "Videor", restrictedRoles: [] },
 ];
 
 const adminDropdownLinks = [
@@ -73,6 +74,12 @@ export default function Navbar() {
     user?.roles.some((r) => ["assistant", "player"].includes(r)) ?? false;
   const isParent = user?.roles.includes("parent") ?? false;
 
+  /* Filter main links based on user role */
+  const mainLinks = allMainLinks.filter(
+    ({ restrictedRoles }) =>
+      !user || !restrictedRoles.some((r) => user.roles.includes(r))
+  );
+
   /* Right-side role links (excluding admin which has its own dropdown) */
   const rightLinks = isAdmin
     ? [{ href: "/dev", label: "🛠 Utveckling" }]
@@ -84,7 +91,10 @@ export default function Navbar() {
     : isAssistantOrPlayer
     ? [{ href: "/lag", label: `${sport.emoji} Laget` }]
     : isParent
-    ? [{ href: "/familj", label: "👪 Min sida" }]
+    ? [
+        { href: "/lag", label: `${sport.emoji} Laget` },
+        { href: "/familj", label: "👪 Min sida" },
+      ]
     : [];
 
   return (

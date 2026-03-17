@@ -99,7 +99,7 @@ const ATTENDANCE_KEY = "basketball_attendance";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function StatistikPage() {
-  const { getMyTeam } = useAuth();
+  const { user, getMyTeam } = useAuth();
   const team = getMyTeam();
   const [players, setPlayers] = useState<Player[]>([]);
   const [shots, setShots] = useState<Shot[]>([]);
@@ -255,6 +255,19 @@ export default function StatistikPage() {
           )
         : 0,
   };
+
+  if (user?.roles.some((r) => ["player", "parent"].includes(r))) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-4xl mb-3">🔒</p>
+          <p className="text-slate-600">
+            Den här sidan är inte tillgänglig för spelare och föräldrar.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
