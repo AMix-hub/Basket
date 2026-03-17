@@ -256,10 +256,10 @@ export default function Navbar() {
                   })}
                 </div>
 
-                {/* Messages icon (desktop only) */}
+                {/* Messages icon */}
                 <Link
                   href="/meddelanden"
-                  className={`hidden md:flex relative items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                  className={`flex relative items-center justify-center w-8 h-8 rounded-full transition-colors ${
                     pathname === "/meddelanden"
                       ? "text-orange-400"
                       : "text-gray-300 hover:text-white"
@@ -421,25 +421,6 @@ export default function Navbar() {
                 ))}
               </>
             )}
-
-            <div className="h-px bg-gray-700 my-2" />
-
-            {/* Messages (mobile) */}
-            <Link
-              href="/meddelanden"
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                pathname === "/meddelanden"
-                  ? "text-orange-400 bg-gray-800"
-                  : "text-gray-300 hover:text-white hover:bg-gray-800"
-              }`}
-            >
-              💬 Chatt
-              {unread > 0 && (
-                <span className="text-xs font-bold bg-red-500 text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 leading-none">
-                  {unread > 9 ? "9+" : unread}
-                </span>
-              )}
-            </Link>
 
             <div className="h-px bg-gray-700 my-2" />
 

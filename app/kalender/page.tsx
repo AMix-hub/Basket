@@ -153,11 +153,12 @@ export default function KalenderPage() {
   const { user, loading, getMyTeam, getAllTeams, getMyTeams } = useAuth();
   const defaultTeam = getMyTeam();
 
-  // For admins with multiple teams, allow selecting which team to view/add to
+  // For admins/coaches with multiple teams, allow selecting which team to view/add to
   const [allTeams, setAllTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
-  // Resolved team: the currently-selected team (or the default team)
-  const team = allTeams.find((t) => t.id === selectedTeamId) ?? defaultTeam;
+  // Resolved team: search in allTeams (admins) and myTeams (coaches) then fall back to default
+  const myTeams = getMyTeams();
+  const team = [...allTeams, ...myTeams].find((t) => t.id === selectedTeamId) ?? defaultTeam;
 
   const canEdit =
     user?.roles.some((r) => r === "coach" || r === "admin" || r === "assistant") ?? false;
@@ -251,11 +252,20 @@ export default function KalenderPage() {
     loadAllTeams();
   }, [loadAllTeams]);
 
+  // Initialise selectedTeamId for coaches/assistants with multiple teams
+  useEffect(() => {
+    if (user?.roles.includes("admin")) return; // handled by loadAllTeams
+    if (myTeams.length > 0 && selectedTeamId === null) {
+      setSelectedTeamId(myTeams[0].id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myTeams.map((t) => t.id).join(","), user]);
+
   // Compute the list of teams where the current user may create activities.
   // Admins see all their teams; coaches/assistants see all teams they belong to.
   const createableTeams: Team[] = user?.roles.includes("admin")
     ? allTeams.filter((t) => t.adminId === user.id)
-    : getMyTeams();
+    : myTeams;
 
   // Scroll to the selected date panel when a date is clicked (useful on mobile)
   useEffect(() => {
@@ -1132,7 +1142,7 @@ export default function KalenderPage() {
           <p className="text-slate-500 text-sm">
             Schemalägg träningar och matcher. Registrera närvaro för varje pass.
           </p>
-          {/* Team selector for admins with multiple teams */}
+          {/* Team selector for admins and coaches with multiple teams */}
           {user?.roles.includes("admin") && allTeams.length > 1 && (
             <div className="mt-3">
               <label className="text-xs font-semibold text-slate-500 block mb-1">
@@ -1151,6 +1161,28 @@ export default function KalenderPage() {
                 {allTeams.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name} ({t.ageGroup})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {!user?.roles.includes("admin") && myTeams.length > 1 && (
+            <div className="mt-3">
+              <label className="text-xs font-semibold text-slate-500 block mb-1">
+                Visa lag:
+              </label>
+              <select
+                value={selectedTeamId ?? ""}
+                onChange={(e) => {
+                  setSelectedTeamId(e.target.value);
+                  setSelectedSession(null);
+                  setSelectedDate(null);
+                }}
+                className="px-3 py-1.5 text-sm border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-slate-700 text-slate-100"
+              >
+                {myTeams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}{t.ageGroup ? ` (${t.ageGroup})` : ""}
                   </option>
                 ))}
               </select>
