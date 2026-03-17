@@ -104,21 +104,37 @@ export default function Navbar() {
               href={user ? sportHome : "/"}
               className="flex items-center gap-2 text-white hover:text-orange-400 transition-colors"
             >
-              {clubLogoUrl ? (
-                <Image
-                  src={clubLogoUrl}
-                  alt="Klubblogga"
-                  width={36}
-                  height={36}
-                  unoptimized
-                  className="rounded-full object-cover"
-                />
+              {user ? (
+                <>
+                  {clubLogoUrl ? (
+                    <Image
+                      src={clubLogoUrl}
+                      alt="Klubblogga"
+                      width={36}
+                      height={36}
+                      unoptimized
+                      className="rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl leading-none">{sport.emoji}</span>
+                  )}
+                  <span className="text-lg font-extrabold tracking-tight">
+                    {clubName ?? sport.name}
+                  </span>
+                </>
               ) : (
-                <span className="text-2xl leading-none">{sport.emoji}</span>
+                <>
+                  <Image
+                    src="/sportiq-logo.png"
+                    alt="SportIQ"
+                    width={36}
+                    height={36}
+                    unoptimized
+                    className="rounded-xl object-cover"
+                  />
+                  <span className="text-lg font-extrabold tracking-tight">SportIQ</span>
+                </>
               )}
-              <span className="text-lg font-extrabold tracking-tight">
-                {clubName ?? sport.name}
-              </span>
             </Link>
           </div>
 
