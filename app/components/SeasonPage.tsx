@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 import { SPORTS } from "../../lib/sports";
+import { autoTag, TAG_LABELS, TAG_COLORS } from "../../lib/exerciseTags";
 
 interface Props {
   plan: SeasonPlan;
@@ -561,9 +562,29 @@ export default function SeasonPage({ plan }: Props) {
 
               <div className="divide-y divide-slate-100 bg-slate-50/50">
                 {/* Plan activities */}
-                {session.activities.map((activity, idx) => (
+                {session.activities.map((activity, idx) => {
+                  const tags = autoTag(activity);
+                  return (
                   <div key={idx} className="px-5 py-4">
-                    <p className="font-semibold text-slate-800 mb-1 text-sm">{activity.name}</p>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="font-semibold text-slate-800 text-sm">{activity.name}</p>
+                      <div className="flex gap-1 flex-wrap shrink-0">
+                        {tags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className={`text-xs font-medium px-2 py-0.5 rounded-full ${TAG_COLORS[tag]}`}
+                          >
+                            {TAG_LABELS[tag]}
+                          </span>
+                        ))}
+                        {activity.durationMinutes && (
+                          <span className="text-xs text-slate-400">⏱ {activity.durationMinutes} min</span>
+                        )}
+                        {activity.intensityLevel && (
+                          <span className="text-xs text-slate-400">{"🔥".repeat(activity.intensityLevel)}</span>
+                        )}
+                      </div>
+                    </div>
                     <p className="text-sm text-slate-500 leading-relaxed">{activity.description}</p>
                     {activity.tips && (
                       <p className="mt-2.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
@@ -571,7 +592,9 @@ export default function SeasonPage({ plan }: Props) {
                       </p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
+
 
                 {/* Coach-added sub-activities */}
                 {sessionNote?.subActivities.map((sub) => (

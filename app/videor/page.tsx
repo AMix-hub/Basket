@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 interface VideoEntry {
   id: string;
@@ -116,7 +117,7 @@ export default function VideorPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">🎬</span>
@@ -140,12 +141,20 @@ export default function VideorPage() {
             (Chrome: cast-ikonen i adressfältet).
           </p>
         </div>
-        <button
-          onClick={() => setShowForm((s) => !s)}
-          className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors shrink-0"
-        >
-          + Lägg till video
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href="/videor/overlay"
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            🖊 Matchanalys / Overlay
+          </Link>
+          <button
+            onClick={() => setShowForm((s) => !s)}
+            className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors shrink-0"
+          >
+            + Lägg till video
+          </button>
+        </div>
       </div>
 
       {/* Add video form */}
