@@ -16,11 +16,13 @@ import {
 import { db } from "../../lib/firebaseClient";
 
 type DevItemCategory = "idea" | "change" | "todo";
+type DevItemPriority = "high" | "medium" | "low";
 
 interface DevItem {
   id: string;
   text: string;
   category: DevItemCategory;
+  priority: DevItemPriority;
   done: boolean;
   createdAt: string;
   doneAt?: string;
@@ -32,17 +34,25 @@ const categoryConfig: Record<DevItemCategory, { label: string; emoji: string; co
   todo:   { label: "Att göra", emoji: "📋", color: "bg-purple-50 border-purple-200 text-purple-800" },
 };
 
+const priorityConfig: Record<DevItemPriority, { label: string; emoji: string; color: string; order: number }> = {
+  high:   { label: "Hög",    emoji: "🔴", color: "bg-red-50 border-red-200 text-red-700",       order: 0 },
+  medium: { label: "Medium", emoji: "🟡", color: "bg-amber-50 border-amber-200 text-amber-700", order: 1 },
+  low:    { label: "Låg",    emoji: "🟢", color: "bg-green-50 border-green-200 text-green-700", order: 2 },
+};
+
 export default function DevPage() {
   const { user } = useAuth();
   const [items, setItems] = useState<DevItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newText, setNewText] = useState("");
   const [newCategory, setNewCategory] = useState<DevItemCategory>("idea");
+  const [newPriority, setNewPriority] = useState<DevItemPriority>("medium");
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState<DevItemCategory | "all">("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [editCategory, setEditCategory] = useState<DevItemCategory>("idea");
+  const [editPriority, setEditPriority] = useState<DevItemPriority>("medium");
 
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
@@ -54,6 +64,7 @@ export default function DevPage() {
           id: d.id,
           text: d.data().text as string,
           category: d.data().category as DevItemCategory,
+          priority: (d.data().priority as DevItemPriority | undefined) ?? "medium",
           done: d.data().done as boolean,
           createdAt: d.data().createdAt as string,
           doneAt: d.data().doneAt as string | undefined,
@@ -72,6 +83,7 @@ export default function DevPage() {
       await addDoc(collection(db, "dev_items"), {
         text: newText.trim(),
         category: newCategory,
+        priority: newPriority,
         done: false,
         createdAt: new Date().toISOString(),
       });
@@ -108,12 +120,14 @@ export default function DevPage() {
     setEditingId(item.id);
     setEditText(item.text);
     setEditCategory(item.category);
+    setEditPriority(item.priority);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditText("");
     setEditCategory("idea");
+    setEditPriority("medium");
   };
 
   const saveEdit = async (item: DevItem) => {
@@ -124,7 +138,8 @@ export default function DevPage() {
     }
     const textChanged = trimmed !== item.text.trim();
     const categoryChanged = editCategory !== item.category;
-    if (!textChanged && !categoryChanged) {
+    const priorityChanged = editPriority !== item.priority;
+    if (!textChanged && !categoryChanged && !priorityChanged) {
       cancelEdit();
       return;
     }
@@ -132,6 +147,7 @@ export default function DevPage() {
       await updateDoc(doc(db, "dev_items", item.id), {
         text: trimmed,
         category: editCategory,
+        priority: editPriority,
       });
       cancelEdit();
     } catch {
@@ -172,16 +188,20 @@ export default function DevPage() {
   }
 
   const filtered = filter === "all" ? items : items.filter((i) => i.category === filter);
-  const pending = filtered.filter((i) => !i.done);
+  const pending = filtered
+    .filter((i) => !i.done)
+    .sort((a, b) => priorityConfig[a.priority].order - priorityConfig[b.priority].order);
   const done    = filtered.filter((i) => i.done);
 
   const noEditProps = {
     editing: false as const,
     editText: "",
     editCategory: "idea" as DevItemCategory,
+    editPriority: "medium" as DevItemPriority,
     onEditStart: () => {},
     onEditChange: () => {},
     onEditCategoryChange: () => {},
+    onEditPriorityChange: () => {},
     onEditSave: () => {},
     onEditCancel: () => {},
   };
@@ -213,6 +233,17 @@ export default function DevPage() {
             {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
               <option key={cat} value={cat}>
                 {categoryConfig[cat].emoji} {categoryConfig[cat].label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={newPriority}
+            onChange={(e) => setNewPriority(e.target.value as DevItemPriority)}
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
+          >
+            {(Object.keys(priorityConfig) as DevItemPriority[]).map((p) => (
+              <option key={p} value={p}>
+                {priorityConfig[p].emoji} {priorityConfig[p].label}
               </option>
             ))}
           </select>
@@ -279,9 +310,11 @@ export default function DevPage() {
                       editing={editingId === item.id}
                       editText={editText}
                       editCategory={editCategory}
+                      editPriority={editPriority}
                       onEditStart={() => startEdit(item)}
                       onEditChange={setEditText}
                       onEditCategoryChange={setEditCategory}
+                      onEditPriorityChange={setEditPriority}
                       onEditSave={() => saveEdit(item)}
                       onEditCancel={cancelEdit}
                     />
@@ -327,9 +360,11 @@ function ItemRow({
   editing,
   editText,
   editCategory,
+  editPriority,
   onEditStart,
   onEditChange,
   onEditCategoryChange,
+  onEditPriorityChange,
   onEditSave,
   onEditCancel,
 }: {
@@ -339,13 +374,16 @@ function ItemRow({
   editing: boolean;
   editText: string;
   editCategory: DevItemCategory;
+  editPriority: DevItemPriority;
   onEditStart: () => void;
   onEditChange: (val: string) => void;
   onEditCategoryChange: (val: DevItemCategory) => void;
+  onEditPriorityChange: (val: DevItemPriority) => void;
   onEditSave: () => void;
   onEditCancel: () => void;
 }) {
   const cat = categoryConfig[item.category];
+  const prio = priorityConfig[item.priority];
 
   return (
     <li className="flex items-start gap-3">
@@ -376,6 +414,22 @@ function ItemRow({
               {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
                 <option key={cat} value={cat}>
                   {categoryConfig[cat].emoji} {categoryConfig[cat].label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={editPriority}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "high" || val === "medium" || val === "low") {
+                  onEditPriorityChange(val);
+                }
+              }}
+              className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
+            >
+              {(Object.keys(priorityConfig) as DevItemPriority[]).map((p) => (
+                <option key={p} value={p}>
+                  {priorityConfig[p].emoji} {priorityConfig[p].label}
                 </option>
               ))}
             </select>
@@ -414,6 +468,11 @@ function ItemRow({
           <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${cat.color}`}>
             {cat.emoji} {cat.label}
           </span>
+          {!item.done && (
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${prio.color}`}>
+              {prio.emoji} {prio.label}
+            </span>
+          )}
           <span className="text-xs text-slate-400">
             {new Date(item.createdAt).toLocaleDateString("sv-SE")}
           </span>
