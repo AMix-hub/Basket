@@ -1167,7 +1167,7 @@ export default function KalenderPage() {
                 setIsRecurring(false);
                 setShowCreateModal(true);
               }}
-              className="px-4 py-2 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-colors shrink-0"
+              className="px-4 py-2 rounded-xl text-sm font-semibold btn-gradient-orange text-white shrink-0"
             >
               + Skapa ny aktivitet
             </button>
@@ -1385,16 +1385,16 @@ export default function KalenderPage() {
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={prevMonth}
-              className="p-2 rounded-xl hover:bg-slate-200 transition-colors text-slate-700 font-bold"
+              className="p-2 rounded-xl hover:bg-slate-700/60 transition-colors text-slate-300 font-bold"
             >
               ‹
             </button>
-            <h2 className="text-lg font-bold text-slate-900">
+            <h2 className="text-lg font-bold text-slate-100">
               {MONTHS_SV[month]} {year}
             </h2>
             <button
               onClick={nextMonth}
-              className="p-2 rounded-xl hover:bg-slate-200 transition-colors text-slate-700 font-bold"
+              className="p-2 rounded-xl hover:bg-slate-700/60 transition-colors text-slate-300 font-bold"
             >
               ›
             </button>
@@ -1405,7 +1405,7 @@ export default function KalenderPage() {
             {DAYS_SV.map((d) => (
               <div
                 key={d}
-                className="text-center text-xs font-semibold text-slate-500 py-2"
+                className="text-center text-xs font-semibold text-slate-400 py-2"
               >
                 {d}
               </div>
@@ -1426,6 +1426,22 @@ export default function KalenderPage() {
               const isSelected = selectedDate === ymd;
               const isFreePeriod = isInFreePeriod(ymd, freePeriods);
 
+              let hasMatch = false;
+              let hasTraining = false;
+              for (const s of daySessions) {
+                if (s.type === "match") hasMatch = true;
+                else hasTraining = true;
+                if (hasMatch && hasTraining) break;
+              }
+
+              let glowClass = "";
+              if (!isSelected) {
+                if (isToday && !isFreePeriod) glowClass = "cal-glow-today";
+                else if (hasMatch && hasTraining) glowClass = "cal-glow-both";
+                else if (hasMatch) glowClass = "cal-glow-match";
+                else if (hasTraining) glowClass = "cal-glow-training";
+              }
+
               return (
                 <button
                   key={i}
@@ -1438,35 +1454,19 @@ export default function KalenderPage() {
                       ? freePeriods.find((p) => ymd >= p.startDate && ymd <= p.endDate)?.name
                       : undefined
                   }
-                  className={`aspect-square rounded-xl flex flex-col items-center pt-1.5 pb-1 px-0.5 text-xs transition-all relative ${
+                  className={`aspect-square rounded-xl flex flex-col items-center pt-1.5 pb-1 px-0.5 text-xs transition-all relative ${glowClass} ${
                     isSelected
                       ? "bg-orange-500 text-white shadow-md"
                       : isFreePeriod
-                      ? "bg-purple-100 text-purple-600 border border-purple-200"
+                      ? "bg-slate-800 text-purple-400 border border-purple-700/40 hover:bg-slate-700/80"
                       : isToday
-                      ? "bg-orange-100 text-orange-700 font-bold"
-                      : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-100"
+                      ? "bg-orange-500/20 text-orange-300 font-bold border border-orange-500/40"
+                      : "bg-slate-800 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50"
                   }`}
                 >
                   <span className="font-semibold">{date.getDate()}</span>
                   {isFreePeriod && !daySessions.length && (
                     <span className="text-purple-400 text-[8px] leading-none mt-0.5">🚫</span>
-                  )}
-                  {daySessions.length > 0 && (
-                    <div className="flex gap-0.5 mt-0.5 flex-wrap justify-center">
-                      {daySessions.map((s) => (
-                        <span
-                          key={s.id}
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            isSelected
-                              ? "bg-white"
-                              : s.type === "match"
-                              ? "bg-red-400"
-                              : "bg-emerald-400"
-                          }`}
-                        />
-                      ))}
-                    </div>
                   )}
                 </button>
               );
@@ -1474,18 +1474,18 @@ export default function KalenderPage() {
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-500">
+          <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-400">
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
+              <span className="w-3 h-3 rounded-md bg-slate-800 inline-block cal-glow-training" />
               Träning
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
+              <span className="w-3 h-3 rounded-md bg-slate-800 inline-block cal-glow-match" />
               Match
             </div>
             {freePeriods.length > 0 && (
               <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-purple-300 inline-block" />
+                <span className="w-3 h-3 rounded-md bg-slate-800 border border-purple-700/50 inline-block" />
                 Träningsfri period
               </div>
             )}
