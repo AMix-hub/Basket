@@ -152,7 +152,7 @@ interface DbTeam {
   adminId: string;
   clubName: string;
   /** URL to the club's logo image (propagated from admin profile). */
-  clubLogoUrl?: string;
+  clubLogoUrl?: string | null;
   sport?: string;
   memberIds: string[];
   inviteCode: string;
@@ -553,7 +553,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coachId:           userId,
         adminId:           invitingAdminId,
         clubName:          invitingAdminClubName ?? "",
-        clubLogoUrl:       invitingAdminLogoUrl,
+        clubLogoUrl:       invitingAdminLogoUrl ?? null,
         sport:             sport ?? "basket",
         memberIds:         [userId, invitingAdminId],
         inviteCode:        generateCode(),
@@ -699,7 +699,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coachId: null,
         adminId: user.id,
         clubName: user.clubName ?? "",
-        clubLogoUrl: user.clubLogoUrl,
+        clubLogoUrl: user.clubLogoUrl ?? null,
         sport: user.sport ?? "basket",
         memberIds: [user.id],
         inviteCode: generateCode(),
