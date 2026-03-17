@@ -23,6 +23,19 @@ body {
   min-width: 320px;
 }
 
+/* Ensure form controls always have readable text on white/light backgrounds */
+input,
+select,
+textarea {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #94a3b8;
+}
+
 /* Smooth accordion open/close */
 details > div {
   animation: slide-down 0.2s ease-out;
