@@ -85,6 +85,16 @@ service cloud.firestore {
       allow update: if isSignedIn() && isTeamMember(resource.data.teamId);
     }
 
+    // ─── coach_chat ───────────────────────────────────────────────
+    // Global channel for coaches, assistants and admins only.
+    match /coach_chat/{msgId} {
+      allow read: if isSignedIn() && isCoachOrAbove();
+      allow create: if isSignedIn() &&
+        request.resource.data.senderId == request.auth.uid &&
+        isCoachOrAbove();
+      allow update: if isSignedIn() && isCoachOrAbove();
+    }
+
     // ─── players ─────────────────────────────────────────────────
     match /players/{playerId} {
       allow read: if isSignedIn() && isTeamMember(resource.data.teamId);

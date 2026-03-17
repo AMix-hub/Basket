@@ -53,7 +53,8 @@ export default function MeddelandenPage() {
 
   const [teamMembers, setTeamMembers] = useState<User[]>([]);
   const [messages, setMessages]       = useState<Message[]>([]);
-  const [selected, setSelected]       = useState<"team" | string>("team");
+  const [coachMessages, setCoachMessages] = useState<Message[]>([]);
+  const [selected, setSelected]       = useState<"team" | "coaches" | string>("team");
   const [draft, setDraft]             = useState("");
   const [sendError, setSendError]     = useState<string | null>(null);
   const [queryError, setQueryError]   = useState<string | null>(null);
@@ -180,9 +181,44 @@ export default function MeddelandenPage() {
     return () => unsubscribe();
   }, [allUserTeams]);
 
+  /* ── Subscribe to coach channel (coaches/assistants/admins only) ── */
+  const isCoachOrAbove = user?.roles.some((r) => ["coach", "assistant", "admin"].includes(r)) ?? false;
+  useEffect(() => {
+    if (!user || !isCoachOrAbove) return;
+
+    const unsubscribe = onSnapshot(
+      collection(db, "coach_chat"),
+      (snap) => {
+        setCoachMessages(
+          snap.docs
+            .map((d) => {
+              const m = d.data();
+              return {
+                id:          d.id,
+                teamId:      "coaches",
+                senderId:    m.senderId as string,
+                senderName:  m.senderName as string,
+                recipientId: null,
+                text:        m.text as string,
+                sentAt:      m.sentAt as string,
+                readBy:      (m.readBy as string[]) ?? [],
+              } as Message;
+            })
+            .sort((a, b) => (a.sentAt < b.sentAt ? -1 : a.sentAt > b.sentAt ? 1 : 0))
+        );
+      },
+      (err) => {
+        console.error("Fel vid hämtning av coachmeddelandena:", err);
+      }
+    );
+
+    return () => unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isCoachOrAbove]);
+
   /* ── Mark visible messages as read ── */
   useEffect(() => {
-    if (!user || !activeTeam || !threadOpen) return;
+    if (!user || !activeTeam || !threadOpen || selected === "coaches") return;
     const toMark = messages.filter((m) => {
       if (m.teamId !== activeTeam.id) return false;
       const isInThread =
@@ -201,6 +237,19 @@ export default function MeddelandenPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, activeTeamId, messages.length, user?.id, threadOpen]);
 
+  /* ── Mark coach-channel messages as read ── */
+  useEffect(() => {
+    if (!user || !threadOpen || selected !== "coaches") return;
+    const toMark = coachMessages.filter((m) => !m.readBy.includes(user.id));
+    if (toMark.length === 0) return;
+
+    toMark.forEach(async (m) => {
+      const newReadBy = [...m.readBy, user.id];
+      await updateDoc(doc(db, "coach_chat", m.id), { readBy: newReadBy });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, coachMessages.length, user?.id, threadOpen]);
+
   /* ── Capture first unread ID when opening a thread ── */
   const openThread = useCallback((teamId: string, threadId: "team" | string) => {
     setActiveTeamId(teamId);
@@ -212,21 +261,27 @@ export default function MeddelandenPage() {
 
   /* ── Update firstUnreadId when thread opens or messages update ── */
   useEffect(() => {
-    if (!threadOpen || !user || !activeTeam) return;
-    const threadMsgs = messages.filter((m) => {
-      if (m.teamId !== activeTeam.id) return false;
-      if (selected === "team") return m.recipientId === null;
-      return (
-        (m.senderId === user.id && m.recipientId === selected) ||
-        (m.senderId === selected && m.recipientId === user.id)
-      );
-    });
+    if (!threadOpen || !user) return;
+    let threadMsgs: Message[];
+    if (selected === "coaches") {
+      threadMsgs = coachMessages;
+    } else {
+      if (!activeTeam) return;
+      threadMsgs = messages.filter((m) => {
+        if (m.teamId !== activeTeam.id) return false;
+        if (selected === "team") return m.recipientId === null;
+        return (
+          (m.senderId === user.id && m.recipientId === selected) ||
+          (m.senderId === selected && m.recipientId === user.id)
+        );
+      });
+    }
     const firstUnread = threadMsgs.find(
       (m) => !m.readBy.includes(user.id) && m.senderId !== user.id
     );
     setFirstUnreadId((prev) => prev ?? (firstUnread?.id ?? null));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threadOpen, selected, activeTeamId, messages.length]);
+  }, [threadOpen, selected, activeTeamId, messages.length, coachMessages.length]);
 
   /* ── Scroll to first unread when thread opens ── */
   useEffect(() => {
@@ -242,17 +297,19 @@ export default function MeddelandenPage() {
   useEffect(() => {
     if (!threadOpen || firstUnreadId) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, selected, threadOpen, firstUnreadId]);
+  }, [messages, coachMessages, selected, threadOpen, firstUnreadId]);
 
-  /* ── Thread messages (scoped to active team) ── */
-  const threadMessages = messages.filter((m) => {
-    if (m.teamId !== activeTeam?.id) return false;
-    if (selected === "team") return m.recipientId === null;
-    return (
-      (m.senderId === user?.id && m.recipientId === selected) ||
-      (m.senderId === selected && m.recipientId === user?.id)
-    );
-  });
+  /* ── Thread messages ── */
+  const threadMessages: Message[] = selected === "coaches"
+    ? coachMessages
+    : messages.filter((m) => {
+        if (m.teamId !== activeTeam?.id) return false;
+        if (selected === "team") return m.recipientId === null;
+        return (
+          (m.senderId === user?.id && m.recipientId === selected) ||
+          (m.senderId === selected && m.recipientId === user?.id)
+        );
+      });
 
   /* ── Unread counts ── */
   const unreadForTeam = (teamId: string) =>
@@ -281,20 +338,34 @@ export default function MeddelandenPage() {
     return teamUnread + dmUnread;
   };
 
+  const unreadCoach = coachMessages.filter(
+    (m) => m.senderId !== user?.id && !m.readBy.includes(user?.id ?? "")
+  ).length;
+
   /* ── Send message ── */
   const sendMessage = async () => {
-    if (!draft.trim() || !user || !activeTeam) return;
-    const msg = {
-      teamId:      activeTeam.id,
-      senderId:    user.id,
-      senderName:  user.name,
-      recipientId: selected === "team" ? null : selected,
-      text:        draft.trim(),
-      sentAt:      new Date().toISOString(),
-      readBy:      [user.id],
-    };
+    if (!draft.trim() || !user) return;
+    if (selected !== "coaches" && !activeTeam) return;
     try {
-      await addDoc(collection(db, "messages"), msg);
+      if (selected === "coaches") {
+        await addDoc(collection(db, "coach_chat"), {
+          senderId:   user.id,
+          senderName: user.name,
+          text:       draft.trim(),
+          sentAt:     new Date().toISOString(),
+          readBy:     [user.id],
+        });
+      } else if (activeTeam) {
+        await addDoc(collection(db, "messages"), {
+          teamId:      activeTeam.id,
+          senderId:    user.id,
+          senderName:  user.name,
+          recipientId: selected === "team" ? null : selected,
+          text:        draft.trim(),
+          sentAt:      new Date().toISOString(),
+          readBy:      [user.id],
+        });
+      }
       setDraft("");
       setSendError(null);
     } catch (err) {
@@ -310,12 +381,14 @@ export default function MeddelandenPage() {
     }
   };
 
-  const selectedMember = selected !== "team"
+  const selectedMember = selected !== "team" && selected !== "coaches"
     ? teamMembers.find((m) => m.id === selected) ?? null
     : null;
 
   const threadTitle =
-    selected === "team"
+    selected === "coaches"
+      ? "🎽 Coach-kanalen"
+      : selected === "team"
       ? `💬 Lagchatt – ${activeTeam?.name ?? "Laget"}`
       : `✉️ ${selectedMember?.name ?? "Direktmeddelande"}`;
 
@@ -439,6 +512,36 @@ export default function MeddelandenPage() {
           {!activeTeam && (
             <p className="text-xs text-slate-400 px-2 pt-2">Laddar lag…</p>
           )}
+
+          {isCoachOrAbove && (
+            <>
+              <p className="text-xs text-slate-400 font-semibold px-1 pt-2 pb-0.5 uppercase tracking-wide">
+                Coach-kanalen
+              </p>
+              <button
+                onClick={() => {
+                  setSelected("coaches");
+                  setThreadOpen(true);
+                  setFirstUnreadId(null);
+                }}
+                className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left w-full ${
+                  selected === "coaches" && threadOpen
+                    ? "bg-orange-500 text-white"
+                    : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span className="flex items-center gap-2 truncate">
+                  <span>🎽</span>
+                  <span className="truncate">Alla coacher</span>
+                </span>
+                {unreadCoach > 0 && !(selected === "coaches" && threadOpen) && (
+                  <span className="ml-1 shrink-0 text-xs font-bold bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCoach > 9 ? "9+" : unreadCoach}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Thread panel – shown when threadOpen is true */}
@@ -462,6 +565,9 @@ export default function MeddelandenPage() {
                 <p className="font-bold text-slate-900 text-sm truncate">{threadTitle}</p>
                 {selected === "team" && (
                   <p className="text-xs text-slate-400 mt-0.5">Alla i {activeTeam?.name ?? "laget"} ser dessa meddelanden</p>
+                )}
+                {selected === "coaches" && (
+                  <p className="text-xs text-slate-400 mt-0.5">Endast coacher, assistenter och administratörer</p>
                 )}
               </div>
             </div>
@@ -538,7 +644,9 @@ export default function MeddelandenPage() {
                   }}
                   onKeyDown={handleKeyDown}
                   placeholder={
-                    selected === "team"
+                    selected === "coaches"
+                      ? "Skriv till coacherna… (Enter för att skicka)"
+                      : selected === "team"
                       ? "Skriv till laget… (Enter för att skicka)"
                       : `Skriv till ${selectedMember?.name ?? ""}… (Enter för att skicka)`
                   }
@@ -547,7 +655,7 @@ export default function MeddelandenPage() {
                 />
                 <button
                   onClick={sendMessage}
-                  disabled={!draft.trim() || !activeTeam}
+                  disabled={!draft.trim() || (selected !== "coaches" && !activeTeam)}
                   className="shrink-0 w-10 h-10 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
                   aria-label="Skicka"
                 >
