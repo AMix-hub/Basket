@@ -281,7 +281,7 @@ export default function VideoOverlayPage() {
           </div>
           <div className="flex items-center gap-3 mb-1">
             <span className="text-3xl">🎬</span>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
               Video-overlay – Matchanalys
             </h1>
           </div>
@@ -298,7 +298,7 @@ export default function VideoOverlayPage() {
       </div>
 
       {showHelp && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 text-sm text-blue-800 space-y-1.5">
+        <div className="bg-blue-900/30 border border-blue-700/50 rounded-2xl p-4 mb-6 text-sm text-blue-800 space-y-1.5">
           <p className="font-semibold">Hur du använder video-overlay:</p>
           <ol className="list-decimal list-inside space-y-1 text-xs">
             <li>Ladda upp ett videoklipp från din enhet (MP4, MOV, WebM).</li>
@@ -312,7 +312,7 @@ export default function VideoOverlayPage() {
 
       {/* Upload area */}
       {!videoSrc && (
-        <div className="bg-white rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center mb-6">
+        <div className="bg-slate-800 rounded-2xl border-2 border-dashed border-slate-300 p-12 text-center mb-6">
           <p className="text-5xl mb-4">📹</p>
           <p className="text-slate-600 font-semibold mb-2">Ladda upp ett videoklipp</p>
           <p className="text-slate-400 text-sm mb-6">Stödjer MP4, MOV, WebM. Videon stannar på din enhet.</p>
@@ -331,7 +331,7 @@ export default function VideoOverlayPage() {
       {videoSrc && (
         <div className="space-y-4">
           {/* Toolbar */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
             <div className="flex flex-wrap items-center gap-4">
               {/* Tools */}
               <div className="flex gap-1">
@@ -343,7 +343,7 @@ export default function VideoOverlayPage() {
                     className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-bold transition-all ${
                       activeTool === t.id
                         ? "bg-orange-500 text-white shadow"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        : "bg-slate-700 text-slate-300 hover:bg-slate-200"
                     }`}
                   >
                     {t.icon}
@@ -397,7 +397,7 @@ export default function VideoOverlayPage() {
                 <button
                   onClick={clearAll}
                   disabled={shapes.length === 0}
-                  className="px-3 py-1.5 text-sm font-semibold bg-red-50 hover:bg-red-100 disabled:opacity-40 text-red-600 rounded-xl transition-colors"
+                  className="px-3 py-1.5 text-sm font-semibold bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 text-red-600 rounded-xl transition-colors"
                 >
                   🗑 Rensa
                 </button>
@@ -453,8 +453,8 @@ export default function VideoOverlayPage() {
             {/* Text input overlay */}
             {pendingTextPos && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
-                <div className="bg-white rounded-xl shadow-xl p-4 w-64">
-                  <p className="text-sm font-semibold text-slate-700 mb-2">Skriv text på videon</p>
+                <div className="bg-[#1e293b] rounded-xl shadow-xl border border-slate-700 p-4 w-64">
+                  <p className="text-sm font-semibold text-slate-300 mb-2">Skriv text på videon</p>
                   <input
                     type="text"
                     value={textInput}
@@ -466,7 +466,7 @@ export default function VideoOverlayPage() {
                   />
                   <div className="flex gap-2">
                     <button onClick={addText} className="flex-1 py-1.5 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600">Lägg till</button>
-                    <button onClick={() => setPendingTextPos(null)} className="flex-1 py-1.5 bg-slate-100 text-slate-700 text-sm font-semibold rounded-lg hover:bg-slate-200">Avbryt</button>
+                    <button onClick={() => setPendingTextPos(null)} className="flex-1 py-1.5 bg-slate-100 text-slate-300 text-sm font-semibold rounded-lg hover:bg-slate-200">Avbryt</button>
                   </div>
                 </div>
               </div>
@@ -474,7 +474,7 @@ export default function VideoOverlayPage() {
           </div>
 
           {/* Video controls */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={togglePlay}

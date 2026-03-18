@@ -68,14 +68,14 @@ export default function ProfilPage() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Min profil</h1>
+      <h1 className="text-2xl font-bold text-slate-100">Min profil</h1>
 
       {/* User info card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-3">
+      <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 space-y-3">
         <div className="flex items-center gap-3">
           <span className="text-4xl">{emoji}</span>
           <div>
-            <p className="text-lg font-semibold text-slate-900">{user.name}</p>
+            <p className="text-lg font-semibold text-slate-100">{user.name}</p>
             <p className="text-sm text-slate-500">{user.email}</p>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default function ProfilPage() {
           {user.roles.map((r) => (
             <span
               key={r}
-              className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-700"
+              className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-orange-500/20 text-orange-400"
             >
               {roleLabel[r]}
             </span>
@@ -102,9 +102,9 @@ export default function ProfilPage() {
       </div>
 
       {/* Push notification section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+      <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+          <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
             <span>🔔</span> Push-notiser
           </h2>
           <p className="text-sm text-slate-500 mt-1">
@@ -120,14 +120,14 @@ export default function ProfilPage() {
         )}
 
         {currentPermission === "granted" && !notifMessage && (
-          <div className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 rounded-lg px-4 py-2.5">
+          <div className="flex items-center gap-2 text-sm font-medium text-green-400 bg-green-900/30 rounded-lg px-4 py-2.5">
             <span>✅</span>
             <span>Notiser är aktiverade</span>
           </div>
         )}
 
         {currentPermission === "denied" && (
-          <div className="text-sm text-red-700 bg-red-50 rounded-lg px-4 py-2.5 space-y-1">
+          <div className="text-sm text-red-400 bg-red-900/30 rounded-lg px-4 py-2.5 space-y-1">
             <p className="font-medium">Notiser är blockerade</p>
             <p className="text-xs">
               Gå till webbläsarens inställningar för den här sidan och tillåt
@@ -160,8 +160,8 @@ export default function ProfilPage() {
           <p
             className={`text-sm rounded-lg px-4 py-2.5 ${
               notifMessage.startsWith("Notiser är nu aktiverade")
-                ? "bg-green-50 text-green-700"
-                : "bg-amber-50 text-amber-700"
+                ? "bg-green-900/30 text-green-400"
+                : "bg-amber-900/30 text-amber-300"
             }`}
           >
             {notifMessage}

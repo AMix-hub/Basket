@@ -69,7 +69,7 @@ function SetPasswordForm() {
     return (
       <div className="text-center">
         <p className="text-4xl mb-3">✅</p>
-        <p className="text-slate-800 font-semibold mb-1">Lösenordet är satt!</p>
+        <p className="text-slate-200 font-semibold mb-1">Lösenordet är satt!</p>
         <p className="text-slate-500 text-sm mb-4">
           Du skickas vidare till inloggningssidan om ett ögonblick…
         </p>
@@ -137,7 +137,7 @@ function SetPasswordForm() {
       )}
 
       {error && (
-        <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+        <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
           {error}
         </p>
       )}
@@ -159,7 +159,7 @@ export default function SetPasswordPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <p className="text-3xl mb-2">🔐</p>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-xl font-extrabold text-slate-100 tracking-tight">
             Sätt ditt lösenord
           </h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -167,7 +167,7 @@ export default function SetPasswordPage() {
           </p>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
           <Suspense fallback={<p className="text-slate-400 text-sm text-center">Laddar…</p>}>
             <SetPasswordForm />
           </Suspense>

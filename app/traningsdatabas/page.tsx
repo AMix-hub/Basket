@@ -16,8 +16,8 @@ const yearPlans = [
     ageGroup: "Upp till 7 år",
     accentColor: "border-t-emerald-500",
     badgeBg: "bg-emerald-500",
-    tagBg: "bg-emerald-50 text-emerald-700",
-    linkColor: "text-emerald-700 group-hover:text-emerald-800",
+    tagBg: "bg-emerald-900/30 text-emerald-400",
+    linkColor: "text-emerald-400 group-hover:text-emerald-300",
     icon: "🌱",
     description:
       "Glädje, lek och grundläggande motorik. 36 träningspass med fokus på att introducera grunderna och ha riktigt kul.",
@@ -28,8 +28,8 @@ const yearPlans = [
     ageGroup: "8 år",
     accentColor: "border-t-blue-500",
     badgeBg: "bg-blue-500",
-    tagBg: "bg-blue-50 text-blue-700",
-    linkColor: "text-blue-700 group-hover:text-blue-800",
+    tagBg: "bg-blue-50 text-blue-300",
+    linkColor: "text-blue-300 group-hover:text-blue-800",
     icon: "⚡",
     description:
       "Repetera grunderna och introducera matchspelet. 36 träningspass med progression mot mer sportspecifika färdigheter.",
@@ -40,7 +40,7 @@ const yearPlans = [
     ageGroup: "9 år",
     accentColor: "border-t-orange-500",
     badgeBg: "bg-orange-500",
-    tagBg: "bg-orange-50 text-orange-700",
+    tagBg: "bg-orange-500/20 text-orange-400",
     linkColor: "text-orange-700 group-hover:text-orange-800",
     icon: "🔥",
     description:
@@ -152,11 +152,11 @@ export default function TraningsdatabasPage() {
       </div>
 
       {/* ── Smart-Tagging övningsbank ── */}
-      <div className="mb-10 bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div className="mb-10 bg-slate-800 rounded-2xl border border-slate-100 shadow-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl">🏷️</span>
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Övningsbank – Smart-Tagging</h2>
+            <h2 className="text-lg font-bold text-slate-100">Övningsbank – Smart-Tagging</h2>
             <p className="text-sm text-slate-500">
               Filtrera {allExercises.length} övningar efter kategori eller sök på nyckelord.
             </p>
@@ -181,7 +181,7 @@ export default function TraningsdatabasPage() {
             className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all ${
               activeTag === null
                 ? "bg-slate-800 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-200"
             }`}
           >
             Alla ({allExercises.length})
@@ -223,12 +223,12 @@ export default function TraningsdatabasPage() {
                       className="border border-slate-200 rounded-xl overflow-hidden"
                     >
                       <button
-                        className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                        className="w-full text-left px-4 py-3 hover:bg-slate-700/30 transition-colors"
                         onClick={() => setExpandedActivity(isExpanded ? null : key)}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-800 text-sm">{ex.name}</p>
+                            <p className="font-semibold text-slate-200 text-sm">{ex.name}</p>
                             <p className="text-xs text-slate-400 mt-0.5">
                               År {ex.planYear} · {ex.sessionTitle}
                             </p>
@@ -256,8 +256,8 @@ export default function TraningsdatabasPage() {
                           </p>
                           {ex.tips && (
                             <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                              <p className="text-xs font-semibold text-amber-700 mb-0.5">💡 Coachetips</p>
-                              <p className="text-xs text-amber-800 leading-relaxed">{ex.tips}</p>
+                              <p className="text-xs font-semibold text-amber-400 mb-0.5">💡 Coachetips</p>
+                              <p className="text-xs text-amber-300 leading-relaxed">{ex.tips}</p>
                             </div>
                           )}
                           <div className="flex items-center gap-3 mt-3">
@@ -301,7 +301,7 @@ export default function TraningsdatabasPage() {
           <Link
             key={s.year}
             href={yearHref(s.year)}
-            className={`group block bg-white rounded-2xl border border-t-4 ${s.accentColor} border-slate-100 p-6 shadow-sm hover:shadow-md transition-shadow`}
+            className={`group block bg-slate-800 rounded-2xl border border-t-4 ${s.accentColor} border-slate-100 p-6 shadow-sm hover:shadow-md transition-shadow`}
           >
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">{s.icon}</span>
@@ -311,7 +311,7 @@ export default function TraningsdatabasPage() {
                 >
                   År {s.year}
                 </span>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                <p className="text-sm font-semibold text-slate-300 mt-0.5">
                   {s.ageGroup}
                 </p>
               </div>
@@ -346,8 +346,8 @@ export default function TraningsdatabasPage() {
       </div>
 
       {/* Info section */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-900 mb-6">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8">
+        <h2 className="text-xl font-bold text-slate-100 mb-6">
           Schemalägg träningar direkt från planen
         </h2>
         <div className="grid sm:grid-cols-3 gap-6 text-sm text-slate-600">
@@ -356,7 +356,7 @@ export default function TraningsdatabasPage() {
               📚
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Välj årsplan</p>
+              <p className="font-semibold text-slate-200 mb-1">Välj årsplan</p>
               <p>Välj rätt år baserat på spelarnas åldersgrupp.</p>
             </div>
           </div>
@@ -365,7 +365,7 @@ export default function TraningsdatabasPage() {
               📅
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">
+              <p className="font-semibold text-slate-200 mb-1">
                 Schemalägg säsongen
               </p>
               <p>
@@ -379,7 +379,7 @@ export default function TraningsdatabasPage() {
               🏷️
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Smart-Tagging</p>
+              <p className="font-semibold text-slate-200 mb-1">Smart-Tagging</p>
               <p>
                 Filtrera övningar efter kategori – försvar, skytte, kondition och
                 mer. Hitta rätt övning snabbt.

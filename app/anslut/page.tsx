@@ -90,7 +90,7 @@ export default function AnslutPage() {
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-full max-w-sm text-center">
           <span className="text-5xl">📧</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-4 mb-2">
+          <h1 className="text-2xl font-extrabold text-slate-100 mt-4 mb-2">
             Bekräfta din e-post
           </h1>
           <p className="text-slate-500 text-sm leading-relaxed">
@@ -111,7 +111,7 @@ export default function AnslutPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <span className="text-4xl">🏀</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-3">
+          <h1 className="text-2xl font-extrabold text-slate-100 mt-3">
             Gå med i ett lag
           </h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -119,11 +119,11 @@ export default function AnslutPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Role selector */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Roll
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -140,7 +140,7 @@ export default function AnslutPage() {
                     className={`py-2.5 px-3 text-left rounded-xl transition-all border ${
                       role === value
                         ? "bg-orange-500 text-white border-orange-500"
-                        : "bg-slate-50 text-slate-700 border-slate-200 hover:border-orange-300"
+                        : "bg-slate-50 text-slate-300 border-slate-200 hover:border-orange-300"
                     }`}
                   >
                     <span className="text-xs font-bold block">{label}</span>
@@ -158,7 +158,7 @@ export default function AnslutPage() {
 
             {/* Name */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Namn
               </label>
               <input
@@ -173,7 +173,7 @@ export default function AnslutPage() {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 E-post
               </label>
               <input
@@ -188,7 +188,7 @@ export default function AnslutPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Lösenord
               </label>
               <input
@@ -203,7 +203,7 @@ export default function AnslutPage() {
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Bekräfta lösenord
               </label>
               <input
@@ -231,7 +231,7 @@ export default function AnslutPage() {
             {role === "coach" && (
               <>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  <label className="block text-sm font-semibold text-slate-300 mb-1">
                     Lagets namn
                   </label>
                   <input
@@ -244,7 +244,7 @@ export default function AnslutPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  <label className="block text-sm font-semibold text-slate-300 mb-1">
                     Åldersgrupp
                   </label>
                   <select
@@ -263,7 +263,7 @@ export default function AnslutPage() {
             {/* Parent: child name */}
             {role === "parent" && (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                <label className="block text-sm font-semibold text-slate-300 mb-1">
                   Barnets namn
                 </label>
                 <input
@@ -282,7 +282,7 @@ export default function AnslutPage() {
 
             {/* Invite code */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 {inviteCodeLabel[role]}
               </label>
               <input
@@ -300,7 +300,7 @@ export default function AnslutPage() {
             </div>
 
             {error && (
-              <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+              <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
                 {error}
               </p>
             )}

@@ -69,7 +69,7 @@ export default function RegisterPage() {
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-full max-w-sm text-center">
           <span className="text-5xl">📧</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-4 mb-2">
+          <h1 className="text-2xl font-extrabold text-slate-100 mt-4 mb-2">
             Bekräfta din e-post
           </h1>
           <p className="text-slate-500 text-sm leading-relaxed">
@@ -91,7 +91,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <span className="text-4xl">🏛</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-3">
+          <h1 className="text-2xl font-extrabold text-slate-100 mt-3">
             Skapa föreningskonto
           </h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -99,11 +99,11 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Namn
               </label>
               <input
@@ -118,7 +118,7 @@ export default function RegisterPage() {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 E-post
               </label>
               <input
@@ -133,7 +133,7 @@ export default function RegisterPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Lösenord
               </label>
               <input
@@ -148,7 +148,7 @@ export default function RegisterPage() {
 
             {/* Confirm Password */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Bekräfta lösenord
               </label>
               <input
@@ -174,7 +174,7 @@ export default function RegisterPage() {
 
             {/* Club name */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Föreningens namn
               </label>
               <input
@@ -189,7 +189,7 @@ export default function RegisterPage() {
 
             {/* Sport selector */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label className="block text-sm font-semibold text-slate-300 mb-2">
                 Sport
               </label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -201,7 +201,7 @@ export default function RegisterPage() {
                     className={`py-2.5 px-3 rounded-xl border text-sm font-semibold transition-all flex items-center gap-2 ${
                       sport === s.id
                         ? "bg-orange-500 text-white border-orange-500"
-                        : "bg-slate-50 text-slate-700 border-slate-200 hover:border-orange-300"
+                        : "bg-slate-50 text-slate-300 border-slate-200 hover:border-orange-300"
                     }`}
                   >
                     <span>{s.emoji}</span>
@@ -212,7 +212,7 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+              <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
                 {error}
               </p>
             )}
@@ -238,7 +238,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Invite-code join link */}
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-700 text-center">
+        <div className="mt-4 p-4 bg-blue-900/30 border border-blue-700/50 rounded-2xl text-sm text-blue-300 text-center">
           <p className="font-semibold mb-1">Har du fått en inbjudningskod?</p>
           <p className="text-blue-600 text-xs mb-2">
             Coacher, assistenter, föräldrar och spelare registrerar sig via

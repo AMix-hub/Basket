@@ -42,9 +42,9 @@ const STATUS_CONFIG: Record<
   AttendanceStatus,
   { label: string; badge: string; icon: string }
 > = {
-  present: { label: "Närvarande", badge: "bg-emerald-100 text-emerald-700", icon: "✓" },
-  absent:  { label: "Frånvarande", badge: "bg-red-100 text-red-700",        icon: "✗" },
-  sick:    { label: "Sjuk",        badge: "bg-amber-100 text-amber-700",     icon: "🤒" },
+  present: { label: "Närvarande", badge: "bg-emerald-900/30 text-emerald-400", icon: "✓" },
+  absent:  { label: "Frånvarande", badge: "bg-red-900/30 text-red-400",        icon: "✗" },
+  sick:    { label: "Sjuk",        badge: "bg-amber-900/30 text-amber-400",     icon: "🤒" },
 };
 
 export default function FamiljPage() {
@@ -137,7 +137,7 @@ export default function FamiljPage() {
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <p className="text-4xl mb-4">👪</p>
-          <h1 className="text-xl font-bold text-slate-800 mb-2">
+          <h1 className="text-xl font-bold text-slate-200 mb-2">
             Logga in för att se ditt barns sida
           </h1>
           <p className="text-slate-500 text-sm mb-6">
@@ -152,7 +152,7 @@ export default function FamiljPage() {
             </Link>
             <Link
               href="/registrera"
-              className="px-4 py-2 bg-slate-100 text-slate-700 text-sm font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+              className="px-4 py-2 bg-slate-100 text-slate-300 text-sm font-semibold rounded-xl hover:bg-slate-200 transition-colors"
             >
               Registrera
             </Link>
@@ -168,7 +168,7 @@ export default function FamiljPage() {
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <p className="text-4xl mb-3">👪</p>
-          <h1 className="text-xl font-bold text-slate-800 mb-2">
+          <h1 className="text-xl font-bold text-slate-200 mb-2">
             Föräldrasidan
           </h1>
           <p className="text-slate-500 text-sm">
@@ -186,7 +186,7 @@ export default function FamiljPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-3xl">👪</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
             Mitt barns sida
           </h1>
         </div>
@@ -199,9 +199,9 @@ export default function FamiljPage() {
 
       {/* No team yet */}
       {!team && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 mb-6">
-          <p className="text-amber-800 font-semibold mb-1">Du är inte med i något lag ännu</p>
-          <p className="text-amber-700 text-sm">
+        <div className="bg-amber-900/30 border border-amber-700/50 rounded-2xl p-6 mb-6">
+          <p className="text-amber-300 font-semibold mb-1">Du är inte med i något lag ännu</p>
+          <p className="text-amber-300 text-sm">
             Be coachen om en <strong>föräldrainbjudningskod</strong> och gå med via
             din profil eller registrering.
           </p>
@@ -210,29 +210,29 @@ export default function FamiljPage() {
 
       {/* Attendance summary card */}
       {matchedPlayer && pastWithAttendance.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
-          <h2 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
+          <h2 className="font-bold text-slate-100 mb-4 flex items-center gap-2">
             <span>📊</span> Närvaro – {childName}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-            <div className="bg-slate-50 rounded-xl p-3">
-              <p className="text-2xl font-extrabold text-slate-900">
+            <div className="bg-slate-900/30 rounded-xl p-3">
+              <p className="text-2xl font-extrabold text-slate-100">
                 {pastWithAttendance.length}
               </p>
               <p className="text-xs text-slate-500 mt-0.5">Pass registrerade</p>
             </div>
             <div className="bg-emerald-50 rounded-xl p-3">
-              <p className="text-2xl font-extrabold text-emerald-700">
+              <p className="text-2xl font-extrabold text-emerald-400">
                 {totalPresent}
               </p>
               <p className="text-xs text-emerald-600 mt-0.5">Närvarande</p>
             </div>
-            <div className="bg-red-50 rounded-xl p-3">
-              <p className="text-2xl font-extrabold text-red-700">{totalAbsent}</p>
+            <div className="bg-red-900/30 rounded-xl p-3">
+              <p className="text-2xl font-extrabold text-red-400">{totalAbsent}</p>
               <p className="text-xs text-red-600 mt-0.5">Frånvarande</p>
             </div>
             <div className="bg-amber-50 rounded-xl p-3">
-              <p className="text-2xl font-extrabold text-amber-700">{totalSick}</p>
+              <p className="text-2xl font-extrabold text-amber-400">{totalSick}</p>
               <p className="text-xs text-amber-600 mt-0.5">Sjukfrånvaro</p>
             </div>
           </div>
@@ -259,7 +259,7 @@ export default function FamiljPage() {
 
       {/* Player not found warning */}
       {team && !matchedPlayer && childName && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-800">
+        <div className="bg-amber-900/30 border border-amber-700/50 rounded-2xl p-4 mb-6 text-sm text-amber-300">
           <strong>Obs!</strong> Hittade ingen spelare med namnet &quot;{childName}&quot; i
           spelarlistan. Kontakta coachen för att lägga till{" "}
           <strong>{childName}</strong> i laget.
@@ -269,11 +269,11 @@ export default function FamiljPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Upcoming sessions */}
         <div>
-          <h2 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <h2 className="font-bold text-slate-100 mb-3 flex items-center gap-2">
             <span>📅</span> Kommande pass
           </h2>
           {upcoming.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-400 text-sm">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 text-center text-slate-400 text-sm">
               Inga kommande pass inlagda ännu.
             </div>
           ) : (
@@ -288,18 +288,18 @@ export default function FamiljPage() {
                 return (
                   <div
                     key={s.id}
-                    className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4"
+                    className="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex items-center gap-4"
                   >
                     <div className="w-12 text-center shrink-0">
                       <p className="text-xs text-slate-400 font-medium uppercase">
                         {MONTHS_SV[d.getMonth()].slice(0, 3)}
                       </p>
-                      <p className="text-xl font-extrabold text-slate-900 leading-tight">
+                      <p className="text-xl font-extrabold text-slate-100 leading-tight">
                         {d.getDate()}
                       </p>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 text-sm">
+                      <p className="font-semibold text-slate-200 text-sm">
                         {s.title}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">
@@ -309,8 +309,8 @@ export default function FamiljPage() {
                     <span
                       className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
                         s.type === "match"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-emerald-100 text-emerald-700"
+                          ? "bg-red-900/30 text-red-400"
+                          : "bg-emerald-900/30 text-emerald-400"
                       }`}
                     >
                       {s.type === "match" ? "Match" : "Träning"}
@@ -324,7 +324,7 @@ export default function FamiljPage() {
 
         {/* Past sessions with child's attendance */}
         <div>
-          <h2 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <h2 className="font-bold text-slate-100 mb-3 flex items-center gap-2">
             <span>📋</span> Genomförda pass
             {matchedPlayer && (
               <span className="text-xs font-normal text-slate-500">
@@ -333,7 +333,7 @@ export default function FamiljPage() {
             )}
           </h2>
           {past.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-400 text-sm">
+            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 text-center text-slate-400 text-sm">
               Inga genomförda pass ännu.
             </div>
           ) : (
@@ -350,10 +350,10 @@ export default function FamiljPage() {
                 return (
                   <div
                     key={s.id}
-                    className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3"
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 flex items-center gap-3"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">
+                      <p className="text-sm font-medium text-slate-200 truncate">
                         {s.title}
                       </p>
                       <p className="text-xs text-slate-400">{label}</p>

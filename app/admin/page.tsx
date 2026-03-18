@@ -517,7 +517,7 @@ export default function AdminPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <span className="text-3xl">🏛</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
             {user.clubName ?? "Föreningsadmin"}
           </h1>
         </div>
@@ -527,8 +527,8 @@ export default function AdminPage() {
       </div>
 
       {/* Club logo */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
-        <h2 className="font-bold text-slate-900 mb-1">Klubblogga</h2>
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-100 mb-1">Klubblogga</h2>
         <p className="text-slate-500 text-sm mb-4">
           Ladda upp din förenings logga. Den visas i navigeringsmenyn för alla
           coacher, spelare och föräldrar i {user.clubName ?? "din förening"}.
@@ -588,7 +588,7 @@ export default function AdminPage() {
               />
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 truncate">
+              <p className="text-sm font-medium text-slate-200 truncate">
                 {selectedLogoFile.name}
               </p>
               <p className="text-xs text-slate-500">
@@ -655,20 +655,20 @@ export default function AdminPage() {
         </div>
 
         {logoError && (
-          <p className="mt-3 text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+          <p className="mt-3 text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
             {logoError}
           </p>
         )}
         {logoSuccess && (
-          <p className="mt-3 text-emerald-600 text-sm bg-emerald-50 px-3 py-2 rounded-xl">
+          <p className="mt-3 text-emerald-400 text-sm bg-emerald-900/30 px-3 py-2 rounded-xl">
             ✓ Loggan har uppdaterats!
           </p>
         )}
       </div>
 
       {/* Coach invite code */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
-        <h2 className="font-bold text-slate-900 mb-1">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-100 mb-1">
           Inbjudningskod för coacher
         </h2>
         <p className="text-slate-500 text-sm mb-4">
@@ -682,7 +682,7 @@ export default function AdminPage() {
         </p>
 
         {user.coachInviteCode ? (
-          <div className="flex items-center gap-3 bg-blue-50 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-3 bg-blue-900/30 rounded-xl px-4 py-3">
             <div className="flex-1">
               <p className="text-xs font-semibold text-blue-600 mb-0.5">
                 🎽 Coach-inbjudningskod
@@ -696,7 +696,7 @@ export default function AdminPage() {
               className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
                 copied === "coach"
                   ? "bg-emerald-500 text-white"
-                  : "bg-blue-200 text-blue-700 hover:bg-blue-300"
+                  : "bg-blue-900/30 text-blue-300 hover:bg-blue-800/30"
               }`}
             >
               {copied === "coach" ? "✓ Kopierad!" : "📋 Kopiera"}
@@ -710,8 +710,8 @@ export default function AdminPage() {
       </div>
 
       {/* Create new team */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
-        <h2 className="font-bold text-slate-900 mb-1">Skapa nytt lag</h2>
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-100 mb-1">Skapa nytt lag</h2>
         <p className="text-slate-500 text-sm mb-4">
           Som admin kan du skapa lag direkt. Bjud sedan in en coach med coach-inbjudningskoden ovan, eller dela lagkoderna nedan med spelare och föräldrar.
         </p>
@@ -725,7 +725,7 @@ export default function AdminPage() {
             className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
           {createTeamError && (
-            <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+            <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
               {createTeamError}
             </p>
           )}
@@ -740,8 +740,8 @@ export default function AdminPage() {
       </div>
 
       {/* All teams in this club */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-        <h2 className="font-bold text-slate-900 mb-4">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
+        <h2 className="font-bold text-slate-100 mb-4">
           Lag i {user.clubName ?? "föreningen"} ({teams?.length ?? 0})
         </h2>
 
@@ -762,9 +762,9 @@ export default function AdminPage() {
                   {/* Team header */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
-                      <p className="font-bold text-slate-900">{team.name}</p>
+                      <p className="font-bold text-slate-100">{team.name}</p>
                       {team.age_group && (
-                        <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                        <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">
                           {team.age_group}
                         </span>
                       )}
@@ -780,7 +780,7 @@ export default function AdminPage() {
                       {team.members.map((m) => (
                         <li key={m.id} className="text-sm">
                           <div className="flex items-center gap-2 mb-1.5">
-                            <span className="font-medium text-slate-800 flex-1 min-w-0">
+                            <span className="font-medium text-slate-200 flex-1 min-w-0">
                               {m.name}
                               {m.roles.includes("parent") && m.child_name && (
                                 <span className="text-xs text-slate-400 ml-1">
@@ -791,7 +791,7 @@ export default function AdminPage() {
                             <button
                               disabled={removing === m.id}
                               onClick={() => removeMember(team, m)}
-                              className="px-2 py-0.5 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                              className="px-2 py-0.5 text-xs font-semibold text-red-600 hover:text-red-800 hover:bg-red-900/30 rounded-lg transition-colors disabled:opacity-50 shrink-0"
                             >
                               {removing === m.id ? "…" : "Ta bort"}
                             </button>
@@ -835,7 +835,7 @@ export default function AdminPage() {
 
                   {/* Team invite codes */}
                   <details className="group mt-3 pt-3 border-t border-slate-100">
-                    <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors list-none flex items-center gap-1">
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors list-none flex items-center gap-1">
                       <span className="chevron inline-block transition-transform group-open:rotate-90">▶</span>
                       Inbjudningskoder för laget
                     </summary>
@@ -845,10 +845,10 @@ export default function AdminPage() {
                         { label: "👪 Förälder", code: team.parent_invite_code, key: `${team.id}-parent` },
                         { label: "🏃 Spelare", code: team.player_invite_code, key: `${team.id}-player` },
                       ].map(({ label, code, key }) => (
-                        <div key={key} className="flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2">
+                        <div key={key} className="flex items-center gap-3 bg-slate-900/30 rounded-lg px-3 py-2">
                           <div className="flex-1">
                             <p className="text-xs font-semibold text-slate-500">{label}</p>
-                            <p className="font-mono font-bold text-slate-800 tracking-widest text-sm">{code}</p>
+                            <p className="font-mono font-bold text-slate-200 tracking-widest text-sm">{code}</p>
                           </div>
                           <button
                             onClick={() => copyToClipboard(code, key)}
@@ -884,8 +884,8 @@ export default function AdminPage() {
       </div>
 
       {/* Hall management */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
-        <h2 className="font-bold text-slate-900 mb-1">🏟 Hallar</h2>
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-100 mb-1">🏟 Hallar</h2>
         <p className="text-slate-500 text-sm mb-4">
           Lägg till träningshallar som coacher kan välja när de schemalägger träningar.
         </p>
@@ -924,9 +924,9 @@ export default function AdminPage() {
         ) : (
           <ul className="space-y-2">
             {halls.map((hall) => (
-              <li key={hall.id} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
+              <li key={hall.id} className="flex items-center gap-3 bg-slate-900/30 rounded-xl px-3 py-2">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-800">{hall.name}</p>
+                  <p className="text-sm font-medium text-slate-200">{hall.name}</p>
                   {hall.address && (
                     <p className="text-xs text-slate-400">{hall.address}</p>
                   )}
@@ -944,8 +944,8 @@ export default function AdminPage() {
       </div>
 
       {/* Training-free periods */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
-        <h2 className="font-bold text-slate-900 mb-1">🚫 Träningsfria perioder</h2>
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-100 mb-1">🚫 Träningsfria perioder</h2>
         <p className="text-slate-500 text-sm mb-4">
           Lägg till perioder då det inte är träning (t.ex. höstlov, jullov). Träningar skapas inte
           automatiskt på dessa datum när du schemalägger återkommande pass.
@@ -1022,8 +1022,8 @@ export default function AdminPage() {
       </div>
 
       {/* Invite user by email */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
-        <h2 className="font-bold text-slate-900 mb-1">✉️ Bjud in användare via e-post</h2>
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-100 mb-1">✉️ Bjud in användare via e-post</h2>
         <p className="text-slate-500 text-sm mb-4">
           Skapa ett konto för en ny användare direkt. Personen får ett mail med en länk för att
           sätta sitt eget lösenord.
@@ -1083,10 +1083,10 @@ export default function AdminPage() {
             </div>
           </div>
           {inviteError && (
-            <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">{inviteError}</p>
+            <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">{inviteError}</p>
           )}
           {inviteSuccess && (
-            <p className="text-emerald-600 text-sm bg-emerald-50 px-3 py-2 rounded-xl">{inviteSuccess}</p>
+            <p className="text-emerald-400 text-sm bg-emerald-900/30 px-3 py-2 rounded-xl">{inviteSuccess}</p>
           )}
           <button
             type="submit"
@@ -1099,8 +1099,8 @@ export default function AdminPage() {
       </div>
 
       {/* User register – all members across all teams */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-6">
-        <h2 className="font-bold text-slate-900 mb-1">👥 Användarregister</h2>
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-100 mb-1">👥 Användarregister</h2>
         <p className="text-slate-500 text-sm mb-4">
           Alla medlemmar i {user.clubName ?? "föreningen"} – du kan redigera deras grupptillhörighet och roller direkt här.
         </p>
@@ -1129,19 +1129,19 @@ export default function AdminPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs font-semibold text-slate-500 border-b border-slate-100">
+                  <tr className="text-left text-xs font-semibold text-slate-500 border-b border-slate-700">
                     <th className="pb-2 pr-4">Namn</th>
                     <th className="pb-2 pr-4">Roller</th>
                     <th className="pb-2">Lag</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-700/50">
                   {memberList
                     .sort((a, b) => a.member.name.localeCompare(b.member.name, "sv"))
                     .map(({ member, teamIds }) => (
-                      <tr key={member.id} className="hover:bg-slate-50">
+                      <tr key={member.id} className="hover:bg-slate-700/30">
                         <td className="py-2 pr-4">
-                          <span className="font-medium text-slate-800">{member.name}</span>
+                          <span className="font-medium text-slate-200">{member.name}</span>
                           {member.child_name && (
                             <span className="text-xs text-slate-400 block">
                               Förälder till {member.child_name}
@@ -1216,7 +1216,7 @@ export default function AdminPage() {
                                   }}
                                   className={`text-xs px-2 py-0.5 rounded-full font-semibold transition-colors ${
                                     isInTeam
-                                      ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                      ? "bg-orange-500/20 text-orange-400 hover:bg-orange-200"
                                       : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                                   }`}
                                 >
