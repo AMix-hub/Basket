@@ -22,8 +22,11 @@ const MONTHS_SV = [
 const DAYS_SV_SHORT = ["M", "T", "O", "T", "F", "L", "S"];
 
 export default function DashboardHome() {
-  const { user, getMyTeam } = useAuth();
-  const team = getMyTeam();
+  const { user, getMyTeams } = useAuth();
+  const myTeams = getMyTeams();
+
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const team = myTeams.find((t) => t.id === selectedTeamId) ?? myTeams[0] ?? null;
 
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
 
@@ -101,14 +104,32 @@ export default function DashboardHome() {
     <div className="space-y-5">
 
       {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-bold text-white">
-          {greeting}, {displayName}! 👋
-        </h1>
-        {team && (
-          <p className="text-sm text-slate-400 mt-1">
-            {team.name} · {team.ageGroup}
-          </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-white">
+            {greeting}, {displayName}! 👋
+          </h1>
+          {team && (
+            <p className="text-sm text-slate-400 mt-1">
+              {team.name} · {team.ageGroup}
+            </p>
+          )}
+        </div>
+        {myTeams.length > 1 && (
+          <select
+            value={team?.id ?? ""}
+            onChange={(e) => {
+              setSelectedTeamId(e.target.value);
+              setSessions([]);
+            }}
+            className="text-sm text-slate-200 bg-slate-700 border border-slate-600 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+          >
+            {myTeams.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
         )}
       </div>
 
