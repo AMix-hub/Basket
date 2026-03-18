@@ -140,8 +140,12 @@ service cloud.firestore {
 
     // ─── tactic_live_state ────────────────────────────────────────
     // One document per team (document ID = teamId).
+    // Public read: the cast receiver page (/cast) is opened on an external
+    // screen (TV/Chromecast) and runs without authentication.  The document
+    // only contains tactical board state (player positions, drawings) which
+    // is not sensitive personal data.  Writes remain coach-only.
     match /tactic_live_state/{teamId} {
-      allow read: if isSignedIn() && isTeamMember(teamId);
+      allow read: if true;
       allow write: if isSignedIn() && isTeamMember(teamId) && isCoachOrAbove();
     }
 
