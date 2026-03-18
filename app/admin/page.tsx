@@ -117,7 +117,11 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
 
-    const q = query(collection(db, "teams"), where("adminId", "==", user.id));
+    // Co-admins have adminId pointing to the original club admin; use that so
+    // they see all club teams rather than an empty list.
+    const effectiveAdminId = user.adminId ?? user.id;
+
+    const q = query(collection(db, "teams"), where("adminId", "==", effectiveAdminId));
 
     const unsub = onSnapshot(q, async (teamSnap) => {
       if (teamSnap.empty) {
@@ -190,7 +194,8 @@ export default function AdminPage() {
   // Load halls for this admin
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
-    const q = query(collection(db, "halls"), where("adminId", "==", user.id));
+    const effectiveAdminId = user.adminId ?? user.id;
+    const q = query(collection(db, "halls"), where("adminId", "==", effectiveAdminId));
     const unsub = onSnapshot(q, (snap) => {
       setHalls(
         snap.docs.map((d) => ({
@@ -206,7 +211,8 @@ export default function AdminPage() {
   // Load training-free periods for this admin
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
-    const q = query(collection(db, "training_free_periods"), where("adminId", "==", user.id));
+    const effectiveAdminId = user.adminId ?? user.id;
+    const q = query(collection(db, "training_free_periods"), where("adminId", "==", effectiveAdminId));
     const unsub = onSnapshot(q, (snap) => {
       setFreePeriods(
         snap.docs.map((d) => ({
@@ -390,7 +396,9 @@ export default function AdminPage() {
           name: inviteName.trim(),
           teamId: inviteTeamId || undefined,
           role: inviteRole,
-          adminId: user.id,
+          // Co-admins invite under the club's root admin so all invited users
+          // appear in the correct club registry.
+          adminId: user.adminId ?? user.id,
         }),
       });
       const data = await res.json();

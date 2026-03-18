@@ -132,6 +132,10 @@ export default function RegistretPage() {
 
   const isAdmin = user?.roles.includes("admin") ?? false;
   const isCoach = user?.roles.includes("coach") ?? false;
+  // Co-admins (promoted from coach/other role) have their own adminId pointing
+  // to the original club admin. Use that as the effective admin ID so all
+  // club-scoped queries resolve correctly for both root admins and co-admins.
+  const effectiveAdminId = user?.adminId ?? user?.id;
 
   useEffect(() => {
     if (!user) return;
@@ -145,9 +149,10 @@ export default function RegistretPage() {
       let teamsToLoad: { id: string; name: string; ageGroup?: string }[];
 
       if (isAdmin) {
-        // Fetch all teams where adminId == user.id
+        // Fetch all teams where adminId == effectiveAdminId
+        // (for co-admins this resolves to their club's original admin ID)
         const adminTeamsSnap = await getDocs(
-          query(collection(db, "teams"), where("adminId", "==", user.id))
+          query(collection(db, "teams"), where("adminId", "==", effectiveAdminId))
         );
         teamsToLoad = adminTeamsSnap.docs.map((d) => ({
           id: d.id,
@@ -199,7 +204,7 @@ export default function RegistretPage() {
       // This covers users who were invited by the admin but not assigned to a team.
       if (isAdmin) {
         const directProfilesSnap = await getDocs(
-          query(collection(db, "profiles"), where("adminId", "==", user.id))
+          query(collection(db, "profiles"), where("adminId", "==", effectiveAdminId))
         );
         const existingMemberIds = new Set(
           results.flatMap((t) => t.members.map((m) => m.id))
@@ -230,7 +235,7 @@ export default function RegistretPage() {
       setTeamData(results);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, teams.map((t: Team) => t.id).join(",")]);
+  }, [user, effectiveAdminId, teams.map((t: Team) => t.id).join(",")]);
 
   const addMemberToTeam = async (memberId: string, teamId: string) => {
     await setDoc(doc(db, "team_members", `${teamId}_${memberId}`), {
