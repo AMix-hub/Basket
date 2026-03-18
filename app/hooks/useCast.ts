@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 export interface CastState {
-  /** True when at least one secondary display is detected as available, or when the fallback (new-tab) mode is active. */
+  /** True when the browser supports casting (Presentation API present, or fallback new-tab mode).
+   *  Note: we are optimistic and do not gate this on whether a device has already been discovered,
+   *  because device discovery (mDNS) can be slow — especially on Android. */
   isAvailable: boolean;
   /** True when a presentation session is currently active. */
   isPresenting: boolean;
@@ -62,7 +64,6 @@ export function useCast(castUrl: string | null): CastState {
       return;
     }
 
-    let cancelled = false;
     const request = new PresentationRequest([castUrl]);
     requestRef.current = request;
 
@@ -72,23 +73,25 @@ export function useCast(castUrl: string | null): CastState {
       navigator.presentation.defaultRequest = request;
     }
 
-    request
-      .getAvailability()
-      .then((availability) => {
-        if (cancelled) return;
-        setIsAvailable(availability.value);
-        availability.addEventListener("change", () => {
-          setIsAvailable(availability.value);
-        });
-      })
-      .catch(() => {
-        /* Some browsers don't implement getAvailability (e.g. older Chrome
-         * versions).  Be optimistic so the button is still shown. */
-        if (!cancelled) setIsAvailable(true);
-      });
+    /* Be optimistic: show the button whenever the browser supports the
+     * Presentation API (e.g. Chrome on Android), even before device
+     * discovery has completed.  On Android Chrome, getAvailability() may
+     * initially return false even when Chromecasts are present on the
+     * local network because mDNS discovery is asynchronous and can take
+     * several seconds on mobile.  The browser's own device picker will
+     * handle the "no devices found" case gracefully. */
+    setIsAvailable(true);
+
+    /* Call getAvailability() so Chrome can update its omnibar Cast icon via
+     * the defaultRequest mechanism.  We do not use the returned value to
+     * gate the button — the optimistic setIsAvailable(true) above already
+     * ensures the button is visible on all Presentation-API-capable browsers. */
+    request.getAvailability().catch(() => {
+      /* Silently ignore — some older Chrome versions do not implement
+       * getAvailability(); our button is shown regardless (see above). */
+    });
 
     return () => {
-      cancelled = true;
       /* Clean up the default request so the Cast icon disappears after navigation. */
       if (
         typeof navigator !== "undefined" &&
