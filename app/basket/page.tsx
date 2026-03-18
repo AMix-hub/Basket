@@ -7,8 +7,8 @@ const seasons = [
     ageGroup: "Upp till 7 år",
     accentColor: "border-t-emerald-500",
     badgeBg: "bg-emerald-500",
-    tagBg: "bg-emerald-50 text-emerald-700",
-    linkColor: "text-emerald-700 group-hover:text-emerald-800",
+    tagBg: "bg-emerald-900/30 text-emerald-400",
+    linkColor: "text-emerald-400 group-hover:text-emerald-300",
     icon: "🌱",
     description:
       "Glädje, lek och grundläggande motorik. 36 träningspass à 50–60 min med fokus på att introducera grunderna och ha riktigt kul.",
@@ -20,8 +20,8 @@ const seasons = [
     ageGroup: "8 år",
     accentColor: "border-t-blue-500",
     badgeBg: "bg-blue-500",
-    tagBg: "bg-blue-50 text-blue-700",
-    linkColor: "text-blue-700 group-hover:text-blue-800",
+    tagBg: "bg-blue-50 text-blue-300",
+    linkColor: "text-blue-300 group-hover:text-blue-800",
     icon: "⚡",
     description:
       "Repetera grunderna och introducera matchspelet. 36 träningspass à 60 min med progression mot mer basketspecifika färdigheter.",
@@ -33,7 +33,7 @@ const seasons = [
     ageGroup: "9 år",
     accentColor: "border-t-orange-500",
     badgeBg: "bg-orange-500",
-    tagBg: "bg-orange-50 text-orange-700",
+    tagBg: "bg-orange-500/20 text-orange-400",
     linkColor: "text-orange-700 group-hover:text-orange-800",
     icon: "🔥",
     description:
@@ -84,7 +84,7 @@ export default function BasketPage() {
           <Link
             key={s.year}
             href={s.href}
-            className={`group block bg-white rounded-2xl border border-t-4 ${s.accentColor} border-slate-100 p-6 shadow-sm card-hover`}
+            className={`group block bg-slate-800 rounded-2xl border border-t-4 ${s.accentColor} border-slate-100 p-6 shadow-sm card-hover`}
           >
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">{s.icon}</span>
@@ -92,7 +92,7 @@ export default function BasketPage() {
                 <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${s.tagBg}`}>
                   År {s.year}
                 </span>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5">
+                <p className="text-sm font-semibold text-slate-300 mt-0.5">
                   {s.ageGroup}
                 </p>
               </div>
@@ -118,8 +118,8 @@ export default function BasketPage() {
       </div>
 
       {/* Info section */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-8 shadow-sm">
-        <h2 className="text-xl font-bold text-slate-900 mb-6">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8">
+        <h2 className="text-xl font-bold text-slate-100 mb-6">
           Hur använder man den här sidan?
         </h2>
         <div className="grid sm:grid-cols-3 gap-6 text-sm text-slate-600">
@@ -128,7 +128,7 @@ export default function BasketPage() {
               📅
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Välj säsongsår</p>
+              <p className="font-semibold text-slate-200 mb-1">Välj säsongsår</p>
               <p>Välj rätt år baserat på barnens åldersgrupp.</p>
             </div>
           </div>
@@ -137,7 +137,7 @@ export default function BasketPage() {
               📝
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Följ månad för månad</p>
+              <p className="font-semibold text-slate-200 mb-1">Följ månad för månad</p>
               <p>
                 Varje månad har tydliga träningspass med tema, övningar och
                 spel.
@@ -149,7 +149,7 @@ export default function BasketPage() {
               🎯
             </div>
             <div>
-              <p className="font-semibold text-slate-800 mb-1">Anpassa fritt</p>
+              <p className="font-semibold text-slate-200 mb-1">Anpassa fritt</p>
               <p>
                 Passen är förslag – anpassa gärna efter din grupps behov och
                 nivå.

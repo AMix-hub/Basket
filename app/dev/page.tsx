@@ -39,14 +39,14 @@ interface DevComment {
 
 const categoryConfig: Record<DevItemCategory, { label: string; emoji: string; color: string }> = {
   idea:   { label: "Idé",      emoji: "💡", color: "bg-yellow-50 border-yellow-200 text-yellow-800" },
-  change: { label: "Ändring",  emoji: "🔧", color: "bg-blue-50 border-blue-200 text-blue-800" },
+  change: { label: "Ändring",  emoji: "🔧", color: "bg-blue-900/30 border-blue-700/50 text-blue-300" },
   todo:   { label: "Att göra", emoji: "📋", color: "bg-purple-50 border-purple-200 text-purple-800" },
 };
 
 const priorityConfig: Record<DevItemPriority, { label: string; emoji: string; color: string; order: number }> = {
-  high:   { label: "Hög",    emoji: "🔴", color: "bg-red-50 border-red-200 text-red-700",       order: 0 },
-  medium: { label: "Medium", emoji: "🟡", color: "bg-amber-50 border-amber-200 text-amber-700", order: 1 },
-  low:    { label: "Låg",    emoji: "🟢", color: "bg-green-50 border-green-200 text-green-700", order: 2 },
+  high:   { label: "Hög",    emoji: "🔴", color: "bg-red-900/30 border-red-700/50 text-red-400",       order: 0 },
+  medium: { label: "Medium", emoji: "🟡", color: "bg-amber-900/30 border-amber-700/50 text-amber-400", order: 1 },
+  low:    { label: "Låg",    emoji: "🟢", color: "bg-green-900/30 border-green-700/50 text-green-400", order: 2 },
 };
 
 export default function DevPage() {
@@ -270,7 +270,7 @@ export default function DevPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <span className="text-3xl">🛠</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
             Utvecklingssida
           </h1>
         </div>
@@ -280,13 +280,13 @@ export default function DevPage() {
       </div>
 
       {/* Add new item */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mb-6">
-        <h2 className="font-bold text-slate-900 mb-4">Lägg till</h2>
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-100 mb-4">Lägg till</h2>
         <form onSubmit={addItem} className="flex flex-col sm:flex-row gap-3">
           <select
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value as DevItemCategory)}
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-300 bg-white hover:border-slate-400 transition-colors shrink-0"
           >
             {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
               <option key={cat} value={cat}>
@@ -297,7 +297,7 @@ export default function DevPage() {
           <select
             value={newPriority}
             onChange={(e) => setNewPriority(e.target.value as DevItemPriority)}
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-300 bg-white hover:border-slate-400 transition-colors shrink-0"
           >
             {(Object.keys(priorityConfig) as DevItemPriority[]).map((p) => (
               <option key={p} value={p}>
@@ -310,7 +310,7 @@ export default function DevPage() {
             value={newText}
             onChange={(e) => setNewText(e.target.value)}
             placeholder="Beskriv idén, ändringen eller uppgiften…"
-            className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
+            className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
             required
           />
           <button
@@ -332,7 +332,7 @@ export default function DevPage() {
             className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
               filter === cat
                 ? "bg-slate-800 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-200"
             }`}
           >
             {cat === "all"
@@ -343,7 +343,7 @@ export default function DevPage() {
       </div>
 
       {/* Items */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
         {loading ? (
           <p className="text-slate-400 text-sm">Laddar…</p>
         ) : items.length === 0 ? (
@@ -523,7 +523,7 @@ function ItemRow({
                     onEditCategoryChange(val);
                   }
                 }}
-                className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
+                className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-300 bg-white hover:border-slate-400 transition-colors shrink-0"
               >
                 {(Object.keys(categoryConfig) as DevItemCategory[]).map((cat) => (
                   <option key={cat} value={cat}>
@@ -539,7 +539,7 @@ function ItemRow({
                     onEditPriorityChange(val);
                   }
                 }}
-                className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 bg-white hover:border-slate-400 transition-colors shrink-0"
+                className="border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-300 bg-white hover:border-slate-400 transition-colors shrink-0"
               >
                 {(Object.keys(priorityConfig) as DevItemPriority[]).map((p) => (
                   <option key={p} value={p}>
@@ -556,7 +556,7 @@ function ItemRow({
                   if (e.key === "Escape") onEditCancel();
                 }}
                 autoFocus
-                className="flex-1 border border-orange-300 rounded-lg px-2 py-1 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                className="flex-1 border border-orange-300 rounded-lg px-2 py-1 text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-orange-300"
               />
               <div className="flex gap-1 shrink-0">
                 <button
@@ -567,14 +567,14 @@ function ItemRow({
                 </button>
                 <button
                   onClick={onEditCancel}
-                  className="px-2 py-1 text-xs font-semibold bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                  className="px-2 py-1 text-xs font-semibold bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-200 transition-colors"
                 >
                   Avbryt
                 </button>
               </div>
             </div>
           ) : (
-            <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-800"}`}>
+            <p className={`text-sm ${item.done ? "line-through text-slate-400" : "text-slate-200"}`}>
               {item.text}
             </p>
           )}
@@ -597,7 +597,7 @@ function ItemRow({
             )}
             <button
               onClick={onToggleComments}
-              className="text-xs text-slate-500 hover:text-slate-700 transition-colors flex items-center gap-1"
+              className="text-xs text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
             >
               💬 {comments.length > 0 ? comments.length : ""} Kommentarer
               <span>{commentsExpanded ? "▲" : "▼"}</span>
@@ -626,21 +626,21 @@ function ItemRow({
 
       {/* Comments section */}
       {commentsExpanded && (
-        <div className="border-t border-slate-100 bg-slate-50 px-3 py-3">
+        <div className="border-t border-slate-700 bg-slate-900/30 px-3 py-3">
           {comments.length > 0 ? (
             <ul className="space-y-2 mb-3">
               {comments.map((comment) => (
                 <li key={comment.id} className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-xs font-semibold text-slate-700">
+                      <span className="text-xs font-semibold text-slate-300">
                         {comment.authorName}
                       </span>
                       <span className="text-xs text-slate-400">
                         {new Date(comment.createdAt).toLocaleDateString("sv-SE")}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-700">{comment.text}</p>
+                    <p className="text-sm text-slate-300">{comment.text}</p>
                   </div>
                   {comment.authorId === currentUserId && (
                     <button

@@ -121,7 +121,7 @@ export default function VideorPage() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">🎬</span>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
               Videobibliotek
             </h1>
           </div>
@@ -159,11 +159,11 @@ export default function VideorPage() {
 
       {/* Add video form */}
       {showForm && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-6">
-          <h2 className="font-bold text-slate-900 mb-4">Lägg till YouTube-video</h2>
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-5 mb-6">
+          <h2 className="font-bold text-slate-100 mb-4">Lägg till YouTube-video</h2>
           <form onSubmit={addVideo} className="space-y-3">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Titel
               </label>
               <input
@@ -176,7 +176,7 @@ export default function VideorPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 YouTube-länk
               </label>
               <input
@@ -195,7 +195,7 @@ export default function VideorPage() {
               )}
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Kategori
               </label>
               <select
@@ -221,7 +221,7 @@ export default function VideorPage() {
                   setShowForm(false);
                   setUrlError("");
                 }}
-                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
+                className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-300 text-sm font-semibold rounded-xl transition-colors"
               >
                 Avbryt
               </button>
@@ -239,7 +239,7 @@ export default function VideorPage() {
             className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all ${
               activeCategory === cat
                 ? "bg-orange-500 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                : "bg-slate-700 text-slate-300 hover:bg-slate-200"
             }`}
           >
             {cat}
@@ -254,7 +254,7 @@ export default function VideorPage() {
 
       {/* Videos grid */}
       {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+        <div className="bg-slate-800 rounded-2xl border border-slate-200 p-12 text-center">
           <p className="text-4xl mb-3">🎬</p>
           <p className="text-slate-500 text-sm">
             {videos.length === 0
@@ -269,7 +269,7 @@ export default function VideorPage() {
             return (
               <div
                 key={v.id}
-                className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+                className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden"
               >
                 {videoId ? (
                   <YouTubeEmbed videoId={videoId} />
@@ -281,16 +281,16 @@ export default function VideorPage() {
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 text-sm truncate">
+                      <p className="font-semibold text-slate-200 text-sm truncate">
                         {v.title}
                       </p>
-                      <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full">
+                      <span className="inline-block mt-1 text-xs font-medium px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">
                         {v.category}
                       </span>
                     </div>
                     <button
                       onClick={() => deleteVideo(v.id)}
-                      className="shrink-0 text-xs px-2 py-1 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium"
+                      className="shrink-0 text-xs px-2 py-1 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-100 transition-colors font-medium"
                     >
                       ✕
                     </button>

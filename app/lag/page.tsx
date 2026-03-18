@@ -227,7 +227,7 @@ export default function LagPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-3xl">🏀</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
             Mina lag
           </h1>
         </div>
@@ -239,14 +239,14 @@ export default function LagPage() {
 
       {/* No team notice */}
       {teams.length === 0 && !joinSuccess && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 text-sm text-amber-800">
+        <div className="bg-amber-900/30 border border-amber-700/50 rounded-2xl p-4 mb-6 text-sm text-amber-300">
           Du är inte med i något lag ännu. Ange en inbjudningskod nedan för att
           gå med.
         </div>
       )}
 
       {joinSuccess && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-6 text-emerald-700 text-sm font-medium">
+        <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-2xl p-4 mb-6 text-emerald-400 text-sm font-medium">
           ✓ Du har gått med i laget! Laginformationen visas nedan.
         </div>
       )}
@@ -266,14 +266,14 @@ export default function LagPage() {
             {/* Team header card */}
             <button
               onClick={() => toggleTeam(team.id)}
-              className="w-full bg-white border border-slate-200 rounded-2xl shadow-sm p-5 flex items-center justify-between gap-4 hover:border-orange-300 transition-colors"
+              className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-5 flex items-center justify-between gap-4 hover:border-orange-300 transition-colors"
             >
               <div className="text-left">
-                <h2 className="text-lg font-extrabold text-slate-900">
+                <h2 className="text-lg font-extrabold text-slate-100">
                   {team.name}
                 </h2>
                 {team.ageGroup && (
-                  <span className="inline-block mt-0.5 text-xs font-semibold px-2.5 py-0.5 bg-orange-100 text-orange-700 rounded-full">
+                  <span className="inline-block mt-0.5 text-xs font-semibold px-2.5 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">
                     {team.ageGroup}
                   </span>
                 )}
@@ -290,8 +290,8 @@ export default function LagPage() {
               <div className="mt-1 space-y-3">
                 {/* Invite codes (coach / admin only) */}
                 {canSeeInvites && (
-                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-                    <h3 className="font-bold text-slate-900 mb-3">
+                  <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+                    <h3 className="font-bold text-slate-100 mb-3">
                       Inbjudningskoder
                     </h3>
                     <p className="text-slate-500 text-sm mb-4">
@@ -299,9 +299,9 @@ export default function LagPage() {
                     </p>
                     <div className="space-y-3">
                       {[
-                        { key: `${team.id}-staff`,  label: "👋 Assistenter / personal", code: team.inviteCode,        bg: "bg-slate-50",    text: "text-slate-500",   mono: "text-slate-900",   btn: "bg-slate-200 text-slate-700 hover:bg-slate-300" },
-                        { key: `${team.id}-parent`, label: "👪 Föräldrar",               code: team.parentInviteCode,  bg: "bg-orange-50",   text: "text-orange-600",  mono: "text-orange-800",  btn: "bg-orange-200 text-orange-700 hover:bg-orange-300" },
-                        { key: `${team.id}-player`, label: "🏃 Spelare",                 code: team.playerInviteCode,  bg: "bg-emerald-50",  text: "text-emerald-600", mono: "text-emerald-800", btn: "bg-emerald-200 text-emerald-700 hover:bg-emerald-300" },
+                        { key: `${team.id}-staff`,  label: "👋 Assistenter / personal", code: team.inviteCode,        bg: "bg-slate-900/30",    text: "text-slate-400",   mono: "text-slate-200",   btn: "bg-slate-700 text-slate-300 hover:bg-slate-600" },
+                        { key: `${team.id}-parent`, label: "👪 Föräldrar",               code: team.parentInviteCode,  bg: "bg-orange-500/10",   text: "text-orange-400",  mono: "text-orange-300",  btn: "bg-orange-500/20 text-orange-400 hover:bg-orange-500/30" },
+                        { key: `${team.id}-player`, label: "🏃 Spelare",                 code: team.playerInviteCode,  bg: "bg-emerald-900/30",  text: "text-emerald-400", mono: "text-emerald-300", btn: "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" },
                       ].map(({ key, label, code, bg, text, mono, btn }) => (
                         <div key={key} className={`flex items-center gap-3 ${bg} rounded-xl px-4 py-3`}>
                           <div className="flex-1">
@@ -319,7 +319,7 @@ export default function LagPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700">
+                    <div className="mt-4 p-3 bg-blue-900/30 border border-blue-700/50 rounded-xl text-xs text-blue-300">
                       💡 <strong>Tips:</strong> Dela rätt kod med rätt person. De
                       registrerar sig via{" "}
                       <Link href="/anslut" className="underline font-medium">
@@ -331,8 +331,8 @@ export default function LagPage() {
                 )}
 
                 {/* Members list */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-                  <h3 className="font-bold text-slate-900 mb-3">
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+                  <h3 className="font-bold text-slate-100 mb-3">
                     Lagmedlemmar ({members.length})
                   </h3>
                   {members.length === 0 ? (
@@ -344,10 +344,10 @@ export default function LagPage() {
                       {members.map((m) => (
                         <li
                           key={m.id}
-                          className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3"
+                          className="flex items-center gap-3 bg-slate-900/30 rounded-xl px-4 py-3"
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-slate-800">
+                            <p className="font-medium text-sm text-slate-200">
                               {m.name}
                             </p>
                             {m.roles.includes("parent") && m.child_name && (
@@ -368,8 +368,8 @@ export default function LagPage() {
                 </div>
 
                 {/* Player groups */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-                  <h3 className="font-bold text-slate-900 mb-3">
+                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+                  <h3 className="font-bold text-slate-100 mb-3">
                     Träningsgrupper ({groups.length})
                   </h3>
                   <p className="text-slate-500 text-sm mb-4">
@@ -395,7 +395,7 @@ export default function LagPage() {
                             >
                               <div className="flex items-center gap-2">
                                 <span className="text-base">👥</span>
-                                <span className="font-semibold text-sm text-slate-800">
+                                <span className="font-semibold text-sm text-slate-200">
                                   {group.name}
                                 </span>
                                 <span className="text-xs text-slate-500">
@@ -438,7 +438,7 @@ export default function LagPage() {
                                                 onChange={() => toggleGroupMember(group, m.id)}
                                                 className="accent-orange-500 w-4 h-4 shrink-0"
                                               />
-                                              <span className="text-sm text-slate-800">{m.name}</span>
+                                              <span className="text-sm text-slate-200">{m.name}</span>
                                               <span className="text-xs text-slate-400">
                                                 {m.roles
                                                   .map((r) => roleLabel[r as keyof typeof roleLabel] ?? r)
@@ -447,7 +447,7 @@ export default function LagPage() {
                                             </label>
                                           ) : (
                                             inGroup && (
-                                              <span className="text-sm text-slate-800">{m.name}</span>
+                                              <span className="text-sm text-slate-200">{m.name}</span>
                                             )
                                           )}
                                         </li>
@@ -493,8 +493,8 @@ export default function LagPage() {
       })}
 
       {/* Join an additional team */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 mt-2">
-        <h2 className="font-bold text-slate-900 mb-1">
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-2">
+        <h2 className="font-bold text-slate-100 mb-1">
           {teams.length === 0 ? "Gå med i ett lag" : "Gå med i ytterligare ett lag"}
         </h2>
         <p className="text-slate-500 text-sm mb-4">
@@ -504,7 +504,7 @@ export default function LagPage() {
         </p>
         <form onSubmit={handleJoin} className="space-y-3">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
+            <label className="block text-sm font-semibold text-slate-300 mb-1">
               Inbjudningskod
             </label>
             <input
@@ -519,7 +519,7 @@ export default function LagPage() {
           </div>
           {user.roles.includes("parent") && (
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Barnets namn
               </label>
               <input

@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <span className="text-4xl">🏆</span>
-          <h1 className="text-2xl font-extrabold text-slate-900 mt-3">
+          <h1 className="text-2xl font-extrabold text-slate-100 mt-3">
             Logga in
           </h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -49,10 +49,10 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 E-post
               </label>
               <input
@@ -65,7 +65,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
                 Lösenord
               </label>
               <input
@@ -79,7 +79,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-xl">
+              <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
                 {error}
               </p>
             )}
