@@ -15,5 +15,16 @@ service firebase.storage {
                    && request.resource.size <= 2 * 1024 * 1024;
     }
 
+    // ─── User avatars ──────────────────────────────────────────────
+    // Any authenticated user can upload/overwrite their own avatar.
+    // Everyone can read, so the avatar is visible to team members.
+    match /avatars/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.contentType.matches('image/.*')
+                   && request.resource.size <= 2 * 1024 * 1024;
+    }
+
   }
 }
