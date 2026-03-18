@@ -21,7 +21,7 @@ export const extraExercises: ExtraExercise[] = [
     description:
       "Spelarna joggar runt planen i en stor cirkel och utför rörelser med bollen på kommando: dribbla med höger hand, dribbla med vänster hand, håll bollen högt, kasta bollen upp och fånga, dribbla under benet. Tränaren varierar kommandona var 15:e sekund.",
     tips:
-      "Håll tempot uppe och se till att spelarna lyfter blicken under dribbling. Rörelserutiner med boll är ett effektivt sätt att aktivera kroppen och simultaneously repetera grundläggande bollhantering.",
+      "Håll tempot uppe och se till att spelarna lyfter blicken under dribbling. Rörelserutiner med boll är ett effektivt sätt att aktivera kroppen och samtidigt repetera grundläggande bollhantering.",
     durationMinutes: 8,
     intensityLevel: 1,
     tags: ["uppvärmning", "dribbling"],
@@ -286,7 +286,7 @@ export const extraExercises: ExtraExercise[] = [
   {
     name: "Enkel zonoffensiv mot 2-3",
     description:
-      "Laget lär sig grundläggande attack mot 2-3 zon: snabba pass, spela in i mitten, spelaren i fri lucka under gett ett skottmöjlighet. Börja med genombandning (walk-through) utan försvar, sedan mot passivt försvar.",
+      "Laget lär sig grundläggande attack mot 2-3 zon: snabba pass, spela in i mitten, spelaren i fri lucka som ger ett skottmöjlighet. Börja med genombandning (walk-through) utan försvar, sedan mot passivt försvar.",
     tips:
       "Mot zonen gäller: passa snabbt för att röra på zonen, håll ihop i offensivpositioner, spela in i 'the gap' (lucka i zonen). Undvik att hålla bollen länge.",
     durationMinutes: 15,

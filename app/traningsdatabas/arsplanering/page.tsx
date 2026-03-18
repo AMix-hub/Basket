@@ -120,7 +120,7 @@ export default function ArsplaneringPage() {
       setLoadingPlans(false);
     });
     return () => unsub();
-  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [team]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Team custom exercises ────────────────────────────────────────────────
   const [teamExercises, setTeamExercises] = useState<TeamExercise[]>([]);
@@ -142,7 +142,7 @@ export default function ArsplaneringPage() {
       );
     });
     return () => unsub();
-  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [team]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── All browsable exercises (db + extra + custom) ────────────────────────
   const allBrowsable = useMemo<BrowsableExercise[]>(() => {

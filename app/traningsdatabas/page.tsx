@@ -112,7 +112,7 @@ export default function TraningsdatabasPage() {
       );
     });
     return () => unsub();
-  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [team]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetExerciseForm = () => {
     setNewExName("");
