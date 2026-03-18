@@ -584,7 +584,7 @@ export default function AdminPage() {
               📷 Välj bild
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
+                accept="image/*"
                 className="hidden"
                 disabled={logoUploading}
                 onChange={handleLogoFileSelect}
