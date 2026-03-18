@@ -32,32 +32,51 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/teams/$(teamId)).data;
     }
 
+    // Returns the effective admin ID for the current user: for co-admins this
+    // is their stored adminId (pointing to the root admin); for root admins it
+    // is their own UID.  Used to scope all club-level Firestore operations.
+    function effectiveAdminId() {
+      let p = getProfile(request.auth.uid);
+      return p.adminId != null ? p.adminId : request.auth.uid;
+    }
+
     // ─── profiles ────────────────────────────────────────────────
     // Public read (needed for invite-code validation before sign-up).
-    // Each user manages only their own row.
+    // Each user manages only their own row; club admins can also manage
+    // the profiles of users in their club (e.g. role / adminId updates).
     match /profiles/{userId} {
       allow read: if true;
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId);
+      allow update: if isSignedIn() && (
+        isOwner(userId) ||
+        // Club admin (root or co-admin) can update profiles of their members
+        (userRole() == 'admin' && resource.data.adminId == effectiveAdminId())
+      );
     }
 
     // ─── teams ───────────────────────────────────────────────────
     // Public read (invite-code validation).
     // Authenticated users can create teams.
-    // Only coach or admin can update their own team.
+    // Only coach or admin (including co-admin) can update their own team.
     match /teams/{teamId} {
       allow read: if true;
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         resource.data.coachId == request.auth.uid ||
-        resource.data.adminId == request.auth.uid
+        resource.data.adminId == request.auth.uid ||
+        // Co-admin: effectiveAdminId resolves to the club's root admin
+        (userRole() == 'admin' && resource.data.adminId == effectiveAdminId())
       );
-      allow delete: if isSignedIn() && resource.data.adminId == request.auth.uid;
+      allow delete: if isSignedIn() && (
+        resource.data.adminId == request.auth.uid ||
+        (userRole() == 'admin' && resource.data.adminId == effectiveAdminId())
+      );
     }
 
     // ─── team_members ─────────────────────────────────────────────
     // Authenticated users can read all memberships.
-    // Users can add themselves, or a coach can add the admin of a team they coach.
+    // Users can add themselves, or a coach can add the admin of a team they
+    // coach, or an admin can add any member to their club's teams.
     match /team_members/{docId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (
@@ -68,10 +87,21 @@ service cloud.firestore {
           request.resource.data.userId == getTeamData(request.resource.data.teamId).adminId
           && getTeamData(request.resource.data.teamId).coachId == request.auth.uid
         )
+        ||
+        // Admin (root or co-admin) can add members to their club's teams
+        (
+          userRole() == 'admin' &&
+          getTeamData(request.resource.data.teamId).adminId == effectiveAdminId()
+        )
       );
       allow delete: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
-        isTeamMember(resource.data.teamId)
+        isTeamMember(resource.data.teamId) ||
+        // Admin can remove members from their club's teams
+        (
+          userRole() == 'admin' &&
+          getTeamData(resource.data.teamId).adminId == effectiveAdminId()
+        )
       );
     }
 
@@ -167,30 +197,40 @@ service cloud.firestore {
     // ─── halls ────────────────────────────────────────────────────
     // Admins manage halls for their association. All signed-in users can read
     // (needed for calendar hall selection by coaches).
+    // Co-admins store and query halls under the root admin's ID (effectiveAdminId).
     match /halls/{hallId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() &&
-        request.resource.data.adminId == request.auth.uid &&
-        userRole() == 'admin';
-      allow update: if isSignedIn() &&
-        resource.data.adminId == request.auth.uid;
-      allow delete: if isSignedIn() &&
-        resource.data.adminId == request.auth.uid;
+        userRole() == 'admin' &&
+        request.resource.data.adminId == effectiveAdminId();
+      allow update: if isSignedIn() && (
+        resource.data.adminId == request.auth.uid ||
+        (userRole() == 'admin' && resource.data.adminId == effectiveAdminId())
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.adminId == request.auth.uid ||
+        (userRole() == 'admin' && resource.data.adminId == effectiveAdminId())
+      );
     }
 
     // ─── training_free_periods ────────────────────────────────────
     // Admins create/manage training-free periods (holidays).
     // All signed-in users can read (needed for calendar display and
     // recurring session generation).
+    // Co-admins store and query periods under the root admin's ID.
     match /training_free_periods/{periodId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() &&
-        request.resource.data.adminId == request.auth.uid &&
-        userRole() == 'admin';
-      allow update: if isSignedIn() &&
-        resource.data.adminId == request.auth.uid;
-      allow delete: if isSignedIn() &&
-        resource.data.adminId == request.auth.uid;
+        userRole() == 'admin' &&
+        request.resource.data.adminId == effectiveAdminId();
+      allow update: if isSignedIn() && (
+        resource.data.adminId == request.auth.uid ||
+        (userRole() == 'admin' && resource.data.adminId == effectiveAdminId())
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.adminId == request.auth.uid ||
+        (userRole() == 'admin' && resource.data.adminId == effectiveAdminId())
+      );
     }
 
     // ─── session_notes ────────────────────────────────────────────

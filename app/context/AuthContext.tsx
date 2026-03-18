@@ -362,10 +362,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Co-admins have adminId pointing to the original club admin; use that
         // to find the right club teams. Root admins have adminId = null so fall
         // back to their own id.
-        const effectiveAdminId = profileData.adminId ?? authId;
-        const adminTeamsSnap = await getDocs(
+        let effectiveAdminId = profileData.adminId ?? authId;
+        let adminTeamsSnap = await getDocs(
           query(collection(db, "teams"), where("adminId", "==", effectiveAdminId))
         );
+
+        /* Self-healing for promoted admins: if their profile has no adminId set
+         * (toggleRole bug – adminId was never written) and no teams are found
+         * under their own ID, infer the club's root admin from the teams they
+         * are already enrolled in.  Then persist the correct adminId so all
+         * subsequent club-scoped queries resolve correctly. */
+        if (adminTeamsSnap.empty && !profileData.adminId) {
+          const memberTeamIdsArray = [...memberTeamIdsSet];
+          if (memberTeamIdsArray.length > 0) {
+            const memberTeamSnaps = await Promise.all(
+              memberTeamIdsArray.map((tid) => getDoc(doc(db, "teams", tid)))
+            );
+            const inferredAdminId = memberTeamSnaps
+              .filter((s) => s.exists())
+              .map((s) => (s.data() as DbTeam).adminId)
+              .find((id) => id && id !== authId);
+            if (inferredAdminId) {
+              // Fix the profile so future logins resolve correctly (admin can
+              // always update their own profile document).
+              await updateDoc(doc(db, "profiles", authId), {
+                adminId: inferredAdminId,
+              });
+              profileData = { ...profileData, adminId: inferredAdminId };
+              effectiveAdminId = inferredAdminId;
+              adminTeamsSnap = await getDocs(
+                query(
+                  collection(db, "teams"),
+                  where("adminId", "==", effectiveAdminId)
+                )
+              );
+            } else {
+              // All enrolled teams have adminId === authId: this admin created
+              // their own teams and is a root admin – no healing needed.
+              console.warn(
+                "[loadProfile] Admin has no teams under own ID and no " +
+                "inferrable club admin from memberships. User may not have " +
+                "been properly linked to a club.",
+                authId
+              );
+            }
+          }
+        }
+
         for (const teamDoc of adminTeamsSnap.docs) {
           if (!memberTeamIdsSet.has(teamDoc.id)) {
             await setDoc(doc(db, "team_members", `${teamDoc.id}_${authId}`), {
