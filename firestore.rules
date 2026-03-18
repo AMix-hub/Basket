@@ -214,8 +214,24 @@ service cloud.firestore {
         isCoachOrAbove();
     }
 
-    // ─── player_groups ────────────────────────────────────────────
-    // Groups of players within a team. Readable by all team members;
+    // ─── custom_season_plans ──────────────────────────────────────
+    // Coaches/admins can create and manage their own annual training
+    // plans, built from exercises in the training database.
+    // Readable by all team members; writable by coach+.
+    match /custom_season_plans/{planId} {
+      allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
+      allow create: if isSignedIn() &&
+        isTeamMember(request.resource.data.teamId) &&
+        isCoachOrAbove();
+      allow update: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
+        isCoachOrAbove();
+      allow delete: if isSignedIn() &&
+        isTeamMember(resource.data.teamId) &&
+        isCoachOrAbove();
+    }
+
+    // ─── player_groups ────────────────────────────────────────────    // Groups of players within a team. Readable by all team members;
     // creatable/updatable/deletable by coaches and admins.
     match /player_groups/{groupId} {
       allow read: if isSignedIn() && isTeamMember(resource.data.teamId);

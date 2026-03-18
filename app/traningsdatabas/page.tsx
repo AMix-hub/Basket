@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { getSport } from "../../lib/sports";
@@ -9,6 +9,28 @@ import type { ExerciseTag } from "../data/types";
 import { year1Plan } from "../data/year1";
 import { year2Plan } from "../data/year2";
 import { year3Plan } from "../data/year3";
+import { extraExercises } from "../data/extraExercises";
+import {
+  collection,
+  query,
+  where,
+  doc,
+  addDoc,
+  deleteDoc,
+  onSnapshot,
+} from "firebase/firestore";
+import { db } from "../../lib/firebaseClient";
+
+interface TeamExercise {
+  id: string;
+  name: string;
+  description: string;
+  tips?: string;
+  durationMinutes?: number;
+  intensityLevel?: 1 | 2 | 3;
+  createdBy: string;
+  createdAt: string;
+}
 
 const yearPlans = [
   {
@@ -50,13 +72,83 @@ const yearPlans = [
 ];
 
 export default function TraningsdatabasPage() {
-  const { user } = useAuth();
+  const { user, getMyTeam } = useAuth();
+  const team = getMyTeam();
   const sportId = user?.sport ?? "basket";
   const sport = getSport(sportId);
+
+  const canEdit =
+    user?.roles.some((r) => r === "coach" || r === "admin" || r === "assistant") ?? false;
 
   const [activeTag, setActiveTag] = useState<ExerciseTag | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
+
+  // ── Custom exercises (team-specific) ──────────────────────────────────────
+  const [teamExercises, setTeamExercises] = useState<TeamExercise[]>([]);
+  const [showAddExercise, setShowAddExercise] = useState(false);
+  const [newExName, setNewExName] = useState("");
+  const [newExDesc, setNewExDesc] = useState("");
+  const [newExTips, setNewExTips] = useState("");
+  const [newExDuration, setNewExDuration] = useState("");
+  const [newExIntensity, setNewExIntensity] = useState<1 | 2 | 3 | "">("");
+  const [savingExercise, setSavingExercise] = useState(false);
+
+  useEffect(() => {
+    if (!team) return;
+    const q = query(collection(db, "team_exercises"), where("teamId", "==", team.id));
+    const unsub = onSnapshot(q, (snap) => {
+      setTeamExercises(
+        snap.docs.map((d) => ({
+          id: d.id,
+          name: d.data().name as string,
+          description: (d.data().description as string) ?? "",
+          tips: (d.data().tips as string | undefined) ?? undefined,
+          durationMinutes: (d.data().durationMinutes as number | undefined) ?? undefined,
+          intensityLevel: (d.data().intensityLevel as 1 | 2 | 3 | undefined) ?? undefined,
+          createdBy: d.data().createdBy as string,
+          createdAt: d.data().createdAt as string,
+        }))
+      );
+    });
+    return () => unsub();
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const resetExerciseForm = () => {
+    setNewExName("");
+    setNewExDesc("");
+    setNewExTips("");
+    setNewExDuration("");
+    setNewExIntensity("");
+    setShowAddExercise(false);
+  };
+
+  const saveCustomExercise = async () => {
+    if (!team || !user || !newExName.trim()) return;
+    const parsedDuration = newExDuration ? parseInt(newExDuration, 10) : null;
+    setSavingExercise(true);
+    try {
+      await addDoc(collection(db, "team_exercises"), {
+        teamId: team.id,
+        name: newExName.trim(),
+        description: newExDesc.trim(),
+        tips: newExTips.trim() || null,
+        durationMinutes:
+          parsedDuration !== null && !isNaN(parsedDuration) ? parsedDuration : null,
+        intensityLevel: newExIntensity || null,
+        createdBy: user.id,
+        createdAt: new Date().toISOString(),
+      });
+      resetExerciseForm();
+    } finally {
+      setSavingExercise(false);
+    }
+  };
+
+  const deleteCustomExercise = async (id: string) => {
+    if (!canEdit) return;
+    await deleteDoc(doc(db, "team_exercises", id));
+  };
 
   function yearHref(year: number) {
     if (sportId === "basket") return `/ar${year}`;
@@ -64,26 +156,61 @@ export default function TraningsdatabasPage() {
   }
 
   // Build a flat list of all exercises across all year plans with their context
-  const allExercises = useMemo(() => {
+  const yearPlanExercises = useMemo(() => {
     const plans = [year1Plan, year2Plan, year3Plan];
     return plans.flatMap((plan) =>
       plan.sessions.flatMap((session) =>
         session.activities.map((activity) => ({
           ...activity,
           computedTags: autoTag(activity),
-          planYear: plan.year,
+          planYear: plan.year as number,
           sessionNumber: session.number,
           sessionTitle: session.title,
+          source: "year" as const,
         }))
       )
     );
   }, []);
 
+  // Extra exercises (from training resources)
+  const extraExerciseItems = useMemo(() => {
+    return extraExercises.map((ex) => ({
+      ...ex,
+      computedTags: autoTag(ex),
+      planYear: undefined as number | undefined,
+      sessionNumber: undefined as number | undefined,
+      sessionTitle: ex.source ?? "Extra övningar",
+      source: "extra" as const,
+    }));
+  }, []);
+
+  // Team's custom exercises
+  const customExerciseItems = useMemo(() => {
+    return teamExercises.map((ex) => ({
+      name: ex.name,
+      description: ex.description,
+      tips: ex.tips,
+      durationMinutes: ex.durationMinutes,
+      intensityLevel: ex.intensityLevel,
+      computedTags: autoTag({ name: ex.name, description: ex.description }),
+      planYear: undefined as number | undefined,
+      sessionNumber: undefined as number | undefined,
+      sessionTitle: "Egna övningar",
+      source: "custom" as const,
+      id: ex.id,
+    }));
+  }, [teamExercises]);
+
+  // All exercises combined
+  const allExercises = useMemo(
+    () => [...yearPlanExercises, ...extraExerciseItems, ...customExerciseItems],
+    [yearPlanExercises, extraExerciseItems, customExerciseItems]
+  );
+
   // Filter exercises by active tag and/or search query
   const filteredExercises = useMemo(() => {
     return allExercises.filter((ex) => {
-      const matchesTag =
-        !activeTag || ex.computedTags.includes(activeTag);
+      const matchesTag = !activeTag || ex.computedTags.includes(activeTag);
       const matchesSearch =
         !searchQuery.trim() ||
         ex.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -129,8 +256,8 @@ export default function TraningsdatabasPage() {
             Träningsdatabas<br className="hidden sm:block" /> – {sport.name}
           </h1>
           <p className="text-slate-300 text-lg max-w-xl mx-auto leading-relaxed">
-            Välj säsongsår för att bläddra i träningspassen, eller filtrera övningar
-            direkt med Smart-Tagging.
+            Välj säsongsår, filtrera med Smart-Tagging, skapa egna övningar eller
+            bygg din egna årsplanering.
           </p>
           <div className="flex justify-center gap-6 mt-8 text-slate-400 text-sm">
             <div className="flex flex-col items-center gap-1">
@@ -147,6 +274,22 @@ export default function TraningsdatabasPage() {
               <span className="text-2xl font-bold text-white">{allExercises.length}</span>
               <span>övningar totalt</span>
             </div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-3 mt-6">
+            <Link
+              href="/traningsdatabas/arsplanering"
+              className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+            >
+              📋 Mina årsplaneringar
+            </Link>
+            {canEdit && (
+              <button
+                onClick={() => setShowAddExercise(true)}
+                className="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors border border-slate-600"
+              >
+                ➕ Skapa egen övning
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -215,7 +358,7 @@ export default function TraningsdatabasPage() {
                   {filteredExercises.length} övning{filteredExercises.length !== 1 ? "ar" : ""} hittades
                 </p>
                 {filteredExercises.map((ex) => {
-                  const key = `${ex.planYear}-${ex.sessionNumber}-${ex.name}`;
+                  const key = `${ex.source}-${ex.planYear ?? "x"}-${ex.sessionNumber ?? "x"}-${ex.name}`;
                   const isExpanded = expandedActivity === key;
                   return (
                     <div
@@ -230,7 +373,9 @@ export default function TraningsdatabasPage() {
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-slate-200 text-sm">{ex.name}</p>
                             <p className="text-xs text-slate-400 mt-0.5">
-                              År {ex.planYear} · {ex.sessionTitle}
+                              {ex.source === "year"
+                                ? `År ${ex.planYear} · ${ex.sessionTitle}`
+                                : ex.sessionTitle}
                             </p>
                           </div>
                           <div className="flex items-center gap-1 flex-wrap shrink-0">
@@ -271,12 +416,26 @@ export default function TraningsdatabasPage() {
                                 {"🔥".repeat(ex.intensityLevel)} Intensitet {ex.intensityLevel}/3
                               </span>
                             )}
-                            <Link
-                              href={yearHref(ex.planYear)}
-                              className="ml-auto text-xs font-semibold text-orange-600 hover:underline"
-                            >
-                              Se träningspass {ex.sessionNumber} →
-                            </Link>
+                            {ex.source === "year" && ex.planYear && ex.sessionNumber && (
+                              <Link
+                                href={yearHref(ex.planYear)}
+                                className="ml-auto text-xs font-semibold text-orange-600 hover:underline"
+                              >
+                                Se träningspass {ex.sessionNumber} →
+                              </Link>
+                            )}
+                            {ex.source === "custom" && canEdit && (
+                              <button
+                                onClick={() =>
+                                  deleteCustomExercise(
+                                    (ex as typeof ex & { id?: string }).id ?? ""
+                                  )
+                                }
+                                className="ml-auto text-xs text-red-400 hover:text-red-300"
+                              >
+                                Ta bort
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -345,12 +504,12 @@ export default function TraningsdatabasPage() {
         ))}
       </div>
 
-      {/* Info section */}
+      {/* ── Info section ────────────────────────────────────── */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8">
         <h2 className="text-xl font-bold text-slate-100 mb-6">
           Schemalägg träningar direkt från planen
         </h2>
-        <div className="grid sm:grid-cols-3 gap-6 text-sm text-slate-600">
+        <div className="grid sm:grid-cols-4 gap-6 text-sm text-slate-600">
           <div className="flex gap-4">
             <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-xl shrink-0">
               📚
@@ -386,8 +545,116 @@ export default function TraningsdatabasPage() {
               </p>
             </div>
           </div>
+          <div className="flex gap-4">
+            <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-xl shrink-0">
+              📋
+            </div>
+            <div>
+              <p className="font-semibold text-slate-200 mb-1">Egna årsplaneringar</p>
+              <p>
+                Bygg en skräddarsydd plan med övningar du väljer ur databasen.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* ── Create Custom Exercise Modal ─────────────────────── */}
+      {showAddExercise && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-white mb-5">Skapa egen övning</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Namn *
+                </label>
+                <input
+                  type="text"
+                  value={newExName}
+                  onChange={(e) => setNewExName(e.target.value)}
+                  placeholder="T.ex. Rörelselekar med boll"
+                  className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Beskrivning *
+                </label>
+                <textarea
+                  value={newExDesc}
+                  onChange={(e) => setNewExDesc(e.target.value)}
+                  placeholder="Beskriv hur övningen genomförs…"
+                  rows={3}
+                  className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Coachetips
+                </label>
+                <textarea
+                  value={newExTips}
+                  onChange={(e) => setNewExTips(e.target.value)}
+                  placeholder="Valfria tips till tränaren…"
+                  rows={2}
+                  className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    Tid (min)
+                  </label>
+                  <input
+                    type="number"
+                    value={newExDuration}
+                    onChange={(e) => setNewExDuration(e.target.value)}
+                    placeholder="T.ex. 10"
+                    min={1}
+                    max={120}
+                    className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    Intensitet
+                  </label>
+                  <select
+                    value={newExIntensity}
+                    onChange={(e) =>
+                      setNewExIntensity(
+                        e.target.value === "" ? "" : (Number(e.target.value) as 1 | 2 | 3)
+                      )
+                    }
+                    className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="">Välj…</option>
+                    <option value={1}>🔥 Låg (1)</option>
+                    <option value={2}>🔥🔥 Medel (2)</option>
+                    <option value={3}>🔥🔥🔥 Hög (3)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={resetExerciseForm}
+                className="flex-1 py-2.5 text-sm font-semibold text-slate-400 border border-slate-600 rounded-xl hover:bg-slate-700 transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={saveCustomExercise}
+                disabled={!newExName.trim() || !newExDesc.trim() || savingExercise}
+                className="flex-1 py-2.5 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingExercise ? "Sparar…" : "Spara övning"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
