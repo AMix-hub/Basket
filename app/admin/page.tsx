@@ -234,7 +234,7 @@ export default function AdminPage() {
       await addDoc(collection(db, "halls"), {
         name: newHallName.trim(),
         address: newHallAddress.trim() || null,
-        adminId: user.id,
+        adminId: user.adminId ?? user.id,
         createdAt: new Date().toISOString(),
       });
       setNewHallName("");
@@ -268,7 +268,7 @@ export default function AdminPage() {
         name: newPeriodName.trim(),
         startDate: newPeriodStart,
         endDate: newPeriodEnd,
-        adminId: user.id,
+        adminId: user.adminId ?? user.id,
         createdAt: new Date().toISOString(),
       });
       setNewPeriodName("");
@@ -342,6 +342,12 @@ export default function AdminPage() {
       await updateDoc(doc(db, "profiles", member.id), {
         roles: newRoles,
         role: primary,
+        // When promoting to admin, set adminId so the co-admin's
+        // effectiveAdminId resolves to the club's root admin and all
+        // club-scoped queries (teams, registret) work correctly.
+        ...(checked && role === "admin" && user
+          ? { adminId: user.adminId ?? user.id }
+          : {}),
       });
 
       // Auto-enroll in all teams if the member is being given the "admin" role
