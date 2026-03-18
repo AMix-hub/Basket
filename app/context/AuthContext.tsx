@@ -32,6 +32,22 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getToken } from "firebase/messaging";
 import type { SportId } from "../../lib/sports";
 
+/* ─── Image upload helpers ───────────────────────────────────── */
+
+/** Regex that matches known image file extensions (covers gallery files that
+ *  may report an empty MIME type, e.g. HEIC photos on iOS). */
+const KNOWN_IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|heic|heif|bmp|svg|avif|tiff?)$/i;
+
+/** Maps lowercase file extensions to their MIME types.  Used to supply an
+ *  explicit contentType when uploading files whose `file.type` is empty,
+ *  ensuring Firebase Storage rules (`contentType.matches('image/.*')`) pass. */
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+  gif: "image/gif", webp: "image/webp", heic: "image/heic",
+  heif: "image/heif", bmp: "image/bmp", avif: "image/avif",
+  tiff: "image/tiff", tif: "image/tiff", svg: "image/svg+xml",
+};
+
 /* ─── Types ──────────────────────────────────────────────── */
 
 export type UserRole = "admin" | "coach" | "assistant" | "parent" | "player";
@@ -747,8 +763,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return "Du måste vara inloggad.";
     if (!user.roles.includes("admin")) return "Endast admins kan ladda upp klubblogga.";
 
-    /* Validate file type */
-    if (!file.type.startsWith("image/")) {
+    /* Validate file type – allow common image MIME types and gallery files
+       that may report an empty type (e.g. HEIC on iOS). */
+    const isImage =
+      file.type.startsWith("image/") ||
+      (!file.type && KNOWN_IMAGE_EXT_RE.test(file.name));
+    if (!isImage) {
       return "Endast bildfiler (JPG, PNG, GIF, WebP) accepteras.";
     }
     /* Validate file size (max 2 MB) */
@@ -757,12 +777,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const ext = file.name.split(".").pop() ?? "png";
+      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
       const storageRef = ref(storage, `clubLogos/${user.id}/logo.${ext}`);
+
+      /* Ensure content type is set – mobile gallery files can have an empty
+         file.type (e.g. HEIC on iOS), which would fail Firebase Storage rules
+         that require contentType.matches('image/.*'). */
+      const contentType = file.type || EXT_TO_MIME[ext] || "image/jpeg";
 
       /* Wrap upload in a 30-second timeout to avoid infinite spinner */
       const uploadWithTimeout = Promise.race([
-        uploadBytes(storageRef, file),
+        uploadBytes(storageRef, file, { contentType }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Upload timeout after 30 s")), 30_000)
         ),
@@ -880,7 +905,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateAvatar = async (file: File): Promise<string | null> => {
     if (!user) return "Du måste vara inloggad.";
 
-    if (!file.type.startsWith("image/")) {
+    /* Validate file type – allow common image MIME types and gallery files
+       that may report an empty type (e.g. HEIC on iOS). */
+    const isImage =
+      file.type.startsWith("image/") ||
+      (!file.type && KNOWN_IMAGE_EXT_RE.test(file.name));
+    if (!isImage) {
       return "Endast bildfiler (JPG, PNG, GIF, WebP) accepteras.";
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -888,11 +918,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const ext = file.name.split(".").pop() ?? "png";
+      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
       const storageRef = ref(storage, `avatars/${user.id}/avatar.${ext}`);
 
+      /* Ensure content type is set – mobile gallery files can have an empty
+         file.type (e.g. HEIC on iOS), which would fail Firebase Storage rules. */
+      const contentType = file.type || EXT_TO_MIME[ext] || "image/jpeg";
+
       const uploadWithTimeout = Promise.race([
-        uploadBytes(storageRef, file),
+        uploadBytes(storageRef, file, { contentType }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Upload timeout after 30 seconds")), 30_000)
         ),
