@@ -29,7 +29,7 @@ function decodeEntities(s: string): string {
  */
 function stripAndDecode(raw: string): string {
   // Unwrap CDATA sections first
-  let text = raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+  const text = raw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
 
   // Walk the string and collect only characters outside of < ... > regions
   let result = "";
@@ -71,6 +71,27 @@ function extractAttr(xml: string, tag: string, attr: string): string {
   return attrMatch ? attrMatch[1] : "";
 }
 
+/**
+ * Titles that indicate a UI element rather than a real news article
+ * (cookie consent banners, GDPR notices, newsletter sign-up blocks, etc.).
+ * Compared case-insensitively against the stripped article title.
+ */
+const NON_NEWS_TITLE_PATTERNS = [
+  /godkänn kakor/i,
+  /acceptera kakor/i,
+  /cookie(s)? (policy|consent|inställningar|notice)/i,
+  /accept (all )?cookies?/i,
+  /we use cookies/i,
+  /privacy (policy|notice)/i,
+  /integritetspolicy/i,
+  /prenumerera på nyhetsbrev/i,
+  /subscribe to (our )?newsletter/i,
+];
+
+function isNonNewsTitle(title: string): boolean {
+  return NON_NEWS_TITLE_PATTERNS.some((re) => re.test(title));
+}
+
 /** Parse an RSS/Atom feed XML string into NewsItems. */
 function parseRss(xml: string): NewsItem[] {
   const items: NewsItem[] = [];
@@ -109,7 +130,9 @@ function parseRss(xml: string): NewsItem[] {
     }
 
     if (title) {
-      items.push({ title, link, description, pubDate, imageUrl: imageUrl || undefined });
+      if (!isNonNewsTitle(title)) {
+        items.push({ title, link, description, pubDate, imageUrl: imageUrl || undefined });
+      }
     }
   }
 
@@ -174,6 +197,7 @@ async function scrapeHtml(pageUrl: string): Promise<NewsItem[]> {
     if (!headingMatch) continue;
     const title = stripAndDecode(headingMatch[1]);
     if (!title) continue;
+    if (isNonNewsTitle(title)) continue;
 
     // Try to find a link
     const linkMatch = /href=["']([^"'#][^"']*?)["']/i.exec(block);
