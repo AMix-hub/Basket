@@ -13,6 +13,7 @@ import { getSport } from "../../lib/sports";
 const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }[] = [
   { href: "/taktik", label: "Taktiktavla", restrictedRoles: [] },
   { href: "/kalender", label: "Kalender", restrictedRoles: [] },
+  { href: "/nyheter", label: "Nyheter", restrictedRoles: [] },
   { href: "/traningsdatabas", label: "Träningsdatabas", restrictedRoles: ["player", "parent"] },
   { href: "/statistik", label: "Statistik", restrictedRoles: ["player", "parent"] },
   { href: "/videor", label: "Videor", restrictedRoles: [] },
