@@ -18,14 +18,6 @@ interface Player {
   y: number;
 }
 
-interface Arrow {
-  id: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-}
-
 type DrawingType = "arrow" | "dashed" | "circle" | "rect" | "zone";
 
 interface Drawing {
@@ -39,12 +31,19 @@ interface Drawing {
   points?: { x: number; y: number }[];
 }
 
+/** One step in a multi-step tactic (mirrors taktik/page.tsx) */
+interface Step {
+  id: string;
+  players: Player[];
+  drawings: Drawing[];
+}
+
 interface LiveState {
   teamId: string;
   players: Player[];
-  arrows?: Arrow[];
   drawings?: Drawing[];
-  steps?: unknown[];
+  /** Multi-step tactic array written by taktik/page.tsx */
+  steps?: Step[];
   animationPlaying: boolean;
   animationStartTime: string | null;
 }
@@ -67,38 +66,12 @@ const TP3_Y2 = 397;
 const TP3_R = 181;
 const L_TP3_X = 130;
 const R_TP3_X = 630;
-const ANIMATION_DURATION = 1600;
+/** Must match ANIM_MS in taktik/page.tsx */
+const ANIM_MS = 1200;
 
 /* ─── Animation helpers ──────────────────────────────────────── */
 function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-
-function buildArrowPlayerMap(
-  arrows: Arrow[],
-  players: Player[]
-): Map<string, string> {
-  const map = new Map<string, string>();
-  const used = new Set<string>();
-  for (const arrow of arrows) {
-    let minDist = 55;
-    let nearest: Player | null = null;
-    for (const p of players) {
-      if (used.has(p.id)) continue;
-      const dx = p.x - arrow.x1;
-      const dy = p.y - arrow.y1;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = p;
-      }
-    }
-    if (nearest) {
-      map.set(arrow.id, nearest.id);
-      used.add(nearest.id);
-    }
-  }
-  return map;
 }
 
 /* ─── SVG marker defs ────────────────────────────────────────── */
@@ -165,7 +138,6 @@ function CastBoard() {
   const teamName = searchParams.get("name") ?? "";
 
   const [players, setPlayers] = useState<Player[]>([]);
-  const [arrows, setArrows] = useState<Arrow[]>([]);
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [animPos, setAnimPos] = useState<
     Map<string, { x: number; y: number }>
@@ -174,59 +146,91 @@ function CastBoard() {
   const [connected, setConnected] = useState(false);
 
   const animFrameRef = useRef<number>(0);
+  const animStateRef = useRef<{
+    isPlaying: boolean;
+    stepIdx: number;
+    stepStart: number;
+    steps: Step[];
+  }>({ isPlaying: false, stepIdx: 0, stepStart: 0, steps: [] });
 
-  /* ─── Animation engine (same logic as taktik/page.tsx) ─────── */
-  const startAnimationAt = useCallback(
-    (offsetMs: number, sourcePlayers: Player[], sourceArrows: Arrow[]) => {
+  /* ─── Step-based animation engine (mirrors taktik/page.tsx) ─── */
+  const startAnimation = useCallback(
+    (offsetMs: number, liveSteps: Step[]) => {
       cancelAnimationFrame(animFrameRef.current);
+      animStateRef.current.isPlaying = false;
 
-      const arrowPlayerMap = buildArrowPlayerMap(sourceArrows, sourcePlayers);
-      if (arrowPlayerMap.size === 0) return;
+      if (liveSteps.length < 2) return;
 
-      /* If animation already finished, settle players immediately */
-      if (offsetMs >= ANIMATION_DURATION) {
-        setPlayers(
-          sourcePlayers.map((p) => {
-            const arrowId = [...arrowPlayerMap.entries()].find(
-              ([, pid]) => pid === p.id
-            )?.[0];
-            if (!arrowId) return p;
-            const arrow = sourceArrows.find((a) => a.id === arrowId);
-            return arrow ? { ...p, x: arrow.x2, y: arrow.y2 } : p;
-          })
-        );
+      const total = (liveSteps.length - 1) * ANIM_MS;
+
+      /* Animation already finished — jump to final step */
+      if (offsetMs >= total) {
+        const lastStep = liveSteps[liveSteps.length - 1];
+        setPlayers(lastStep.players);
+        setDrawings(lastStep.drawings);
+        setAnimPos(new Map());
+        setIsAnimating(false);
         return;
       }
 
-      const startTime = performance.now() - offsetMs;
+      const si = Math.min(Math.floor(offsetMs / ANIM_MS), liveSteps.length - 2);
+      const stepElapsed = offsetMs - si * ANIM_MS;
+      const now = performance.now();
+
+      animStateRef.current = {
+        isPlaying: true,
+        stepIdx: si,
+        stepStart: now - stepElapsed,
+        steps: liveSteps,
+      };
       setIsAnimating(true);
 
-      const tick = (now: number) => {
-        const raw = Math.min((now - startTime) / ANIMATION_DURATION, 1);
+      const tick = (ts: number) => {
+        const state = animStateRef.current;
+        if (!state.isPlaying) return;
+
+        const fromStep = state.steps[state.stepIdx];
+        const toStep = state.steps[state.stepIdx + 1];
+        const elapsed = ts - state.stepStart;
+        const raw = Math.min(elapsed / ANIM_MS, 1);
         const t = easeInOut(raw);
 
+        /* Show drawings from the step being animated away from */
+        setDrawings(fromStep.drawings);
+        /* Update base players so newly added players are visible */
+        setPlayers(fromStep.players);
+
+        /* Interpolate each player toward its position in the next step */
         const newPos = new Map<string, { x: number; y: number }>();
-        for (const [arrowId, playerId] of arrowPlayerMap) {
-          const arrow = sourceArrows.find((a) => a.id === arrowId);
-          if (!arrow) continue;
-          newPos.set(playerId, {
-            x: arrow.x1 + (arrow.x2 - arrow.x1) * t,
-            y: arrow.y1 + (arrow.y2 - arrow.y1) * t,
+        for (const from of fromStep.players) {
+          const to = toStep.players.find((p) => p.id === from.id);
+          newPos.set(from.id, {
+            x: from.x + ((to?.x ?? from.x) - from.x) * t,
+            y: from.y + ((to?.y ?? from.y) - from.y) * t,
           });
         }
         setAnimPos(newPos);
 
-        if (raw < 1) {
-          animFrameRef.current = requestAnimationFrame(tick);
+        if (raw >= 1) {
+          if (state.stepIdx < state.steps.length - 2) {
+            /* Advance to next step-to-step transition */
+            animStateRef.current = {
+              ...state,
+              stepIdx: state.stepIdx + 1,
+              stepStart: ts,
+            };
+            animFrameRef.current = requestAnimationFrame(tick);
+          } else {
+            /* All steps done */
+            animStateRef.current.isPlaying = false;
+            const lastStep = state.steps[state.steps.length - 1];
+            setPlayers(lastStep.players);
+            setDrawings(lastStep.drawings);
+            setAnimPos(new Map());
+            setIsAnimating(false);
+          }
         } else {
-          setPlayers((prev) =>
-            prev.map((p) => {
-              const pos = newPos.get(p.id);
-              return pos ? { ...p, x: pos.x, y: pos.y } : p;
-            })
-          );
-          setAnimPos(new Map());
-          setIsAnimating(false);
+          animFrameRef.current = requestAnimationFrame(tick);
         }
       };
 
@@ -248,18 +252,19 @@ function CastBoard() {
         if (cancelled || !snap.exists()) return;
 
         const live = snap.data() as LiveState;
+        const liveSteps = (live.steps ?? []) as Step[];
+
         setPlayers(live.players ?? []);
-        setArrows(live.arrows ?? []);
         setDrawings(live.drawings ?? []);
+        setConnected(true);
 
-        if (!connected) setConnected(true);
-
-        if (live.animationPlaying && live.animationStartTime) {
+        if (live.animationPlaying && live.animationStartTime && liveSteps.length >= 2) {
           const elapsed =
             Date.now() - new Date(live.animationStartTime).getTime();
-          startAnimationAt(elapsed, live.players ?? [], live.arrows ?? []);
+          startAnimation(elapsed, liveSteps);
         } else if (!live.animationPlaying) {
           cancelAnimationFrame(animFrameRef.current);
+          animStateRef.current.isPlaying = false;
           setIsAnimating(false);
           setAnimPos(new Map());
         }
@@ -271,7 +276,7 @@ function CastBoard() {
       unsubscribe();
       cancelAnimationFrame(animFrameRef.current);
     };
-  }, [teamId, startAnimationAt]);
+  }, [teamId, startAnimation]);
 
   /* ─── No team ID ─────────────────────────────────────────────── */
   if (!teamId) {
@@ -360,21 +365,6 @@ function CastBoard() {
             }
             return null;
           })}
-
-          {/* Movement arrows */}
-          {arrows.map((a) => (
-            <line
-              key={a.id}
-              x1={a.x1}
-              y1={a.y1}
-              x2={a.x2}
-              y2={a.y2}
-              stroke="#facc15"
-              strokeWidth={2.5}
-              markerEnd="url(#cast-ah-y)"
-              strokeLinecap="round"
-            />
-          ))}
 
           {/* Players */}
           {players.map((p) => {
