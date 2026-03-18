@@ -168,8 +168,11 @@ export default function SeasonPage({ plan }: Props) {
     if (!user) return;
     const isAdmin = user.roles.includes("admin");
     if (isAdmin) {
+      // Co-admins have adminId pointing to the original club admin; use that
+      // to find the correct club teams.
+      const effectiveAdminId = user.adminId ?? user.id;
       // Query admin's teams directly using already-imported Firestore functions
-      getDocs(query(collection(db, "teams"), where("adminId", "==", user.id))).then((snap) => {
+      getDocs(query(collection(db, "teams"), where("adminId", "==", effectiveAdminId))).then((snap) => {
         const adminTeams = snap.docs.map((d) => ({
           id: d.id,
           name: d.data().name as string,
@@ -194,7 +197,11 @@ export default function SeasonPage({ plan }: Props) {
 
   useEffect(() => {
     if (!user) return;
-    const adminId = user.roles.includes("admin") ? user.id : team?.adminId;
+    // For co-admins, use their adminId (the club's root admin) so they see the
+    // right training-free periods. Fall back to team's adminId for non-admins.
+    const adminId = user.roles.includes("admin")
+      ? (user.adminId ?? user.id)
+      : team?.adminId;
     if (!adminId) return;
     const q = query(collection(db, "training_free_periods"), where("adminId", "==", adminId));
     const unsub = onSnapshot(q, (snap) => {

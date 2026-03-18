@@ -244,7 +244,10 @@ export default function KalenderPage() {
   const loadAllTeams = useCallback(async () => {
     if (!user?.roles.includes("admin")) return;
     const fetched = await getAllTeams();
-    const adminTeams = fetched.filter((t) => t.adminId === user.id);
+    // Co-admins have adminId pointing to the original club admin; use that so
+    // they see all club teams instead of an empty list.
+    const effectiveAdminId = user.adminId ?? user.id;
+    const adminTeams = fetched.filter((t) => t.adminId === effectiveAdminId);
     setAllTeams(adminTeams);
     setSelectedTeamId((prev) => prev ?? (adminTeams.length > 0 ? adminTeams[0].id : null));
   }, [user, getAllTeams]);
@@ -265,7 +268,7 @@ export default function KalenderPage() {
   // Compute the list of teams where the current user may create activities.
   // Admins see all their teams; coaches/assistants see all teams they belong to.
   const createableTeams: Team[] = user?.roles.includes("admin")
-    ? allTeams.filter((t) => t.adminId === user.id)
+    ? allTeams.filter((t) => t.adminId === (user.adminId ?? user.id))
     : myTeams;
 
   // Scroll to the selected date panel when a date is clicked (useful on mobile)

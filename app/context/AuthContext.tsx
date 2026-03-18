@@ -74,6 +74,13 @@ export interface User {
   /** Sport this user / club is associated with (defaults to "basket"). */
   sport?: SportId;
   createdAt: string;
+  /**
+   * The Firestore ID of the club admin who administers this user's club.
+   * For the original club admin this is null (they own the club).
+   * For co-admins (coaches/assistants elevated to admin), this points to the
+   * original admin so that all club-scoped queries resolve correctly.
+   */
+  adminId?: string | null;
 }
 
 export interface Team {
@@ -219,6 +226,7 @@ function toUser(id: string, p: DbProfile, email: string): User {
     avatarUrl: p.avatarUrl ?? undefined,
     sport: (p.sport as SportId | undefined) ?? "basket",
     createdAt: p.createdAt,
+    adminId: p.adminId ?? null,
   };
 }
 
@@ -344,13 +352,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       /* For admins: auto-enroll in all teams they administer (self-healing).
        * This covers teams created before this feature, or when the admin was
-       * already logged in at the time the coach registered and created a team. */
+       * already logged in at the time the coach registered and created a team.
+       * For co-admins (promoted from coach), use their adminId to find the club
+       * teams (since those teams' adminId still points to the original admin). */
       const isAdminUser =
         (profileData.roles ?? []).includes("admin") ||
         profileData.role === "admin";
       if (isAdminUser) {
+        // Co-admins have adminId pointing to the original club admin; use that
+        // to find the right club teams. Root admins have adminId = null so fall
+        // back to their own id.
+        const effectiveAdminId = profileData.adminId ?? authId;
         const adminTeamsSnap = await getDocs(
-          query(collection(db, "teams"), where("adminId", "==", authId))
+          query(collection(db, "teams"), where("adminId", "==", effectiveAdminId))
         );
         for (const teamDoc of adminTeamsSnap.docs) {
           if (!memberTeamIdsSet.has(teamDoc.id)) {
@@ -731,12 +745,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return "Du måste vara inloggad för att skapa lag.";
     if (!user.roles.includes("admin")) return "Endast admins kan skapa lag.";
     try {
+      // Co-admins create teams under the club's root admin so new teams appear
+      // in the correct club and are visible to all club admins.
+      const effectiveAdminId = user.adminId ?? user.id;
       const newTeamId = crypto.randomUUID();
       const newTeam: DbTeam = {
         name: teamName,
         ageGroup,
         coachId: null,
-        adminId: user.id,
+        adminId: effectiveAdminId,
         clubName: user.clubName ?? "",
         clubLogoUrl: user.clubLogoUrl ?? null,
         sport: user.sport ?? "basket",

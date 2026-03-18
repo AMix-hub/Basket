@@ -257,7 +257,10 @@ export default function LagPage() {
         const groups = groupsByTeam[team.id] ?? [];
         const isExpanded = expandedTeams.has(team.id);
         const isCoach = user.roles.includes("coach") && team.coachId === user.id;
-        const isAdmin = user.roles.includes("admin") && team.adminId === user.id;
+        // Co-admins have adminId pointing to the original club admin; treat them
+        // as admin for any team that belongs to the same club.
+        const effectiveAdminId = (user.roles.includes("admin") && user.adminId) ? user.adminId : user.id;
+        const isAdmin = user.roles.includes("admin") && team.adminId === effectiveAdminId;
         const canSeeInvites = isCoach || isAdmin;
         const canManageGroups = isCoach || isAdmin;
 
