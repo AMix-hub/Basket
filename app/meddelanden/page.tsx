@@ -461,7 +461,7 @@ export default function MeddelandenPage() {
                   <span className="truncate">{allUserTeams.length > 1 ? t.name : "Lagchatt"}</span>
                 </span>
                 {totalUnread > 0 && !isActiveTeamChat && (
-                  <span className="ml-1 shrink-0 text-xs font-bold bg-red-900/300 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="ml-1 shrink-0 text-xs font-bold bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
                     {totalUnread > 9 ? "9+" : totalUnread}
                   </span>
                 )}
@@ -497,7 +497,7 @@ export default function MeddelandenPage() {
                   <span className="truncate">{m.name}</span>
                 </span>
                 {count > 0 && !isActive && (
-                  <span className="ml-1 shrink-0 text-xs font-bold bg-red-900/300 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="ml-1 shrink-0 text-xs font-bold bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
                     {count > 9 ? "9+" : count}
                   </span>
                 )}
@@ -535,7 +535,7 @@ export default function MeddelandenPage() {
                   <span className="truncate">Alla coacher</span>
                 </span>
                 {unreadCoach > 0 && !(selected === "coaches" && threadOpen) && (
-                  <span className="ml-1 shrink-0 text-xs font-bold bg-red-900/300 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="ml-1 shrink-0 text-xs font-bold bg-orange-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
                     {unreadCoach > 9 ? "9+" : unreadCoach}
                   </span>
                 )}
@@ -573,7 +573,7 @@ export default function MeddelandenPage() {
             </div>
 
             {queryError && (
-              <div className="mx-4 mt-3 px-3 py-2 bg-red-900/30 border border-red-200 rounded-xl text-xs text-red-600">
+              <div className="mx-4 mt-3 px-3 py-2 bg-red-900/30 border border-red-700/50 rounded-xl text-xs text-red-400">
                 {queryError}
               </div>
             )}
@@ -629,7 +629,7 @@ export default function MeddelandenPage() {
 
             <div className="px-4 py-3 border-t border-slate-100 shrink-0">
               {sendError && (
-                <div className="mb-2 px-3 py-2 bg-red-900/30 border border-red-200 rounded-xl text-xs text-red-600">
+                <div className="mb-2 px-3 py-2 bg-red-900/30 border border-red-700/50 rounded-xl text-xs text-red-400">
                   {sendError}
                 </div>
               )}

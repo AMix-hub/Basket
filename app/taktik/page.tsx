@@ -1149,7 +1149,7 @@ export default function TaktikPage() {
                           ))}
                           {selectedPlayer.role && (
                             <button onClick={() => updatePlayerInfo(selectedPlayer.id, { role: undefined })}
-                              className="text-xs px-2 py-0.5 rounded-lg font-medium bg-red-900/30 border border-red-200 text-red-600 hover:bg-red-100">
+                              className="text-xs px-2 py-0.5 rounded-lg font-medium bg-red-900/30 border border-red-700/50 text-red-400 hover:bg-red-900/50">
                               ✕ Rensa roll
                             </button>
                           )}
@@ -1230,7 +1230,7 @@ export default function TaktikPage() {
                 </button>
                 {steps.length > 1 && !isPlaying && (
                   <button onClick={() => removeStep(idx)} title="Ta bort steg"
-                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-900/300 text-white text-xs leading-none items-center justify-center hidden group-hover:flex">
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 text-white text-xs leading-none items-center justify-center hidden group-hover:flex">
                     ×
                   </button>
                 )}
@@ -1244,7 +1244,7 @@ export default function TaktikPage() {
           <div className="flex items-center gap-2 shrink-0">
             {steps.length < 2 && !isPlaying && <span className="text-xs text-slate-400 hidden sm:block">Lägg till 2+ steg</span>}
             <button onClick={isPlaying ? stopAnimation : playAnimation} disabled={!isPlaying && steps.length < 2}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all ${isPlaying ? "bg-red-900/300 hover:bg-red-600" : "bg-green-600 hover:bg-green-700 disabled:opacity-40"}`}>
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all ${isPlaying ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700 disabled:opacity-40"}`}>
               {isPlaying ? "⏹ Stopp" : "▶ Spela upp"}
             </button>
             <button onClick={exportPng} disabled={isPlaying} title="Exportera aktuellt steg som PNG"

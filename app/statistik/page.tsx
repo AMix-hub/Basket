@@ -368,7 +368,7 @@ export default function StatistikPage() {
               Satt
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-red-900/300 inline-block" />
+              <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
               Miss
             </div>
             {viewMode === "log" && (
@@ -399,8 +399,8 @@ export default function StatistikPage() {
                     onClick={() => setShotResult("missed")}
                     className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
                       shotResult === "missed"
-                        ? "bg-red-900/300 text-white shadow-md scale-105"
-                        : "bg-red-900/30 text-red-400 hover:bg-red-100"
+                        ? "bg-red-600 text-white shadow-md scale-105"
+                        : "bg-red-900/30 text-red-400 hover:bg-red-900/50"
                     }`}
                   >
                     ✗ Miss

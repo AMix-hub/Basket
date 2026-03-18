@@ -290,7 +290,7 @@ export default function VideorPage() {
                     </div>
                     <button
                       onClick={() => deleteVideo(v.id)}
-                      className="shrink-0 text-xs px-2 py-1 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-100 transition-colors font-medium"
+                      className="shrink-0 text-xs px-2 py-1 bg-red-900/30 text-red-400 rounded-lg hover:bg-red-900/50 transition-colors font-medium"
                     >
                       ✕
                     </button>

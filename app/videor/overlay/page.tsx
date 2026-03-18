@@ -397,7 +397,7 @@ export default function VideoOverlayPage() {
                 <button
                   onClick={clearAll}
                   disabled={shapes.length === 0}
-                  className="px-3 py-1.5 text-sm font-semibold bg-red-900/30 hover:bg-red-100 disabled:opacity-40 text-red-600 rounded-xl transition-colors"
+                  className="px-3 py-1.5 text-sm font-semibold bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 text-red-600 rounded-xl transition-colors"
                 >
                   🗑 Rensa
                 </button>

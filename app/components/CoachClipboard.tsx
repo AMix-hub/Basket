@@ -136,7 +136,7 @@ export default function CoachClipboard() {
                   }}
                   className={`flex-1 py-2.5 rounded-xl font-semibold text-sm text-white transition-colors ${
                     running
-                      ? "bg-red-900/300 hover:bg-red-600"
+                      ? "bg-red-600 hover:bg-red-700"
                       : "bg-emerald-500 hover:bg-emerald-600"
                   }`}
                 >
