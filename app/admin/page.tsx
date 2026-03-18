@@ -63,7 +63,7 @@ const BYTES_PER_KB = 1024;
 const BYTES_PER_MB = 1024 * 1024;
 
 export default function AdminPage() {
-  const { user, createTeam, updateClubLogo, updateClubLogoUrl } = useAuth();
+  const { user, createTeam, updateClubLogo, updateClubLogoUrl, updateClubWebsiteUrl } = useAuth();
   const [copied, setCopied] = useState<string | null>(null);
   // null = not yet loaded (loading state derived from value)
   const [teams, setTeams] = useState<TeamWithMembers[] | null>(null);
@@ -96,6 +96,12 @@ export default function AdminPage() {
   const [logoUrlSaving, setLogoUrlSaving] = useState(false);
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+
+  // Club website URL state
+  const [websiteUrlInput, setWebsiteUrlInput] = useState(user?.clubWebsiteUrl ?? "");
+  const [websiteUrlSaving, setWebsiteUrlSaving] = useState(false);
+  const [websiteUrlError, setWebsiteUrlError] = useState<string | null>(null);
+  const [websiteUrlSuccess, setWebsiteUrlSuccess] = useState(false);
 
   // Invite user by email state
   const [inviteEmail, setInviteEmail] = useState("");
@@ -464,6 +470,22 @@ export default function AdminPage() {
     setLogoUrlSaving(false);
   };
 
+  const handleWebsiteUrlSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!websiteUrlInput.trim()) return;
+    setWebsiteUrlSaving(true);
+    setWebsiteUrlError(null);
+    setWebsiteUrlSuccess(false);
+    const err = await updateClubWebsiteUrl(websiteUrlInput);
+    if (err) {
+      setWebsiteUrlError(err);
+    } else {
+      setWebsiteUrlSuccess(true);
+      setTimeout(() => setWebsiteUrlSuccess(false), 3000);
+    }
+    setWebsiteUrlSaving(false);
+  };
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;
@@ -662,6 +684,61 @@ export default function AdminPage() {
         {logoSuccess && (
           <p className="mt-3 text-emerald-400 text-sm bg-emerald-900/30 px-3 py-2 rounded-xl">
             ✓ Loggan har uppdaterats!
+          </p>
+        )}
+      </div>
+
+      {/* Club website URL */}
+      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-100 mb-1">Föreningens webbplats</h2>
+        <p className="text-slate-500 text-sm mb-4">
+          Ange din förenings webbplats så att alla i{" "}
+          <strong className="text-slate-300">{user.clubName ?? "föreningen"}</strong> kan se
+          nyheter direkt i appen via menyn <strong className="text-slate-300">Nyheter</strong>.
+        </p>
+        {user.clubWebsiteUrl && (
+          <p className="text-sm text-slate-400 mb-3">
+            Nuvarande:{" "}
+            <a
+              href={user.clubWebsiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-400 hover:underline break-all"
+            >
+              {user.clubWebsiteUrl}
+            </a>
+          </p>
+        )}
+        <form onSubmit={handleWebsiteUrlSave} className="flex items-center gap-2 flex-wrap">
+          <input
+            type="text"
+            inputMode="url"
+            placeholder="https://www.dinförening.se"
+            value={websiteUrlInput}
+            onChange={(e) => setWebsiteUrlInput(e.target.value)}
+            className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-slate-600 bg-slate-700 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-slate-400"
+            disabled={websiteUrlSaving}
+          />
+          <button
+            type="submit"
+            disabled={websiteUrlSaving || !websiteUrlInput.trim()}
+            className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+              websiteUrlSaving || !websiteUrlInput.trim()
+                ? "bg-slate-600 text-slate-400 cursor-not-allowed"
+                : "bg-orange-500 hover:bg-orange-600 text-white"
+            }`}
+          >
+            {websiteUrlSaving ? "Sparar…" : "Spara"}
+          </button>
+        </form>
+        {websiteUrlError && (
+          <p className="mt-3 text-red-400 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
+            {websiteUrlError}
+          </p>
+        )}
+        {websiteUrlSuccess && (
+          <p className="mt-3 text-emerald-400 text-sm bg-emerald-900/30 px-3 py-2 rounded-xl">
+            ✓ Webbplatsen har sparats!
           </p>
         )}
       </div>

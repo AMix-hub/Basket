@@ -51,6 +51,8 @@ export interface User {
   clubName?: string;         // admin:  association / club name
   /** URL to the club's logo image (set by admin). */
   clubLogoUrl?: string;
+  /** URL to the club's website for fetching news (set by admin). */
+  clubWebsiteUrl?: string;
   /** URL to the user's personal profile avatar image. */
   avatarUrl?: string;
   /** Sport this user / club is associated with (defaults to "basket"). */
@@ -67,6 +69,8 @@ export interface Team {
   clubName: string;
   /** URL to the club's logo image (set by admin). */
   clubLogoUrl?: string;
+  /** URL to the club's website for fetching news (set by admin, propagated to teams). */
+  clubWebsiteUrl?: string;
   sport: SportId;
   memberIds: string[];
   inviteCode: string;        // assistants
@@ -117,6 +121,10 @@ interface AuthContextType {
    */
   updateClubLogoUrl: (url: string) => Promise<string | null>;
   /**
+   * Admin sets the club's website URL for news fetching. Returns null on success, or a Swedish error string.
+   */
+  updateClubWebsiteUrl: (url: string) => Promise<string | null>;
+  /**
    * Any user can upload a personal avatar image. Returns null on success, or a Swedish error string.
    */
   updateAvatar: (file: File) => Promise<string | null>;
@@ -143,6 +151,8 @@ interface DbProfile {
   sport?: string;
   /** URL to the club's logo image (admin only). */
   clubLogoUrl?: string;
+  /** URL to the club's website for fetching news (admin only). */
+  clubWebsiteUrl?: string;
   /** Email stored for push/email notification delivery. */
   email?: string;
   /** FCM token for device push notifications (updated on every login). */
@@ -161,6 +171,8 @@ interface DbTeam {
   clubName: string;
   /** URL to the club's logo image (propagated from admin profile). */
   clubLogoUrl?: string | null;
+  /** URL to the club's website for news (propagated from admin profile). */
+  clubWebsiteUrl?: string | null;
   sport?: string;
   memberIds: string[];
   inviteCode: string;
@@ -187,6 +199,7 @@ function toUser(id: string, p: DbProfile, email: string): User {
     coachInviteCode: p.coachInviteCode ?? undefined,
     clubName: p.clubName ?? undefined,
     clubLogoUrl: p.clubLogoUrl ?? undefined,
+    clubWebsiteUrl: p.clubWebsiteUrl ?? undefined,
     avatarUrl: p.avatarUrl ?? undefined,
     sport: (p.sport as SportId | undefined) ?? "basket",
     createdAt: p.createdAt,
@@ -202,6 +215,7 @@ function toTeam(id: string, t: DbTeam): Team {
     adminId: t.adminId,
     clubName: t.clubName,
     clubLogoUrl: t.clubLogoUrl ?? undefined,
+    clubWebsiteUrl: t.clubWebsiteUrl ?? undefined,
     sport: (t.sport as SportId | undefined) ?? "basket",
     memberIds: t.memberIds ?? [],
     inviteCode: t.inviteCode,
@@ -821,6 +835,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /* ── updateClubWebsiteUrl (admin sets club website URL for news) ── */
+  const updateClubWebsiteUrl = async (url: string): Promise<string | null> => {
+    if (!user) return "Du måste vara inloggad.";
+    if (!user.roles.includes("admin")) return "Endast admins kan ändra föreningens webbplats.";
+
+    const trimmed = url.trim();
+    if (!trimmed) return "Ange en giltig URL.";
+    if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) {
+      return "URL:en måste börja med http:// eller https://.";
+    }
+    try {
+      new URL(trimmed);
+    } catch {
+      return "Ange en giltig URL.";
+    }
+
+    try {
+      /* Save URL to admin's profile */
+      await updateDoc(doc(db, "profiles", user.id), { clubWebsiteUrl: trimmed });
+
+      /* Propagate to all teams belonging to this admin */
+      const teamsSnap = await getDocs(
+        query(collection(db, "teams"), where("adminId", "==", user.id))
+      );
+      await Promise.all(
+        teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubWebsiteUrl: trimmed }))
+      );
+
+      /* Update local state */
+      setUser({ ...user, clubWebsiteUrl: trimmed });
+      if (currentTeam) {
+        setCurrentTeam({ ...currentTeam, clubWebsiteUrl: trimmed });
+      }
+
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return translateFirebaseError(msg) || "Kunde inte spara URL:en. Försök igen.";
+    }
+  };
+
   /* ── updateAvatar (any user uploads a personal profile avatar) ── */
   const updateAvatar = async (file: File): Promise<string | null> => {
     if (!user) return "Du måste vara inloggad.";
@@ -872,6 +927,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createTeam,
         updateClubLogo,
         updateClubLogoUrl,
+        updateClubWebsiteUrl,
         updateAvatar,
         requestPushPermission: () => {
           if (!user) return Promise.resolve();
