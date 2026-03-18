@@ -33,12 +33,24 @@ export default function RootLayout({
 
         {/*
          * Google Cast Sender SDK
-         * Loading this script tells Chrome that the app supports casting.
-         * Chrome will automatically show the Cast icon in the address bar
-         * when a compatible device (Chromecast) is on the local network,
-         * and will use navigator.presentation.defaultRequest (set by the
-         * useCast hook) to know which URL to open on the receiver.
+         *
+         * The __onGCastApiAvailable callback MUST be defined before
+         * cast_sender.js is loaded.  Without it the Cast API will not
+         * initialise and Chrome will not start mDNS discovery for
+         * Chromecast devices on the local network, meaning the device
+         * picker opened by PresentationRequest.start() will be empty.
+         *
+         * We use the W3C Presentation API (useCast hook) for session
+         * management, so the callback itself can be minimal – its mere
+         * existence is what triggers Chrome's Cast initialisation.
          */}
+        <Script
+          id="cast-api-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `window['__onGCastApiAvailable'] = function() {};`,
+          }}
+        />
         <Script
           src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"
           strategy="lazyOnload"

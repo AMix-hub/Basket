@@ -44,6 +44,14 @@ export function useCast(castUrl: string | null): CastState {
   const connectionRef = useRef<PresentationConnection | null>(null);
   /** Kept in sync with `castUrl` so the fallback `startCast` can read the latest value. */
   const castUrlRef = useRef<string | null>(castUrl);
+  /**
+   * Holds the PresentationAvailability object returned by getAvailability().
+   * Chrome keeps its mDNS device-discovery scan active only as long as a
+   * live JavaScript reference to the object exists.  Without this ref the
+   * object can be GC-ed and Chrome silently stops scanning, which means the
+   * device picker opened by start() will be empty.
+   */
+  const availabilityRef = useRef<PresentationAvailability | null>(null);
 
   useEffect(() => {
     castUrlRef.current = castUrl;
@@ -83,16 +91,22 @@ export function useCast(castUrl: string | null): CastState {
     setIsAvailable(true);
 
     /* Call getAvailability() so Chrome can update its omnibar Cast icon via
-     * the defaultRequest mechanism.  We do not use the returned value to
-     * gate the button — the optimistic setIsAvailable(true) above already
-     * ensures the button is visible on all Presentation-API-capable browsers. */
-    request.getAvailability().catch(() => {
+     * the defaultRequest mechanism.  We store the returned PresentationAvailability
+     * object in a ref: Chrome keeps its mDNS device-discovery scan alive only as
+     * long as a JavaScript reference to that object exists.  Discarding it causes
+     * Chrome to stop scanning, which leaves the device picker empty even when a
+     * Chromecast is on the local network. */
+    request.getAvailability().then((avail) => {
+      availabilityRef.current = avail;
+    }).catch(() => {
       /* Silently ignore — some older Chrome versions do not implement
        * getAvailability(); our button is shown regardless (see above). */
     });
 
     return () => {
-      /* Clean up the default request so the Cast icon disappears after navigation. */
+      /* Release the availability object and clear the default request so that
+       * Chrome stops device discovery and the Cast icon disappears after navigation. */
+      availabilityRef.current = null;
       if (
         typeof navigator !== "undefined" &&
         navigator.presentation?.defaultRequest === request
