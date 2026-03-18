@@ -51,6 +51,8 @@ export interface User {
   clubName?: string;         // admin:  association / club name
   /** URL to the club's logo image (set by admin). */
   clubLogoUrl?: string;
+  /** URL to the user's personal profile avatar image. */
+  avatarUrl?: string;
   /** Sport this user / club is associated with (defaults to "basket"). */
   sport?: SportId;
   createdAt: string;
@@ -115,6 +117,10 @@ interface AuthContextType {
    */
   updateClubLogoUrl: (url: string) => Promise<string | null>;
   /**
+   * Any user can upload a personal avatar image. Returns null on success, or a Swedish error string.
+   */
+  updateAvatar: (file: File) => Promise<string | null>;
+  /**
    * Requests push-notification permission and registers an FCM token for the
    * current user.  Call this when the user explicitly clicks "Aktivera notiser".
    */
@@ -143,6 +149,8 @@ interface DbProfile {
   fcmToken?: string | null;
   /** ID of the admin who administers this user (set at registration). */
   adminId?: string | null;
+  /** URL to the user's personal profile avatar image. */
+  avatarUrl?: string;
 }
 
 interface DbTeam {
@@ -179,6 +187,7 @@ function toUser(id: string, p: DbProfile, email: string): User {
     coachInviteCode: p.coachInviteCode ?? undefined,
     clubName: p.clubName ?? undefined,
     clubLogoUrl: p.clubLogoUrl ?? undefined,
+    avatarUrl: p.avatarUrl ?? undefined,
     sport: (p.sport as SportId | undefined) ?? "basket",
     createdAt: p.createdAt,
   };
@@ -812,6 +821,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  /* ── updateAvatar (any user uploads a personal profile avatar) ── */
+  const updateAvatar = async (file: File): Promise<string | null> => {
+    if (!user) return "Du måste vara inloggad.";
+
+    if (!file.type.startsWith("image/")) {
+      return "Endast bildfiler (JPG, PNG, GIF, WebP) accepteras.";
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      return "Bilden är för stor. Max 2 MB tillåts.";
+    }
+
+    try {
+      const ext = file.name.split(".").pop() ?? "png";
+      const storageRef = ref(storage, `avatars/${user.id}/avatar.${ext}`);
+
+      const uploadWithTimeout = Promise.race([
+        uploadBytes(storageRef, file),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Upload timeout after 30 seconds")), 30_000)
+        ),
+      ]);
+
+      await uploadWithTimeout;
+      const url = await getDownloadURL(storageRef);
+
+      await updateDoc(doc(db, "profiles", user.id), { avatarUrl: url });
+      setUser({ ...user, avatarUrl: url });
+
+      return null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("timeout")) return "Uppladdningen tog för lång tid. Kontrollera din internetanslutning.";
+      return translateFirebaseError(msg) || "Kunde inte ladda upp bilden. Försök igen.";
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -827,6 +872,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         createTeam,
         updateClubLogo,
         updateClubLogoUrl,
+        updateAvatar,
         requestPushPermission: () => {
           if (!user) return Promise.resolve();
           return registerPushToken(user.id);
