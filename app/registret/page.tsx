@@ -149,10 +149,16 @@ export default function RegistretPage() {
       let teamsToLoad: { id: string; name: string; ageGroup?: string }[];
 
       if (isAdmin) {
-        // Fetch all teams where adminId == effectiveAdminId
-        // (for co-admins this resolves to their club's original admin ID)
+        // Build the set of admin IDs to query by. For root admins (adminId ==
+        // null) this is just their own UID. For co-admins it includes both
+        // their own UID and the club's root admin UID so that teams are found
+        // even when the profile's adminId was incorrectly set or not yet healed.
+        const adminIds = [...new Set([effectiveAdminId, user.id].filter(Boolean))] as string[];
+
         const adminTeamsSnap = await getDocs(
-          query(collection(db, "teams"), where("adminId", "==", effectiveAdminId))
+          adminIds.length === 1
+            ? query(collection(db, "teams"), where("adminId", "==", adminIds[0]))
+            : query(collection(db, "teams"), where("adminId", "in", adminIds))
         );
         teamsToLoad = adminTeamsSnap.docs.map((d) => ({
           id: d.id,
@@ -203,8 +209,11 @@ export default function RegistretPage() {
       // For admins: also include users linked directly via adminId in their profile.
       // This covers users who were invited by the admin but not assigned to a team.
       if (isAdmin) {
+        const adminIds = [...new Set([effectiveAdminId, user.id].filter(Boolean))] as string[];
         const directProfilesSnap = await getDocs(
-          query(collection(db, "profiles"), where("adminId", "==", effectiveAdminId))
+          adminIds.length === 1
+            ? query(collection(db, "profiles"), where("adminId", "==", adminIds[0]))
+            : query(collection(db, "profiles"), where("adminId", "in", adminIds))
         );
         const existingMemberIds = new Set(
           results.flatMap((t) => t.members.map((m) => m.id))
@@ -349,14 +358,14 @@ export default function RegistretPage() {
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
           <p className="text-slate-400 text-sm">Laddar…</p>
         </div>
-      ) : isAdmin && allMembersForAdmin ? (
+      ) : isAdmin ? (
         /* Admin view: flat list of all unique members with team info */
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
           <h2 className="font-bold text-slate-100 mb-1">👥 Användarregister</h2>
           <p className="text-slate-400 text-sm mb-4">
-            {allMembersForAdmin.length} unika medlemmar i {teamData.filter((t) => t.id !== "__unassigned__").length} lag.
+            {(allMembersForAdmin ?? []).length} unika medlemmar i {teamData.filter((t) => t.id !== "__unassigned__").length} lag.
           </p>
-          {allMembersForAdmin.length === 0 ? (
+          {(allMembersForAdmin ?? []).length === 0 ? (
             <p className="text-slate-400 text-sm">Inga medlemmar registrerade ännu.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -370,7 +379,7 @@ export default function RegistretPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
-                  {allMembersForAdmin.map(({ member, teamNames, teamIds }) => (
+                  {(allMembersForAdmin ?? []).map(({ member, teamNames, teamIds }) => (
                     <tr key={member.id} className="hover:bg-slate-700/30">
                       <td className="py-2 pr-4">
                         <span className="font-medium text-slate-200">

@@ -117,11 +117,17 @@ export default function AdminPage() {
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
 
-    // Co-admins have adminId pointing to the original club admin; use that so
-    // they see all club teams rather than an empty list.
-    const effectiveAdminId = user.adminId ?? user.id;
+    // Build the set of admin IDs to query by. For root admins (adminId == null)
+    // this is just their own UID. For co-admins it includes both their own UID
+    // and the club's root admin UID so that teams are found even when the
+    // profile's adminId was incorrectly set or hasn't been healed yet.
+    const adminIdSet = new Set([user.id]);
+    if (user.adminId) adminIdSet.add(user.adminId);
+    const adminIds = [...adminIdSet];
 
-    const q = query(collection(db, "teams"), where("adminId", "==", effectiveAdminId));
+    const q = adminIds.length === 1
+      ? query(collection(db, "teams"), where("adminId", "==", adminIds[0]))
+      : query(collection(db, "teams"), where("adminId", "in", adminIds));
 
     const unsub = onSnapshot(q, async (teamSnap) => {
       if (teamSnap.empty) {
