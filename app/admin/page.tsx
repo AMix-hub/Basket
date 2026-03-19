@@ -605,7 +605,7 @@ export default function AdminPage() {
               />
             </label>
             <p className="text-xs text-slate-400">
-              JPG, PNG, GIF eller WebP · max 2 MB
+              JPG, PNG, GIF eller WebP · max 5 MB
             </p>
           </div>
         </div>

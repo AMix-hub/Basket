@@ -831,9 +831,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isImage) {
       return "Endast bildfiler (JPG, PNG, GIF, WebP) accepteras.";
     }
-    /* Validate file size (max 2 MB) */
-    if (file.size > 2 * 1024 * 1024) {
-      return "Bilden är för stor. Max 2 MB tillåts.";
+    /* Validate file size (max 5 MB) */
+    if (file.size > 5 * 1024 * 1024) {
+      return "Bilden är för stor. Max 5 MB tillåts.";
     }
 
     try {
@@ -973,8 +973,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isImage) {
       return "Endast bildfiler (JPG, PNG, GIF, WebP) accepteras.";
     }
-    if (file.size > 2 * 1024 * 1024) {
-      return "Bilden är för stor. Max 2 MB tillåts.";
+    if (file.size > 5 * 1024 * 1024) {
+      return "Bilden är för stor. Max 5 MB tillåts.";
     }
 
     try {
