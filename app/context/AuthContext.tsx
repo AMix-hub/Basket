@@ -367,9 +367,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           query(collection(db, "teams"), where("adminId", "==", effectiveAdminId))
         );
 
-        /* Self-healing for promoted admins: if their profile has no adminId set
+        /* Self-healing case 1: adminId is set but points to the wrong club.
+         * Detect this when the adminId-based query returns empty AND the user's
+         * own UID has teams (meaning they are actually a root admin whose
+         * adminId was incorrectly written, e.g. by another admin toggling their
+         * role).  Fix: clear adminId so the root admin's own UID is used. */
+        if (adminTeamsSnap.empty && profileData.adminId) {
+          const ownTeamsSnap = await getDocs(
+            query(collection(db, "teams"), where("adminId", "==", authId))
+          );
+          if (!ownTeamsSnap.empty) {
+            await updateDoc(doc(db, "profiles", authId), { adminId: null });
+            profileData = { ...profileData, adminId: null };
+            effectiveAdminId = authId;
+            adminTeamsSnap = ownTeamsSnap;
+          }
+        }
+
+        /* Self-healing case 2: promoted admins whose profile has no adminId set
          * (toggleRole bug – adminId was never written) and no teams are found
-         * under their own ID, infer the club's root admin from the teams they
+         * under their own ID.  Infer the club's root admin from the teams they
          * are already enrolled in.  Then persist the correct adminId so all
          * subsequent club-scoped queries resolve correctly. */
         if (adminTeamsSnap.empty && !profileData.adminId) {
