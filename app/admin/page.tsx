@@ -553,6 +553,9 @@ export default function AdminPage() {
     );
   }
 
+  // Root admins have adminId === null; co-admins have adminId pointing to the root admin.
+  const isRootAdmin = !user.adminId;
+
   return (
     <div>
       {/* Header */}
@@ -564,11 +567,14 @@ export default function AdminPage() {
           </h1>
         </div>
         <p className="text-slate-500 text-sm">
-          Hantera behöriga, bjud in coacher och följ alla lag i din förening.
+          {isRootAdmin
+            ? "Hantera behöriga, bjud in coacher och följ alla lag i din förening."
+            : "Du är medadmin. Du kan hantera lag, hallar, träningsfria perioder och bjuda in användare."}
         </p>
       </div>
 
-      {/* Club logo */}
+      {/* Club logo – only the root admin can manage club-level settings */}
+      {isRootAdmin && (
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
         <h2 className="font-bold text-slate-100 mb-1">Klubblogga</h2>
         <p className="text-slate-500 text-sm mb-4">
@@ -707,8 +713,10 @@ export default function AdminPage() {
           </p>
         )}
       </div>
+      )} {/* end isRootAdmin – club logo */}
 
-      {/* Club website URL */}
+      {/* Club website URL – only root admin */}
+      {isRootAdmin && (
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
         <h2 className="font-bold text-slate-100 mb-1">Föreningens webbplats</h2>
         <p className="text-slate-500 text-sm mb-4">
@@ -762,8 +770,10 @@ export default function AdminPage() {
           </p>
         )}
       </div>
+      )} {/* end isRootAdmin – website URL */}
 
-      {/* Coach invite code */}
+      {/* Coach invite code – only root admin */}
+      {isRootAdmin && (
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
         <h2 className="font-bold text-slate-100 mb-1">
           Inbjudningskod för coacher
@@ -805,12 +815,15 @@ export default function AdminPage() {
           </p>
         )}
       </div>
+      )} {/* end isRootAdmin – coach invite code */}
 
       {/* Create new team */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
         <h2 className="font-bold text-slate-100 mb-1">Skapa nytt lag</h2>
         <p className="text-slate-500 text-sm mb-4">
-          Som admin kan du skapa lag direkt. Bjud sedan in en coach med coach-inbjudningskoden ovan, eller dela lagkoderna nedan med spelare och föräldrar.
+          {isRootAdmin
+            ? "Som admin kan du skapa lag direkt. Bjud sedan in en coach med coach-inbjudningskoden ovan, eller dela lagkoderna nedan med spelare och föräldrar."
+            : "Som medadmin kan du skapa lag direkt. Dela lagkoderna nedan med coacher, spelare och föräldrar."}
         </p>
         <form onSubmit={handleCreateTeam} className="space-y-3">
           <input
