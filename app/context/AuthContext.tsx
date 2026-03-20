@@ -26,6 +26,7 @@ import {
   or,
   getDocs,
   limit,
+  onSnapshot,
 } from "firebase/firestore";
 import { auth, db, storage, getClientMessaging } from "../../lib/firebaseClient";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -552,6 +553,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [loadProfile, registerPushToken]);
 
+  /* ── Real-time profile sync ── */
+  /* Keeps roles, adminId and other profile fields up to date for the current
+   * user without requiring a page refresh.  This means that when an admin
+   * promotes another logged-in user to admin (or changes any other role), the
+   * promoted user's UI updates immediately – no logout/login needed. */
+  useEffect(() => {
+    if (!user?.id) return;
+    const profileRef = doc(db, "profiles", user.id);
+    const unsubscribe = onSnapshot(profileRef, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data() as DbProfile;
+      // Derive roles using the same logic as toUser()
+      const roles: UserRole[] =
+        data.roles && data.roles.length > 0
+          ? (data.roles as UserRole[])
+          : [data.role as UserRole];
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              roles,
+              adminId: data.adminId ?? null,
+              clubName: data.clubName ?? prev.clubName,
+              clubLogoUrl: data.clubLogoUrl ?? prev.clubLogoUrl,
+              clubWebsiteUrl: data.clubWebsiteUrl ?? prev.clubWebsiteUrl,
+              coachInviteCode: data.coachInviteCode ?? prev.coachInviteCode,
+            }
+          : prev
+      );
+    });
+    return () => unsubscribe();
+  // Only re-run when the user's Firebase UID changes (i.e. on login/logout).
+  // setUser is a stable useState dispatcher so it doesn't need to be listed.
+  // The updater form (prev => …) is used to avoid any stale-closure issue with
+  // the user object inside the snapshot callback.
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── login ── */
   const login = async (email: string, password: string): Promise<string | null> => {
     try {
@@ -592,16 +630,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         query(
           collection(db, "profiles"),
           where("coachInviteCode", "==", code),
-          where("role", "==", "admin"),
           limit(1)
         )
       );
       if (adminSnap.empty)
         return "Ogiltig admin-inbjudningskod. Kontakta din föreningsadmin.";
       const adminDoc = adminSnap.docs[0];
+      const adminData = adminDoc.data() as DbProfile;
+      // Verify the profile is an admin using both the roles array and the legacy
+      // role field so that profiles created or modified via either path are found.
+      const isAdminProfile =
+        (adminData.roles ?? []).includes("admin") || adminData.role === "admin";
+      if (!isAdminProfile)
+        return "Ogiltig admin-inbjudningskod. Kontakta din föreningsadmin.";
       invitingAdminId       = adminDoc.id;
-      invitingAdminClubName = (adminDoc.data().clubName as string) ?? "";
-      invitingAdminLogoUrl  = (adminDoc.data().clubLogoUrl as string | undefined) ?? undefined;
+      invitingAdminClubName = (adminData.clubName as string) ?? "";
+      invitingAdminLogoUrl  = (adminData.clubLogoUrl as string | undefined) ?? undefined;
     }
 
     if (role === "assistant") {
@@ -878,7 +922,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       /* Propagate to all teams belonging to this admin */
       const teamsSnap = await getDocs(
-        query(collection(db, "teams"), where("adminId", "==", user.id))
+        query(collection(db, "teams"), where("adminId", "==", user.adminId ?? user.id))
       );
       await Promise.all(
         teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubLogoUrl: url }))
@@ -918,7 +962,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       /* Propagate to all teams belonging to this admin */
       const teamsSnap = await getDocs(
-        query(collection(db, "teams"), where("adminId", "==", user.id))
+        query(collection(db, "teams"), where("adminId", "==", user.adminId ?? user.id))
       );
       await Promise.all(
         teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubLogoUrl: trimmed }))
@@ -959,7 +1003,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       /* Propagate to all teams belonging to this admin */
       const teamsSnap = await getDocs(
-        query(collection(db, "teams"), where("adminId", "==", user.id))
+        query(collection(db, "teams"), where("adminId", "==", user.adminId ?? user.id))
       );
       await Promise.all(
         teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubWebsiteUrl: trimmed }))
