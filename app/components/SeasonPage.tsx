@@ -217,7 +217,7 @@ export default function SeasonPage({ plan }: Props) {
   }, [user?.id, user?.roles, team?.adminId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!user) return;
-    const adminId = user.roles.includes("admin") ? user.id : team?.adminId;
+    const adminId = user.roles.includes("admin") ? (user.adminId ?? user.id) : team?.adminId;
     if (!adminId) return;
     const q = query(collection(db, "halls"), where("adminId", "==", adminId));
     const unsub = onSnapshot(q, (snap) => {
