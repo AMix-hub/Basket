@@ -763,7 +763,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (firestoreErr) {
       /* Roll back: remove the auth user so the same e-mail can be used again. */
-      try { await credential.user.delete(); } catch { /* best-effort */ }
+      try { await credential.user.delete(); } catch (deleteErr) {
+        console.warn("[register] Could not delete auth user after Firestore failure:", deleteErr);
+      }
       throw firestoreErr;
     }
 
