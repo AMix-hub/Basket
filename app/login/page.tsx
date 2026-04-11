@@ -17,9 +17,18 @@ export default function LoginPage() {
 
   // After a successful login the auth state updates asynchronously.
   // Redirect to the dashboard once the user object is populated.
+  // If loading finishes but user is still null, something went wrong after
+  // Firebase auth succeeded (e.g. Firestore unreachable) – show an error.
   useEffect(() => {
-    if (loginAttempted && !loading && user) {
+    if (!loginAttempted || loading) return;
+    if (user) {
       router.push("/");
+    } else {
+      setError(
+        "Inloggning lyckades men profilen kunde inte laddas. " +
+        "Kontrollera din internetanslutning och försök igen."
+      );
+      setLoginAttempted(false);
     }
   }, [loginAttempted, loading, user, router]);
 
