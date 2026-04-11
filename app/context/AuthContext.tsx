@@ -311,6 +311,9 @@ function translateFirebaseError(message: string): string {
   if (m.includes("user-disabled")) {
     return "Det här kontot har inaktiverats. Kontakta administratören.";
   }
+  if (m.includes("missing or insufficient permissions") || m.includes("permission-denied")) {
+    return "Behörighetsfel – kontrollera din anslutning och försök igen. Om felet kvarstår, kontakta supporten.";
+  }
   return message;
 }
 
@@ -331,19 +334,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const profileSnap = await getDoc(doc(db, "profiles", authId));
       let profileData = profileSnap.exists() ? (profileSnap.data() as DbProfile) : null;
 
-      /* Fallback: profile missing – create from provided info */
+      /* Fallback: profile missing – this can happen briefly during registration
+       * while register() is still awaiting the Firestore write, or for users
+       * whose profile was deleted.  Do NOT auto-create a fallback here because
+       * it races with register()'s own setDoc and can overwrite the real profile
+       * with wrong data.  Return null and let the caller handle the empty state. */
       if (!profileData) {
-        const fallbackProfile: DbProfile = {
-          name: "Okänd",
-          role: "player",
-          roles: ["player"],
-          clubName: null,
-          coachInviteCode: null,
-          childName: null,
-          createdAt: new Date().toISOString(),
-        };
-        await setDoc(doc(db, "profiles", authId), fallbackProfile);
-        profileData = fallbackProfile;
+        console.warn("[loadProfile] Profile missing for uid:", authId);
+        setUser(null);
+        setCurrentTeam(null);
+        setCurrentTeams([]);
+        return null;
       }
 
       /* Find ALL team memberships (multi-group support) */
@@ -691,66 +692,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     const userId = credential.user.uid;
 
-    /* 3 ─ Create profile in Firestore ───────────────────────── */
-    const newProfile: DbProfile = {
-      name: name || "Okänd",
-      role,
-      roles: [role],
-      email,
-      clubName:        role === "admin"  ? (clubName  ?? null) : null,
-      childName:       role === "parent" ? (childName ?? null) : null,
-      coachInviteCode: role === "admin"  ? generateCode()      : null,
-      sport:           sport ?? "basket",
-      createdAt:       new Date().toISOString(),
-      // Link non-admin users back to their admin so the admin's registry shows them
-      adminId:         role === "admin"  ? null
-                       : (invitingAdminId ?? teamFromCode?.data.adminId ?? null),
-    };
-    await setDoc(doc(db, "profiles", userId), newProfile);
+    /* Ensure the ID token is available to the Firestore SDK before any writes.
+     * Without this there is a brief window right after account creation where
+     * Firestore may see request.auth as null and deny the write. */
+    await credential.user.getIdToken();
 
-    /* 4 ─ For coaches: create a new team ────────────────────── */
-    let newTeamId: string | null = null;
-
-    if (role === "coach" && teamName && invitingAdminId) {
-      newTeamId = crypto.randomUUID();
-      const newTeam: DbTeam = {
-        name:              teamName,
-        ageGroup:          ageGroup ?? "",
-        coachId:           userId,
-        adminId:           invitingAdminId,
-        clubName:          invitingAdminClubName ?? "",
-        clubLogoUrl:       invitingAdminLogoUrl ?? null,
-        sport:             sport ?? "basket",
-        memberIds:         [userId, invitingAdminId],
-        inviteCode:        generateCode(),
-        parentInviteCode:  generateCode(),
-        playerInviteCode:  generateCode(),
+    /* 3–5 ─ Firestore writes – if anything fails here we delete the just-created
+     * auth user so the caller can retry with the same e-mail address. */
+    try {
+      /* 3 ─ Create profile ─────────────────────────────────── */
+      const newProfile: DbProfile = {
+        name: name || "Okänd",
+        role,
+        roles: [role],
+        email,
+        clubName:        role === "admin"  ? (clubName  ?? null) : null,
+        childName:       role === "parent" ? (childName ?? null) : null,
+        coachInviteCode: role === "admin"  ? generateCode()      : null,
+        sport:           sport ?? "basket",
+        createdAt:       new Date().toISOString(),
+        // Link non-admin users back to their admin so the admin's registry shows them
+        adminId:         role === "admin"  ? null
+                         : (invitingAdminId ?? teamFromCode?.data.adminId ?? null),
       };
-      await setDoc(doc(db, "teams", newTeamId), newTeam);
-      await setDoc(doc(db, "team_members", `${newTeamId}_${userId}`), {
-        teamId: newTeamId,
-        userId,
-        joinedAt: new Date().toISOString(),
-      });
-      await setDoc(doc(db, "team_members", `${newTeamId}_${invitingAdminId}`), {
-        teamId: newTeamId,
-        userId: invitingAdminId,
-        joinedAt: new Date().toISOString(),
-      });
-    }
+      await setDoc(doc(db, "profiles", userId), newProfile);
 
-    /* 5 ─ For assistant / parent / player: join existing team ─ */
-    if (teamFromCode) {
-      newTeamId = teamFromCode.id;
-      const newMemberIds = [
-        ...new Set([...(teamFromCode.data.memberIds ?? []), userId]),
-      ];
-      await updateDoc(doc(db, "teams", teamFromCode.id), { memberIds: newMemberIds });
-      await setDoc(doc(db, "team_members", `${teamFromCode.id}_${userId}`), {
-        teamId: teamFromCode.id,
-        userId,
-        joinedAt: new Date().toISOString(),
-      });
+      /* 4 ─ For coaches: create a new team ────────────────────── */
+      let newTeamId: string | null = null;
+
+      if (role === "coach" && teamName && invitingAdminId) {
+        newTeamId = crypto.randomUUID();
+        const newTeam: DbTeam = {
+          name:              teamName,
+          ageGroup:          ageGroup ?? "",
+          coachId:           userId,
+          adminId:           invitingAdminId,
+          clubName:          invitingAdminClubName ?? "",
+          clubLogoUrl:       invitingAdminLogoUrl ?? null,
+          sport:             sport ?? "basket",
+          memberIds:         [userId, invitingAdminId],
+          inviteCode:        generateCode(),
+          parentInviteCode:  generateCode(),
+          playerInviteCode:  generateCode(),
+        };
+        await setDoc(doc(db, "teams", newTeamId), newTeam);
+        await setDoc(doc(db, "team_members", `${newTeamId}_${userId}`), {
+          teamId: newTeamId,
+          userId,
+          joinedAt: new Date().toISOString(),
+        });
+        await setDoc(doc(db, "team_members", `${newTeamId}_${invitingAdminId}`), {
+          teamId: newTeamId,
+          userId: invitingAdminId,
+          joinedAt: new Date().toISOString(),
+        });
+      }
+
+      /* 5 ─ For assistant / parent / player: join existing team ─ */
+      if (teamFromCode) {
+        newTeamId = teamFromCode.id;
+        const newMemberIds = [
+          ...new Set([...(teamFromCode.data.memberIds ?? []), userId]),
+        ];
+        await updateDoc(doc(db, "teams", teamFromCode.id), { memberIds: newMemberIds });
+        await setDoc(doc(db, "team_members", `${teamFromCode.id}_${userId}`), {
+          teamId: teamFromCode.id,
+          userId,
+          joinedAt: new Date().toISOString(),
+        });
+      }
+    } catch (firestoreErr) {
+      /* Roll back: remove the auth user so the same e-mail can be used again. */
+      try { await credential.user.delete(); } catch (deleteErr) {
+        console.warn("[register] Could not delete auth user after Firestore failure:", deleteErr);
+      }
+      throw firestoreErr;
     }
 
     return null; // success
