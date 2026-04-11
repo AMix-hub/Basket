@@ -305,6 +305,12 @@ function translateFirebaseError(message: string): string {
   if (m.includes("api-key-not-valid") || m.includes("invalid api")) {
     return "Tjänsten är inte tillgänglig just nu. Försök igen senare eller kontakta supporten.";
   }
+  if (m.includes("unauthorized-domain")) {
+    return "Den här domänen är inte behörig för inloggning. Kontakta supporten.";
+  }
+  if (m.includes("user-disabled")) {
+    return "Det här kontot har inaktiverats. Kontakta administratören.";
+  }
   return message;
 }
 
@@ -542,6 +548,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loadProfile(firebaseUser.uid, firebaseUser.email ?? "")
           .then((u) => {
             if (u) registerPushToken(u.id);
+          })
+          .catch((err) => {
+            console.error("[AuthContext] loadProfile misslyckades:", err);
           })
           .finally(() => setLoading(false));
       } else {
