@@ -547,6 +547,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        // Set loading=true before kicking off profile fetch so that any
+        // login-page observer (loginAttempted + loading) waits until the
+        // profile is actually loaded rather than seeing loading=false + user=null
+        // immediately after signInWithEmailAndPassword resolves.
+        setLoading(true);
         loadProfile(firebaseUser.uid, firebaseUser.email ?? "")
           .then((u) => {
             if (u) registerPushToken(u.id);
