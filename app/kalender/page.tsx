@@ -11,6 +11,9 @@ import {
   doc,
   writeBatch,
   setDoc,
+  deleteDoc,
+  getDocs,
+  getDoc,
 } from "firebase/firestore";
 import { db, auth } from "../../lib/firebaseClient";
 import { useAuth } from "../context/AuthContext";
@@ -52,7 +55,17 @@ interface TrainingSession {
   recurringGroupId?: string;
   planYear?: number;
   planSessionNumber?: number;
+  // Match-specific
+  opponent?: string;
+  location?: string;
+  homeOrAway?: "home" | "away";
+  result?: string;
+  // Coach assignment
+  coachId?: string;
+  coachName?: string;
 }
+
+type RsvpStatus = "coming" | "not_coming" | "maybe";
 
 interface Hall {
   id: string;
@@ -184,6 +197,10 @@ export default function KalenderPage() {
   const [newTime, setNewTime] = useState("17:00");
   const [newEndTime, setNewEndTime] = useState("18:30");
   const [newHallId, setNewHallId] = useState("");
+  const [newOpponent, setNewOpponent] = useState("");
+  const [newLocation, setNewLocation] = useState("");
+  const [newHomeOrAway, setNewHomeOrAway] = useState<"home" | "away">("home");
+  const [newCoachId, setNewCoachId] = useState("");
 
   // Recurring session fields
   const [isRecurring, setIsRecurring] = useState(false);
@@ -213,8 +230,21 @@ export default function KalenderPage() {
   const [editTime, setEditTime] = useState("");
   const [editEndTime, setEditEndTime] = useState("");
   const [editHallId, setEditHallId] = useState("");
+  const [editOpponent, setEditOpponent] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editHomeOrAway, setEditHomeOrAway] = useState<"home" | "away">("home");
+  const [editResult, setEditResult] = useState("");
+  const [editCoachId, setEditCoachId] = useState("");
   const [editBusy, setEditBusy] = useState(false);
   const [selectedEditIds, setSelectedEditIds] = useState<Set<string>>(new Set());
+
+  // RSVP state
+  const [myRsvps, setMyRsvps] = useState<Record<string, RsvpStatus>>({});
+  const [rsvpCounts, setRsvpCounts] = useState<Record<string, { coming: number; not_coming: number; maybe: number }>>({});
+  const [rsvpBusy, setRsvpBusy] = useState<string | null>(null);
+
+  // Team coaches for session assignment
+  const [teamCoaches, setTeamCoaches] = useState<{ id: string; name: string }[]>([]);
 
   // Session notes (exercises linked to plan sessions or directly to a calendar session)
   const [sessionNotes, setSessionNotes] = useState<Record<string, SessionNote>>({});
@@ -325,6 +355,12 @@ export default function KalenderPage() {
       recurringGroupId: (d.data().recurringGroupId as string | undefined) ?? undefined,
       planYear: (d.data().planYear as number | undefined) ?? undefined,
       planSessionNumber: (d.data().planSessionNumber as number | undefined) ?? undefined,
+      opponent: (d.data().opponent as string | undefined) ?? undefined,
+      location: (d.data().location as string | undefined) ?? undefined,
+      homeOrAway: (d.data().homeOrAway as "home" | "away" | undefined) ?? undefined,
+      result: (d.data().result as string | undefined) ?? undefined,
+      coachId: (d.data().coachId as string | undefined) ?? undefined,
+      coachName: (d.data().coachName as string | undefined) ?? undefined,
     });
 
     if (selectedTeamId === "__all__" && allTeams.length > 0) {
@@ -391,6 +427,49 @@ export default function KalenderPage() {
     return () => unsub();
   }, [team]);
 
+  // Subscribe to the current user's RSVPs for this team's sessions
+  useEffect(() => {
+    if (!user || !team) { setMyRsvps({}); return; }
+    const q = query(collection(db, "rsvps"), where("teamId", "==", team.id), where("userId", "==", user.id));
+    const unsub = onSnapshot(q, (snap) => {
+      const loaded: Record<string, RsvpStatus> = {};
+      snap.docs.forEach((d) => { loaded[d.data().sessionId as string] = d.data().status as RsvpStatus; });
+      setMyRsvps(loaded);
+    });
+    return () => unsub();
+  }, [user, team]);
+
+  // Subscribe to all RSVPs so coaches/admins can see totals
+  useEffect(() => {
+    if (!team || !canEdit) { setRsvpCounts({}); return; }
+    const q = query(collection(db, "rsvps"), where("teamId", "==", team.id));
+    const unsub = onSnapshot(q, (snap) => {
+      const counts: Record<string, { coming: number; not_coming: number; maybe: number }> = {};
+      snap.docs.forEach((d) => {
+        const sid = d.data().sessionId as string;
+        const st = d.data().status as RsvpStatus;
+        if (!counts[sid]) counts[sid] = { coming: 0, not_coming: 0, maybe: 0 };
+        counts[sid][st]++;
+      });
+      setRsvpCounts(counts);
+    });
+    return () => unsub();
+  }, [team, canEdit]);
+
+  // Load coaches/assistants in the current team for session assignment
+  useEffect(() => {
+    if (!team) { setTeamCoaches([]); return; }
+    (async () => {
+      const snap = await getDocs(query(collection(db, "team_members"), where("teamId", "==", team.id)));
+      const coachIds = snap.docs
+        .filter((d) => ["coach", "assistant"].includes(d.data().role as string))
+        .map((d) => d.data().userId as string);
+      if (coachIds.length === 0) { setTeamCoaches([]); return; }
+      const profiles = await Promise.all(coachIds.map((id) => getDoc(doc(db, "profiles", id))));
+      setTeamCoaches(profiles.filter((p) => p.exists()).map((p) => ({ id: p.id, name: p.data()!.name as string })));
+    })();
+  }, [team]);
+
   const savePlayers = (updated: Player[]) => {
     setPlayers(updated);
     localStorage.setItem(PLAYERS_KEY, JSON.stringify(updated));
@@ -429,6 +508,12 @@ export default function KalenderPage() {
       ? { hallId: selectedHall.id, hallName: selectedHall.name }
       : {};
 
+    const matchFields = newType === "match"
+      ? { opponent: newOpponent.trim() || null, location: newLocation.trim() || null, homeOrAway: newHomeOrAway }
+      : {};
+    const selectedCoach = teamCoaches.find((c) => c.id === newCoachId);
+    const coachFields = selectedCoach ? { coachId: selectedCoach.id, coachName: selectedCoach.name } : {};
+
     if (isRecurring) {
       if (!recurStartDate || !recurEndDate || recurEndDate < recurStartDate) return;
       const allDates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
@@ -450,6 +535,8 @@ export default function KalenderPage() {
             time: newTime,
             endTime: newEndTime || null,
             ...hallFields,
+            ...matchFields,
+            ...coachFields,
             createdBy: user.id,
             recurringGroupId: groupId,
           });
@@ -467,6 +554,8 @@ export default function KalenderPage() {
         time: newTime,
         endTime: newEndTime || null,
         ...hallFields,
+        ...matchFields,
+        ...coachFields,
         createdBy: user.id,
       });
     }
@@ -476,6 +565,10 @@ export default function KalenderPage() {
     setNewTime("17:00");
     setNewEndTime("18:30");
     setNewHallId("");
+    setNewOpponent("");
+    setNewLocation("");
+    setNewHomeOrAway("home");
+    setNewCoachId("");
     setIsRecurring(false);
     setShowCreateModal(false);
   };
@@ -591,6 +684,11 @@ export default function KalenderPage() {
     setEditTime(s.time);
     setEditEndTime(s.endTime ?? "");
     setEditHallId(s.hallId ?? "");
+    setEditOpponent(s.opponent ?? "");
+    setEditLocation(s.location ?? "");
+    setEditHomeOrAway(s.homeOrAway ?? "home");
+    setEditResult(s.result ?? "");
+    setEditCoachId(s.coachId ?? "");
     setEditScope("single");
     setSelectedEditIds(new Set([s.id]));
   };
@@ -611,6 +709,7 @@ export default function KalenderPage() {
       }
 
       const selectedHall = halls.find((h) => h.id === editHallId);
+      const selectedCoachEdit = teamCoaches.find((c) => c.id === editCoachId);
       const updates: Record<string, unknown> = {
         title: editTitle.trim(),
         type: editType,
@@ -618,6 +717,12 @@ export default function KalenderPage() {
         endTime: editEndTime || null,
         hallId: selectedHall?.id ?? null,
         hallName: selectedHall?.name ?? null,
+        opponent: editType === "match" ? (editOpponent.trim() || null) : null,
+        location: editType === "match" ? (editLocation.trim() || null) : null,
+        homeOrAway: editType === "match" ? editHomeOrAway : null,
+        result: editResult.trim() || null,
+        coachId: selectedCoachEdit?.id ?? null,
+        coachName: selectedCoachEdit?.name ?? null,
       };
 
       const BATCH_SIZE = 500;
@@ -639,6 +744,12 @@ export default function KalenderPage() {
           endTime: editEndTime || undefined,
           hallId: selectedHall?.id,
           hallName: selectedHall?.name,
+          opponent: editType === "match" ? (editOpponent.trim() || undefined) : undefined,
+          location: editType === "match" ? (editLocation.trim() || undefined) : undefined,
+          homeOrAway: editType === "match" ? editHomeOrAway : undefined,
+          result: editResult.trim() || undefined,
+          coachId: selectedCoachEdit?.id,
+          coachName: selectedCoachEdit?.name,
         });
       }
 
@@ -685,6 +796,29 @@ export default function KalenderPage() {
         );
         return [...filtered, { sessionId, playerId, status }];
       });
+    }
+  };
+
+  /* ── RSVP ── */
+  const submitRsvp = async (sessionId: string, status: RsvpStatus) => {
+    if (!user || !team || rsvpBusy) return;
+    setRsvpBusy(sessionId);
+    try {
+      const docId = `${sessionId}_${user.id}`;
+      if (myRsvps[sessionId] === status) {
+        await deleteDoc(doc(db, "rsvps", docId));
+      } else {
+        await setDoc(doc(db, "rsvps", docId), {
+          sessionId,
+          userId: user.id,
+          userName: user.name,
+          teamId: team.id,
+          status,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } finally {
+      setRsvpBusy(null);
     }
   };
 
@@ -1062,6 +1196,51 @@ export default function KalenderPage() {
                   </select>
                 </div>
               )}
+              {/* Match-specific fields */}
+              {editType === "match" && (
+                <div className="space-y-2 bg-red-50 rounded-xl p-3 border border-red-100">
+                  <p className="text-xs font-semibold text-red-700">Matchinfo</p>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Motståndare</label>
+                    <input type="text" value={editOpponent} onChange={(e) => setEditOpponent(e.target.value)}
+                      placeholder="Motståndarlaget..."
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Plats / Arena</label>
+                    <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}
+                      placeholder="Arena eller adress..."
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Hemma / Borta</label>
+                    <select value={editHomeOrAway} onChange={(e) => setEditHomeOrAway(e.target.value as "home" | "away")}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 bg-white">
+                      <option value="home">🏠 Hemma</option>
+                      <option value="away">✈️ Borta</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Resultat (om matchen spelats)</label>
+                    <input type="text" value={editResult} onChange={(e) => setEditResult(e.target.value)}
+                      placeholder="t.ex. 68–54"
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
+                  </div>
+                </div>
+              )}
+              {/* Coach assignment */}
+              {teamCoaches.length > 0 && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">Ansvarig tränare</label>
+                  <select value={editCoachId} onChange={(e) => setEditCoachId(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                    <option value="">Ingen specifik tränare</option>
+                    {teamCoaches.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Recurring scope */}
               {editingSession.recurringGroupId && (
@@ -1325,6 +1504,59 @@ export default function KalenderPage() {
                     <option value="">🏟 Välj hall (valfritt)</option>
                     {halls.map((h) => (
                       <option key={h.id} value={h.id}>{h.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {/* Match-specific fields */}
+              {newType === "match" && (
+                <div className="space-y-2 bg-red-50 rounded-xl p-3 border border-red-100">
+                  <p className="text-xs font-semibold text-red-700">Matchinfo</p>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Motståndare</label>
+                    <input
+                      type="text"
+                      value={newOpponent}
+                      onChange={(e) => setNewOpponent(e.target.value)}
+                      placeholder="Motståndarlaget..."
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Plats / Arena</label>
+                    <input
+                      type="text"
+                      value={newLocation}
+                      onChange={(e) => setNewLocation(e.target.value)}
+                      placeholder="Arena eller adress..."
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-500 block mb-0.5">Hemma / Borta</label>
+                    <select
+                      value={newHomeOrAway}
+                      onChange={(e) => setNewHomeOrAway(e.target.value as "home" | "away")}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 bg-white"
+                    >
+                      <option value="home">🏠 Hemma</option>
+                      <option value="away">✈️ Borta</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+              {/* Coach assignment */}
+              {teamCoaches.length > 0 && (
+                <div>
+                  <label className="text-xs text-slate-500 block mb-0.5">Ansvarig tränare</label>
+                  <select
+                    value={newCoachId}
+                    onChange={(e) => setNewCoachId(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  >
+                    <option value="">Ingen specifik tränare</option>
+                    {teamCoaches.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
@@ -1670,6 +1902,41 @@ export default function KalenderPage() {
                     <p className="font-semibold text-sm text-slate-200 mt-1">
                       {s.title}
                     </p>
+                    {/* Match meta: opponent, location, result */}
+                    {s.type === "match" && (s.opponent || s.location || s.result) && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {s.homeOrAway && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium">
+                            {s.homeOrAway === "home" ? "🏠 Hemma" : "✈️ Borta"}
+                          </span>
+                        )}
+                        {s.opponent && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 font-medium">
+                            vs {s.opponent}
+                          </span>
+                        )}
+                        {s.location && (
+                          <span className="text-xs text-slate-400">📍 {s.location}</span>
+                        )}
+                        {s.result && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 font-bold">
+                            {s.result}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {/* Coach name */}
+                    {s.coachName && (
+                      <p className="text-xs text-indigo-400 mt-0.5">🏃 {s.coachName}</p>
+                    )}
+                    {/* RSVP count for coaches */}
+                    {canEdit && rsvpCounts[s.id] && (rsvpCounts[s.id].coming + rsvpCounts[s.id].not_coming + rsvpCounts[s.id].maybe) > 0 && (
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        RSVP: <span className="text-emerald-400">{rsvpCounts[s.id].coming}✓</span>{" "}
+                        <span className="text-red-400">{rsvpCounts[s.id].not_coming}✗</span>{" "}
+                        <span className="text-amber-400">{rsvpCounts[s.id].maybe}?</span>
+                      </p>
+                    )}
                     {s.planSessionNumber && (
                       <p className="text-xs text-slate-400 mt-0.5">
                         Pass {s.planSessionNumber}{s.planYear ? ` · År ${s.planYear}` : ""}
@@ -1701,6 +1968,29 @@ export default function KalenderPage() {
                     {/* Expanded session detail: plan exercises + notes + reminder */}
                     {isExpanded && (
                       <div className="mt-2 border-t border-orange-200 pt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+
+                        {/* RSVP buttons for non-coach users on upcoming sessions */}
+                        {!canEdit && s.date >= toYMD(today) && (
+                          <div className="bg-slate-700/50 rounded-lg px-2.5 py-2">
+                            <p className="text-xs font-semibold text-slate-400 mb-1.5">Kommer du?</p>
+                            <div className="flex gap-1.5">
+                              {([["coming", "✓ Ja", "emerald"], ["maybe", "? Kanske", "amber"], ["not_coming", "✗ Nej", "red"]] as const).map(([st, label, color]) => (
+                                <button
+                                  key={st}
+                                  disabled={rsvpBusy === s.id}
+                                  onClick={(e) => { e.stopPropagation(); submitRsvp(s.id, st); }}
+                                  className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all ${
+                                    myRsvps[s.id] === st
+                                      ? color === "emerald" ? "bg-emerald-600 text-white" : color === "amber" ? "bg-amber-500 text-white" : "bg-red-600 text-white"
+                                      : "bg-slate-600 text-slate-300 hover:bg-slate-500"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Tränarkommentar */}
                         {note?.comment && (

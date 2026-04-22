@@ -15,8 +15,120 @@ import {
   setDoc,
   updateDoc,
   arrayUnion,
+  addDoc,
+  onSnapshot,
+  orderBy,
 } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
+
+interface PlayerNote {
+  id: string;
+  teamId: string;
+  playerId: string;
+  playerName: string;
+  coachId: string;
+  coachName: string;
+  note: string;
+  date: string;
+  createdAt: string;
+}
+
+interface PlayerNotesModalProps {
+  member: ProfileRow;
+  teamId: string;
+  coachId: string;
+  coachName: string;
+  onClose: () => void;
+}
+
+function PlayerNotesModal({ member, teamId, coachId, coachName, onClose }: PlayerNotesModalProps) {
+  const [notes, setNotes] = useState<PlayerNote[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "player_notes"),
+      where("teamId", "==", teamId),
+      where("playerId", "==", member.id),
+      orderBy("createdAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as PlayerNote)));
+    });
+    return () => unsub();
+  }, [teamId, member.id]);
+
+  const saveNote = async () => {
+    if (!newNote.trim() || saving) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, "player_notes"), {
+        teamId,
+        playerId: member.id,
+        playerName: member.name,
+        coachId,
+        coachName,
+        note: newNote.trim(),
+        date: today,
+        createdAt: new Date().toISOString(),
+      });
+      setNewNote("");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+      <div className="bg-[#1e293b] border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-bold text-slate-100">Anteckningar</h3>
+            <p className="text-sm text-slate-400 mt-0.5">{member.name}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none">✕</button>
+        </div>
+
+        {/* Add note */}
+        <div className="mb-4">
+          <textarea
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            placeholder="Skriv en anteckning om spelaren..."
+            rows={3}
+            className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+          />
+          <button
+            disabled={saving || !newNote.trim()}
+            onClick={saveNote}
+            className="mt-2 w-full py-2 rounded-xl bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-40 transition-colors"
+          >
+            {saving ? "Sparar…" : "+ Lägg till anteckning"}
+          </button>
+        </div>
+
+        {/* Notes list */}
+        <div className="overflow-y-auto space-y-3 flex-1">
+          {notes.length === 0 ? (
+            <p className="text-slate-400 text-sm text-center py-4">Inga anteckningar ännu.</p>
+          ) : (
+            notes.map((n) => (
+              <div key={n.id} className="bg-slate-800 rounded-xl p-3 border border-slate-700">
+                <p className="text-sm text-slate-200 leading-relaxed">{n.note}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-slate-500">{n.coachName}</span>
+                  <span className="text-xs text-slate-600">{n.date}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ProfileRow {
   id: string;
@@ -129,6 +241,7 @@ export default function RegistretPage() {
   const [teamData, setTeamData] = useState<TeamWithMembers[] | null>(null);
   const [adminTeams, setAdminTeams] = useState<{ id: string; name: string; ageGroup?: string }[]>([]);
   const [assigningMember, setAssigningMember] = useState<{ member: ProfileRow; teamIds: string[] } | null>(null);
+  const [notesTarget, setNotesTarget] = useState<{ member: ProfileRow; teamId: string } | null>(null);
 
   const isAdmin = user?.roles.includes("admin") ?? false;
   const isCoach = user?.roles.includes("coach") ?? false;
@@ -338,6 +451,16 @@ export default function RegistretPage() {
           onClose={() => setAssigningMember(null)}
         />
       )}
+      {/* Player notes modal */}
+      {notesTarget && user && (
+        <PlayerNotesModal
+          member={notesTarget.member}
+          teamId={notesTarget.teamId}
+          coachId={user.id}
+          coachName={user.name}
+          onClose={() => setNotesTarget(null)}
+        />
+      )}
 
       {/* Header */}
       <div className="mb-6">
@@ -420,15 +543,26 @@ export default function RegistretPage() {
                         </div>
                       </td>
                       <td className="py-2 pl-2">
-                        <button
-                          onClick={() =>
-                            setAssigningMember({ member, teamIds })
-                          }
-                          className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-orange-500/20 text-slate-400 hover:text-orange-400 rounded-lg transition-colors font-medium"
-                          title="Lägg till i lag"
-                        >
-                          + Lag
-                        </button>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() =>
+                              setAssigningMember({ member, teamIds })
+                            }
+                            className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-orange-500/20 text-slate-400 hover:text-orange-400 rounded-lg transition-colors font-medium"
+                            title="Lägg till i lag"
+                          >
+                            + Lag
+                          </button>
+                          {teamIds.length > 0 && (
+                            <button
+                              onClick={() => setNotesTarget({ member, teamId: teamIds[0] })}
+                              className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 rounded-lg transition-colors font-medium"
+                              title="Anteckningar"
+                            >
+                              📝
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -464,7 +598,8 @@ export default function RegistretPage() {
                     <thead>
                       <tr className="text-left text-xs font-semibold text-slate-500 border-b border-slate-700">
                         <th className="pb-2 pr-4">Namn</th>
-                        <th className="pb-2">Roller</th>
+                        <th className="pb-2 pr-4">Roller</th>
+                        <th className="pb-2"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
@@ -482,7 +617,7 @@ export default function RegistretPage() {
                                 </span>
                               )}
                             </td>
-                            <td className="py-2">
+                            <td className="py-2 pr-4">
                               <div className="flex flex-wrap gap-1">
                                 {member.roles.map((r) => (
                                   <span
@@ -493,6 +628,15 @@ export default function RegistretPage() {
                                   </span>
                                 ))}
                               </div>
+                            </td>
+                            <td className="py-2">
+                              <button
+                                onClick={() => setNotesTarget({ member, teamId: team.id })}
+                                className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 rounded-lg transition-colors font-medium"
+                                title="Visa / lägg till anteckningar"
+                              >
+                                📝
+                              </button>
                             </td>
                           </tr>
                         ))}

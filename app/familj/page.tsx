@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, orderBy } from "firebase/firestore";
 import { db } from "../../lib/firebaseClient";
 import { useAuth } from "../context/AuthContext";
 
@@ -13,9 +13,12 @@ interface TrainingSession {
   title: string;
   type: "träning" | "match";
   time: string;
+  opponent?: string;
+  homeOrAway?: "home" | "away";
 }
 
 type AttendanceStatus = "present" | "absent" | "sick";
+type RsvpStatus = "coming" | "not_coming" | "maybe";
 
 interface Attendance {
   sessionId: string;
@@ -62,6 +65,9 @@ export default function FamiljPage() {
     const p = localStorage.getItem(PLAYERS_KEY);
     return p ? (JSON.parse(p) as Player[]) : [];
   });
+  const [myRsvps, setMyRsvps] = useState<Record<string, RsvpStatus>>({});
+  const [rsvpBusy, setRsvpBusy] = useState<string | null>(null);
+  const [playerNotes, setPlayerNotes] = useState<Array<{ id: string; note: string; coachName: string; date: string }>>([]);
 
   // Suppress unused-setter warnings – setters kept for future use
   void setAttendance; void setPlayers;
@@ -80,11 +86,69 @@ export default function FamiljPage() {
         title: d.data().title as string,
         type: d.data().type as "träning" | "match",
         time: d.data().time as string,
+        opponent: (d.data().opponent as string | undefined) ?? undefined,
+        homeOrAway: (d.data().homeOrAway as "home" | "away" | undefined) ?? undefined,
       }));
       setSessions(loaded);
     });
     return () => unsubscribe();
   }, [team]);
+
+  // Subscribe to RSVPs for current user
+  useEffect(() => {
+    if (!user || !team) { setMyRsvps({}); return; }
+    const q = query(collection(db, "rsvps"), where("teamId", "==", team.id), where("userId", "==", user.id));
+    const unsub = onSnapshot(q, (snap) => {
+      const loaded: Record<string, RsvpStatus> = {};
+      snap.docs.forEach((d) => { loaded[d.data().sessionId as string] = d.data().status as RsvpStatus; });
+      setMyRsvps(loaded);
+    });
+    return () => unsub();
+  }, [user, team]);
+
+  // Subscribe to player notes for the child (matched by Firebase UID lookup via profiles)
+  useEffect(() => {
+    if (!user || !team) { setPlayerNotes([]); return; }
+    // Parents see notes for their child; players see their own notes
+    const targetId = user.id;
+    const q = query(
+      collection(db, "player_notes"),
+      where("teamId", "==", team.id),
+      where("playerId", "==", targetId),
+      orderBy("createdAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setPlayerNotes(snap.docs.map((d) => ({
+        id: d.id,
+        note: d.data().note as string,
+        coachName: d.data().coachName as string,
+        date: d.data().date as string,
+      })));
+    });
+    return () => unsub();
+  }, [user, team]);
+
+  const submitRsvp = async (sessionId: string, status: RsvpStatus) => {
+    if (!user || !team || rsvpBusy) return;
+    setRsvpBusy(sessionId);
+    try {
+      const docId = `${sessionId}_${user.id}`;
+      if (myRsvps[sessionId] === status) {
+        await deleteDoc(doc(db, "rsvps", docId));
+      } else {
+        await setDoc(doc(db, "rsvps", docId), {
+          sessionId,
+          userId: user.id,
+          userName: user.name,
+          teamId: team.id,
+          status,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    } finally {
+      setRsvpBusy(null);
+    }
+  };
 
   /* ── Match child name to player ── */
   const childName = user?.childName ?? "";
@@ -285,36 +349,60 @@ export default function FamiljPage() {
                   month: "short",
                   day: "numeric",
                 });
+                const myRsvp = myRsvps[s.id];
                 return (
                   <div
                     key={s.id}
-                    className="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex items-center gap-4"
+                    className="bg-slate-800 border border-slate-700 rounded-2xl p-4"
                   >
-                    <div className="w-12 text-center shrink-0">
-                      <p className="text-xs text-slate-400 font-medium uppercase">
-                        {MONTHS_SV[d.getMonth()].slice(0, 3)}
-                      </p>
-                      <p className="text-xl font-extrabold text-slate-100 leading-tight">
-                        {d.getDate()}
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 text-center shrink-0">
+                        <p className="text-xs text-slate-400 font-medium uppercase">
+                          {MONTHS_SV[d.getMonth()].slice(0, 3)}
+                        </p>
+                        <p className="text-xl font-extrabold text-slate-100 leading-tight">
+                          {d.getDate()}
+                        </p>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-200 text-sm">
+                          {s.title}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {label} · {s.time}
+                        </p>
+                        {s.type === "match" && s.opponent && (
+                          <p className="text-xs text-red-400 mt-0.5">
+                            {s.homeOrAway === "home" ? "🏠" : "✈️"} vs {s.opponent}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                          s.type === "match"
+                            ? "bg-red-900/30 text-red-400"
+                            : "bg-emerald-900/30 text-emerald-400"
+                        }`}
+                      >
+                        {s.type === "match" ? "Match" : "Träning"}
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-200 text-sm">
-                        {s.title}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {label} · {s.time}
-                      </p>
+                    <div className="mt-3 flex gap-1.5">
+                      {([["coming", "✓ Ja", "emerald"], ["maybe", "? Kanske", "amber"], ["not_coming", "✗ Nej", "red"]] as const).map(([st, lbl, color]) => (
+                        <button
+                          key={st}
+                          disabled={rsvpBusy === s.id}
+                          onClick={() => submitRsvp(s.id, st)}
+                          className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
+                            myRsvp === st
+                              ? color === "emerald" ? "bg-emerald-600 text-white" : color === "amber" ? "bg-amber-500 text-white" : "bg-red-600 text-white"
+                              : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                          }`}
+                        >
+                          {lbl}
+                        </button>
+                      ))}
                     </div>
-                    <span
-                      className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                        s.type === "match"
-                          ? "bg-red-900/30 text-red-400"
-                          : "bg-emerald-900/30 text-emerald-400"
-                      }`}
-                    >
-                      {s.type === "match" ? "Match" : "Träning"}
-                    </span>
                   </div>
                 );
               })}
@@ -376,6 +464,27 @@ export default function FamiljPage() {
           )}
         </div>
       </div>
+
+      {/* Coach notes for the child/player */}
+      {playerNotes.length > 0 && (
+        <div className="mt-6">
+          <h2 className="font-bold text-slate-100 mb-3 flex items-center gap-2">
+            <span>📝</span> Tränarens anteckningar
+            {childName && <span className="text-xs font-normal text-slate-500">– om {childName}</span>}
+          </h2>
+          <div className="space-y-3">
+            {playerNotes.map((n) => (
+              <div key={n.id} className="bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3">
+                <p className="text-sm text-slate-200 leading-relaxed">{n.note}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-xs text-indigo-400">{n.coachName}</span>
+                  <span className="text-xs text-slate-600">{n.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -290,6 +290,35 @@ service cloud.firestore {
         isCoachOrAbove();
     }
 
+    // ─── rsvps ───────────────────────────────────────────────────
+    // Any team member can read RSVPs for their team and write their own.
+    // Coaches/admins can read all RSVPs (for head-count).
+    match /rsvps/{docId} {
+      allow read: if isSignedIn() && isTeamMember(resource.data.teamId);
+      allow create, update: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        isTeamMember(request.resource.data.teamId);
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // ─── player_notes ─────────────────────────────────────────────
+    // Coaches/admins write notes per player; the player and their
+    // parents can read notes for themselves.
+    match /player_notes/{noteId} {
+      allow read: if isSignedIn() && (
+        isCoachOrAbove() ||
+        resource.data.playerId == request.auth.uid
+      );
+      allow create: if isSignedIn() && isCoachOrAbove() &&
+        request.resource.data.coachId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        isCoachOrAbove() &&
+        resource.data.coachId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        isCoachOrAbove() &&
+        resource.data.coachId == request.auth.uid;
+    }
+
     // ─── dev_items ────────────────────────────────────────────────
     // Development tracking items. Accessible only to admins.
     match /dev_items/{itemId} {
