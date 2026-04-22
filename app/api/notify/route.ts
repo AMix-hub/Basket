@@ -60,6 +60,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  /* ── 2b. Verify the caller is a logged-in user ── */
+  {
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      const { getAuth } = await import("firebase-admin/auth");
+      const { getApps } = await import("firebase-admin/app");
+      const apps = getApps();
+      if (apps.length === 0) {
+        return NextResponse.json({ error: "Firebase Admin not initialized" }, { status: 500 });
+      }
+      await getAuth(apps[0]).verifyIdToken(authHeader.slice(7));
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   /* ── 3. Fetch team members ── */
   const membersSnap = await adminDb
     .collection("team_members")

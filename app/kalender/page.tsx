@@ -12,7 +12,7 @@ import {
   writeBatch,
   setDoc,
 } from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { db, auth } from "../../lib/firebaseClient";
 import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
 import { autoTag, TAG_LABELS, TAG_COLORS } from "../../lib/exerciseTags";
@@ -559,9 +559,10 @@ export default function KalenderPage() {
         });
 
         // Send push notification + email (fire-and-forget)
+        const notifyToken = await auth.currentUser?.getIdToken().catch(() => "") ?? "";
         fetch("/api/notify", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${notifyToken}` },
           body: JSON.stringify({
             teamId: notifyTeam.id,
             sessionTitle: cancellingSession.title,
@@ -808,9 +809,10 @@ export default function KalenderPage() {
     if (!team || sendingReminder) return;
     setSendingReminder(s.id);
     try {
+      const token = (await auth.currentUser?.getIdToken()) ?? "";
       await fetch("/api/notify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           teamId: team.id,
           sessionTitle: s.title,

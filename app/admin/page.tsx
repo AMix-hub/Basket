@@ -21,7 +21,7 @@ import {
   addDoc,
   onSnapshot,
 } from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { db, auth } from "../../lib/firebaseClient";
 
 interface TeamRow {
   id: string;
@@ -348,11 +348,15 @@ export default function AdminPage() {
       await updateDoc(doc(db, "profiles", member.id), {
         roles: newRoles,
         role: primary,
-        // When promoting to admin, set adminId so the co-admin's
-        // effectiveAdminId resolves to the club's root admin and all
-        // club-scoped queries (teams, registret) work correctly.
+        // When promoting to admin, copy club identity so the co-admin sees the
+        // correct club name/logo and creates teams with the right club data.
         ...(checked && role === "admin" && user
-          ? { adminId: user.adminId ?? user.id }
+          ? {
+              adminId: user.adminId ?? user.id,
+              clubName: user.clubName ?? null,
+              clubLogoUrl: user.clubLogoUrl ?? null,
+              clubWebsiteUrl: user.clubWebsiteUrl ?? null,
+            }
           : {}),
       });
 
@@ -400,9 +404,10 @@ export default function AdminPage() {
     setInviteError(null);
     setInviteSuccess(null);
     try {
+      const token = (await auth.currentUser?.getIdToken()) ?? "";
       const res = await fetch("/api/create-user", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({
           email: inviteEmail.trim().toLowerCase(),
           name: inviteName.trim(),

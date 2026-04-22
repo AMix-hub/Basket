@@ -27,6 +27,7 @@ import {
   getDocs,
   limit,
   onSnapshot,
+  writeBatch,
 } from "firebase/firestore";
 import { auth, db, storage, getClientMessaging } from "../../lib/firebaseClient";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -877,14 +878,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Co-admins create teams under the club's root admin so new teams appear
       // in the correct club and are visible to all club admins.
       const effectiveAdminId = user.adminId ?? user.id;
+
+      // Co-admins may not have clubName/logo on their own profile (it lives on
+      // the root admin's profile). Fall back to fetching it so new teams always
+      // carry the correct club identity.
+      let clubName = user.clubName ?? "";
+      let clubLogoUrl: string | null = user.clubLogoUrl ?? null;
+      if (user.adminId && (!clubName || !clubLogoUrl)) {
+        const rootSnap = await getDoc(doc(db, "profiles", user.adminId));
+        if (rootSnap.exists()) {
+          const d = rootSnap.data() as DbProfile;
+          if (!clubName) clubName = d.clubName ?? "";
+          if (!clubLogoUrl) clubLogoUrl = d.clubLogoUrl ?? null;
+        }
+      }
+
       const newTeamId = crypto.randomUUID();
       const newTeam: DbTeam = {
         name: teamName,
         ageGroup,
         coachId: null,
         adminId: effectiveAdminId,
-        clubName: user.clubName ?? "",
-        clubLogoUrl: user.clubLogoUrl ?? null,
+        clubName,
+        clubLogoUrl,
         sport: user.sport ?? "basket",
         memberIds: [user.id],
         inviteCode: generateCode(),
@@ -942,16 +958,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await uploadWithTimeout;
       const url = await getDownloadURL(storageRef);
 
-      /* Save to admin's profile */
-      await updateDoc(doc(db, "profiles", user.id), { clubLogoUrl: url });
-
-      /* Propagate to all teams belonging to this admin */
+      /* Save to admin's profile and propagate to all teams atomically */
       const teamsSnap = await getDocs(
         query(collection(db, "teams"), where("adminId", "==", user.adminId ?? user.id))
       );
-      await Promise.all(
-        teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubLogoUrl: url }))
-      );
+      const logoBatch = writeBatch(db);
+      logoBatch.update(doc(db, "profiles", user.id), { clubLogoUrl: url });
+      teamsSnap.docs.forEach((d) => logoBatch.update(doc(db, "teams", d.id), { clubLogoUrl: url }));
+      await logoBatch.commit();
 
       /* Update local state */
       setUser({ ...user, clubLogoUrl: url });
@@ -982,16 +996,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      /* Save URL to admin's profile */
-      await updateDoc(doc(db, "profiles", user.id), { clubLogoUrl: trimmed });
-
-      /* Propagate to all teams belonging to this admin */
+      /* Save URL to admin's profile and propagate to all teams atomically */
       const teamsSnap = await getDocs(
         query(collection(db, "teams"), where("adminId", "==", user.adminId ?? user.id))
       );
-      await Promise.all(
-        teamsSnap.docs.map((d) => updateDoc(doc(db, "teams", d.id), { clubLogoUrl: trimmed }))
-      );
+      const logoBatch = writeBatch(db);
+      logoBatch.update(doc(db, "profiles", user.id), { clubLogoUrl: trimmed });
+      teamsSnap.docs.forEach((d) => logoBatch.update(doc(db, "teams", d.id), { clubLogoUrl: trimmed }));
+      await logoBatch.commit();
 
       /* Update local state */
       setUser({ ...user, clubLogoUrl: trimmed });

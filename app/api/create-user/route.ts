@@ -66,6 +66,17 @@ export async function POST(req: NextRequest) {
     }
     const adminAuth = getAuth(apps[0]);
 
+    // Verify the request comes from a logged-in user
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      await adminAuth.verifyIdToken(authHeader.slice(7));
+    } catch {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Create the user in Firebase Auth
     let userRecord;
     try {
@@ -188,7 +199,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ uid });
   } catch (err: unknown) {
     console.error("[create-user] Error:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "Kunde inte skapa användaren. Kontakta administratören." },
+      { status: 500 }
+    );
   }
 }
