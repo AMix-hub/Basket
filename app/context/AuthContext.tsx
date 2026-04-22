@@ -610,6 +610,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<string | null> => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // Set loading=true NOW so that when the login page's useEffect fires
+      // with loginAttempted=true it also sees loading=true and waits.
+      // onAuthStateChanged will keep loading=true while the profile loads.
+      setLoading(true);
       return null;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -698,10 +702,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     const userId = credential.user.uid;
 
-    /* Ensure the ID token is available to the Firestore SDK before any writes.
-     * Without this there is a brief window right after account creation where
-     * Firestore may see request.auth as null and deny the write. */
-    await credential.user.getIdToken();
+    /* Force-refresh the ID token so the Firestore SDK picks up the new auth
+     * state before any writes.  The plain getIdToken() call may resolve before
+     * Firestore's internal auth listener has processed the new credential,
+     * causing request.auth to appear null and the write to be denied. */
+    await credential.user.getIdToken(true);
 
     /* 3–5 ─ Firestore writes – if anything fails here we delete the just-created
      * auth user so the caller can retry with the same e-mail address. */
@@ -721,7 +726,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         adminId:         role === "admin"  ? null
                          : (invitingAdminId ?? teamFromCode?.data.adminId ?? null),
       };
-      await setDoc(doc(db, "profiles", userId), newProfile);
+      // Retry once with a short delay — Firestore's internal auth-state listener
+      // occasionally hasn't processed the new token yet even after getIdToken(true).
+      try {
+        await setDoc(doc(db, "profiles", userId), newProfile);
+      } catch (firstErr) {
+        const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+        if (firstMsg.includes("permission") || firstMsg.includes("Permission")) {
+          await new Promise<void>((res) => setTimeout(res, 600));
+          await setDoc(doc(db, "profiles", userId), newProfile);
+        } else {
+          throw firstErr;
+        }
+      }
 
       /* 4 ─ For coaches: create a new team ────────────────────── */
       let newTeamId: string | null = null;
