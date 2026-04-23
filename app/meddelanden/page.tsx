@@ -4,31 +4,18 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useAuth, User } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  doc,
-  getDoc,
-  getDocs,
-} from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 export interface Message {
   id: string;
-  teamId: string;
-  senderId: string;
+  teamId: string;    // maps to team_id in DB
+  senderId: string;  // maps to sender_id
   senderName: string;
-  /** null → team chat; userId string → direct message */
   recipientId: string | null;
   text: string;
-  sentAt: string;
-  /** IDs of users who have read this message */
-  readBy: string[];
+  sentAt: string;    // maps to sent_at
+  readBy: string[];  // maps to read_by
 }
 
 /* ─── Helpers ────────────────────────────────────────────────── */
@@ -70,149 +57,109 @@ export default function MeddelandenPage() {
   useEffect(() => {
     if (!user) return;
     (async () => {
-      const memberSnap = await getDocs(
-        query(collection(db, "team_members"), where("userId", "==", user.id))
-      );
-      const teamIds = memberSnap.docs.map((d) => d.data().teamId as string);
+      const { data: memberships } = await supabase
+        .from("team_members").select("team_id").eq("user_id", user.id);
+      const teamIds = (memberships ?? []).map((m: { team_id: string }) => m.team_id);
       if (teamIds.length === 0) { setAllUserTeams([]); return; }
 
-      const teamPromises = teamIds.map((id) => getDoc(doc(db, "teams", id)));
-      const teamSnaps = await Promise.all(teamPromises);
-      const teams: Team[] = teamSnaps
-        .filter((s) => s.exists())
-        .map((s) => {
-          const t = s.data()!;
-          return {
-            id: s.id,
-            name: t.name as string,
-            ageGroup: t.ageGroup as string,
-            coachId: (t.coachId as string) ?? "",
-            adminId: t.adminId as string,
-            clubName: (t.clubName as string) ?? "",
-            sport: ((t.sport as string) ?? "basket") as import("../../lib/sports").SportId,
-            memberIds: (t.memberIds as string[]) ?? [],
-            inviteCode: (t.inviteCode as string) ?? "",
-            parentInviteCode: (t.parentInviteCode as string) ?? "",
-            playerInviteCode: (t.playerInviteCode as string) ?? "",
-          } as Team;
-        });
+      const { data: teamRows } = await supabase.from("teams").select("*").in("id", teamIds);
+      const teams: Team[] = (teamRows ?? []).map((t) => ({
+        id: t.id, name: t.name, ageGroup: t.age_group,
+        coachId: t.coach_id ?? "", adminId: t.admin_id,
+        clubName: t.club_name ?? "",
+        sport: (t.sport ?? "basket") as import("../../lib/sports").SportId,
+        memberIds: t.member_ids ?? [],
+        inviteCode: t.invite_code ?? "",
+        parentInviteCode: t.parent_invite_code ?? "",
+        playerInviteCode: t.player_invite_code ?? "",
+      } as Team));
       setAllUserTeams(teams);
       setActiveTeamId((prev) => prev ?? (teams.length > 0 ? teams[0].id : null));
     })();
-  }, [user]);
+  }, [user?.id]);
 
   /* ── Load team members for the active team ── */
   useEffect(() => {
     if (!activeTeam || !user) return;
     setTeamMembers([]);
     (async () => {
-      const memberSnap = await getDocs(
-        query(collection(db, "team_members"), where("teamId", "==", activeTeam.id))
-      );
-
-      const ids = memberSnap.docs
-        .map((d) => d.data().userId as string)
-        .filter((id) => id !== user.id);
-
+      const { data: memberships } = await supabase
+        .from("team_members").select("user_id").eq("team_id", activeTeam.id);
+      const ids = (memberships ?? []).map((m: { user_id: string }) => m.user_id).filter((id) => id !== user.id);
       if (ids.length === 0) { setTeamMembers([]); return; }
 
-      const profilePromises = ids.map((id) => getDoc(doc(db, "profiles", id)));
-      const profileSnaps = await Promise.all(profilePromises);
-
+      const { data: profiles } = await supabase.from("profiles").select("*").in("id", ids);
       setTeamMembers(
-        profileSnaps
-          .filter((s) => s.exists())
-          .map((s) => {
-            const p = s.data()!;
-            return {
-              id: s.id,
-              name: p.name as string,
-              email: "",
-              roles:
-                p.roles && (p.roles as string[]).length > 0
-                  ? (p.roles as string[])
-                  : [p.role as string],
-              teamId: activeTeam.id,
-              childName: p.childName as string | undefined,
-              createdAt: "",
-            } as User;
-          })
+        (profiles ?? []).map((p) => ({
+          id: p.id, name: p.name, email: p.email ?? "",
+          roles: p.roles?.length > 0 ? p.roles : [p.role],
+          teamId: activeTeam.id,
+          childName: p.child_name ?? undefined,
+          createdAt: p.created_at,
+        } as User))
       );
     })();
-  }, [activeTeam, user]);
+  }, [activeTeam?.id, user?.id]);
 
   /* ── Load + subscribe to messages for all user's teams ── */
   useEffect(() => {
     if (allUserTeams.length === 0) return;
+    const teamIds = allUserTeams.map((t) => t.id);
+    let mounted = true;
 
-    const teamIds = allUserTeams.map((t) => t.id).slice(0, 30);
-    const q = teamIds.length === 1
-      ? query(collection(db, "messages"), where("teamId", "==", teamIds[0]))
-      : query(collection(db, "messages"), where("teamId", "in", teamIds));
+    const mapMsg = (m: Record<string, unknown>): Message => ({
+      id: m.id as string, teamId: m.team_id as string,
+      senderId: m.sender_id as string, senderName: m.sender_name as string,
+      recipientId: (m.recipient_id as string | null) ?? null,
+      text: m.text as string, sentAt: m.sent_at as string,
+      readBy: (m.read_by as string[]) ?? [],
+    });
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snap) => {
-        setQueryError(null);
-        setMessages(
-          snap.docs
-            .map((d) => {
-              const m = d.data();
-              return {
-                id:          d.id,
-                teamId:      m.teamId as string,
-                senderId:    m.senderId as string,
-                senderName:  m.senderName as string,
-                recipientId: (m.recipientId as string | null) ?? null,
-                text:        m.text as string,
-                sentAt:      m.sentAt as string,
-                readBy:      (m.readBy as string[]) ?? [],
-              } as Message;
-            })
-            .sort((a, b) => (a.sentAt < b.sentAt ? -1 : a.sentAt > b.sentAt ? 1 : 0))
-        );
-      },
-      (err) => {
-        console.error("Fel vid hämtning av meddelanden:", err);
-        setQueryError("Kunde inte hämta meddelanden. Försök igen.");
-      }
+    const load = () =>
+      supabase.from("messages").select("*").in("team_id", teamIds)
+        .then(({ data, error }) => {
+          if (!mounted) return;
+          if (error) { setQueryError("Kunde inte hämta meddelanden."); return; }
+          setQueryError(null);
+          setMessages((data ?? []).map(mapMsg).sort((a, b) => a.sentAt < b.sentAt ? -1 : 1));
+        });
+
+    load();
+    const channels = teamIds.map((tid) =>
+      supabase.channel(`messages:${tid}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `team_id=eq.${tid}` }, load)
+        .subscribe()
     );
 
-    return () => unsubscribe();
-  }, [allUserTeams]);
+    return () => { mounted = false; channels.forEach((c) => supabase.removeChannel(c)); };
+  }, [allUserTeams.map((t) => t.id).join(",")]);
 
-  /* ── Subscribe to coach channel (coaches/assistants/admins only) ── */
-  const isCoachOrAbove = user?.roles.some((r) => ["coach", "assistant", "admin"].includes(r)) ?? false;
+  /* ── Subscribe to coach channel ── */
+  const isCoachOrAbove = user?.roles.some((r) => ["coach", "assistant", "admin", "co_admin"].includes(r)) ?? false;
   useEffect(() => {
     if (!user || !isCoachOrAbove) return;
+    let mounted = true;
 
-    const unsubscribe = onSnapshot(
-      collection(db, "coach_chat"),
-      (snap) => {
-        setCoachMessages(
-          snap.docs
-            .map((d) => {
-              const m = d.data();
-              return {
-                id:          d.id,
-                teamId:      "coaches",
-                senderId:    m.senderId as string,
-                senderName:  m.senderName as string,
-                recipientId: null,
-                text:        m.text as string,
-                sentAt:      m.sentAt as string,
-                readBy:      (m.readBy as string[]) ?? [],
-              } as Message;
-            })
-            .sort((a, b) => (a.sentAt < b.sentAt ? -1 : a.sentAt > b.sentAt ? 1 : 0))
-        );
-      },
-      (err) => {
-        console.error("Fel vid hämtning av coachmeddelandena:", err);
-      }
-    );
+    const load = () =>
+      supabase.from("coach_chat").select("*").order("sent_at", { ascending: true })
+        .then(({ data }) => {
+          if (!mounted) return;
+          setCoachMessages(
+            (data ?? []).map((m) => ({
+              id: m.id, teamId: "coaches",
+              senderId: m.sender_id, senderName: m.sender_name,
+              recipientId: null, text: m.text,
+              sentAt: m.sent_at, readBy: [],
+            } as Message))
+          );
+        });
 
-    return () => unsubscribe();
+    load();
+    const channel = supabase.channel("coach-chat-sub")
+      .on("postgres_changes", { event: "*", schema: "public", table: "coach_chat" }, load)
+      .subscribe();
+
+    return () => { mounted = false; supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, isCoachOrAbove]);
 
@@ -232,7 +179,7 @@ export default function MeddelandenPage() {
 
     toMark.forEach(async (m) => {
       const newReadBy = [...m.readBy, user.id];
-      await updateDoc(doc(db, "messages", m.id), { readBy: newReadBy });
+      await supabase.from("messages").update({ read_by: newReadBy }).eq("id", m.id);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, activeTeamId, messages.length, user?.id, threadOpen]);
@@ -243,10 +190,8 @@ export default function MeddelandenPage() {
     const toMark = coachMessages.filter((m) => !m.readBy.includes(user.id));
     if (toMark.length === 0) return;
 
-    toMark.forEach(async (m) => {
-      const newReadBy = [...m.readBy, user.id];
-      await updateDoc(doc(db, "coach_chat", m.id), { readBy: newReadBy });
-    });
+    // coach_chat table has no read_by column — skip marking for now
+    void toMark;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, coachMessages.length, user?.id, threadOpen]);
 
@@ -348,22 +293,16 @@ export default function MeddelandenPage() {
     if (selected !== "coaches" && !activeTeam) return;
     try {
       if (selected === "coaches") {
-        await addDoc(collection(db, "coach_chat"), {
-          senderId:   user.id,
-          senderName: user.name,
-          text:       draft.trim(),
-          sentAt:     new Date().toISOString(),
-          readBy:     [user.id],
+        await supabase.from("coach_chat").insert({
+          sender_id: user.id, sender_name: user.name,
+          text: draft.trim(), sent_at: new Date().toISOString(),
         });
       } else if (activeTeam) {
-        await addDoc(collection(db, "messages"), {
-          teamId:      activeTeam.id,
-          senderId:    user.id,
-          senderName:  user.name,
-          recipientId: selected === "team" ? null : selected,
-          text:        draft.trim(),
-          sentAt:      new Date().toISOString(),
-          readBy:      [user.id],
+        await supabase.from("messages").insert({
+          team_id: activeTeam.id, sender_id: user.id, sender_name: user.name,
+          recipient_id: selected === "team" ? null : selected,
+          text: draft.trim(), sent_at: new Date().toISOString(),
+          read_by: [user.id],
         });
       }
       setDraft("");

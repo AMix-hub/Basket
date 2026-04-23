@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
 /* ─── Types ─────────────────────────────────────────────────── */
@@ -123,25 +122,11 @@ export default function StatistikPage() {
     return ca ? JSON.parse(ca) : [];
   });
 
-  // Subscribe to Firestore sessions for the current team
   useEffect(() => {
-    if (!team) {
-      setCalSessions([]);
-      return;
-    }
-    const q = query(collection(db, "sessions"), where("teamId", "==", team.id));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setCalSessions(
-        snap.docs.map((d) => ({
-          id: d.id,
-          date: d.data().date as string,
-          title: d.data().title as string,
-          type: d.data().type as string,
-        }))
-      );
-    });
-    return () => unsubscribe();
-  }, [team]);
+    if (!team) { setCalSessions([]); return; }
+    supabase.from("sessions").select("id, date, title, type").eq("team_id", team.id)
+      .then(({ data }) => setCalSessions((data ?? []).map((d) => ({ id: d.id, date: d.date, title: d.title, type: d.type }))));
+  }, [team?.id]);
 
   const svgRef = useRef<SVGSVGElement>(null);
 

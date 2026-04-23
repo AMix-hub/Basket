@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebaseClient";
+import { supabase } from "@/lib/supabase";
 
 /* ─── Types (mirrors taktik/page.tsx) ───────────────────────── */
 interface Player {
@@ -245,35 +244,35 @@ function CastBoard() {
 
     let cancelled = false;
 
-    /* Real-time subscription */
-    const unsubscribe = onSnapshot(
-      doc(db, "tactic_live_state", teamId),
-      (snap) => {
-        if (cancelled || !snap.exists()) return;
-
-        const live = snap.data() as LiveState;
-        const liveSteps = (live.steps ?? []) as Step[];
-
-        setPlayers(live.players ?? []);
-        setDrawings(live.drawings ?? []);
-        setConnected(true);
-
-        if (live.animationPlaying && live.animationStartTime && liveSteps.length >= 2) {
-          const elapsed =
-            Date.now() - new Date(live.animationStartTime).getTime();
-          startAnimation(elapsed, liveSteps);
-        } else if (!live.animationPlaying) {
-          cancelAnimationFrame(animFrameRef.current);
-          animStateRef.current.isPlaying = false;
-          setIsAnimating(false);
-          setAnimPos(new Map());
-        }
+    const handle = (live: LiveState) => {
+      if (cancelled) return;
+      const liveSteps = (live.steps ?? []) as Step[];
+      setPlayers(live.players ?? []);
+      setDrawings(live.drawings ?? []);
+      setConnected(true);
+      if (live.animationPlaying && live.animationStartTime && liveSteps.length >= 2) {
+        const elapsed = Date.now() - new Date(live.animationStartTime).getTime();
+        startAnimation(elapsed, liveSteps);
+      } else if (!live.animationPlaying) {
+        cancelAnimationFrame(animFrameRef.current);
+        animStateRef.current.isPlaying = false;
+        setIsAnimating(false);
+        setAnimPos(new Map());
       }
-    );
+    };
+
+    supabase.from("tactic_live_state").select("*").eq("team_id", teamId).single()
+      .then(({ data }) => { if (data) handle(data as unknown as LiveState); });
+
+    const channel = supabase
+      .channel(`cast:${teamId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tactic_live_state", filter: `team_id=eq.${teamId}` },
+        (payload) => { handle(payload.new as unknown as LiveState); })
+      .subscribe();
 
     return () => {
       cancelled = true;
-      unsubscribe();
+      supabase.removeChannel(channel);
       cancelAnimationFrame(animFrameRef.current);
     };
   }, [teamId, startAnimation]);

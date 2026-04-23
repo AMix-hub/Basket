@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
 interface TrainingSession {
@@ -35,20 +34,29 @@ export default function DashboardHome() {
 
   useEffect(() => {
     if (!team) return;
-    const q = query(collection(db, "sessions"), where("teamId", "==", team.id));
-    return onSnapshot(q, (snap) => {
-      setSessions(
-        snap.docs.map((d) => ({
-          id: d.id,
-          date: d.data().date as string,
-          title: d.data().title as string,
-          type: (d.data().type as "träning" | "match") ?? "träning",
-          time: (d.data().time as string) ?? "",
-          planSessionNumber: d.data().planSessionNumber as number | undefined,
-        }))
-      );
-    });
-  }, [team]);
+    let mounted = true;
+
+    const load = () =>
+      supabase.from("sessions").select("id, date, title, type, time").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          setSessions(
+            (data ?? []).map((d) => ({
+              id: d.id, date: d.date, title: d.title,
+              type: (d.type as "träning" | "match") ?? "träning",
+              time: d.time ?? "",
+            }))
+          );
+        });
+
+    load();
+    const channel = supabase
+      .channel(`dashboard-sessions:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+
+    return () => { mounted = false; supabase.removeChannel(channel); };
+  }, [team?.id]);
 
   /* ── Computed stats ── */
   const trainingSessions = sessions.filter((s) => s.type === "träning");

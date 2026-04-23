@@ -2,70 +2,83 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
-/**
- * Returns the total count of unread messages (team chat + DMs + coach channel)
- * for the currently logged-in user in their team.
- * Uses Firestore real-time listener for instant updates.
- */
 export function useUnreadCount(): number {
   const { user, getMyTeam } = useAuth();
-  const [count, setCount]   = useState(0);
+  const [count, setCount]      = useState(0);
+  const [coachCount, setCoachCount] = useState(0);
 
   useEffect(() => {
     const team = getMyTeam();
     if (!user || !team) return;
 
-    /* Listen to all messages in this team where the user is not the sender */
-    const q = query(
-      collection(db, "messages"),
-      where("teamId", "==", team.id),
-    );
+    let mounted = true;
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      let unread = 0;
-      snap.forEach((docSnap) => {
-        const msg = docSnap.data();
-        if (
-          msg.senderId !== user.id &&
-          !(msg.readBy as string[] ?? []).includes(user.id)
-        ) {
-          unread++;
-        }
+    // Initial fetch
+    supabase
+      .from("messages")
+      .select("id, sender_id, read_by")
+      .eq("team_id", team.id)
+      .then(({ data }) => {
+        if (!mounted) return;
+        const unread = (data ?? []).filter(
+          (m) => m.sender_id !== user.id && !(m.read_by as string[] ?? []).includes(user.id)
+        ).length;
+        setCount(unread);
       });
-      setCount(unread);
-    });
 
-    return () => unsubscribe();
-  }, [user, getMyTeam]);
+    // Real-time updates
+    const channel = supabase
+      .channel(`unread-messages:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `team_id=eq.${team.id}` }, () => {
+        supabase
+          .from("messages")
+          .select("id, sender_id, read_by")
+          .eq("team_id", team.id)
+          .then(({ data }) => {
+            if (!mounted) return;
+            const unread = (data ?? []).filter(
+              (m) => m.sender_id !== user.id && !(m.read_by as string[] ?? []).includes(user.id)
+            ).length;
+            setCount(unread);
+          });
+      })
+      .subscribe();
 
-  const [coachCount, setCoachCount] = useState(0);
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, getMyTeam]);
 
   useEffect(() => {
     if (!user) return;
-    const isCoachOrAbove = user.roles.some((r) =>
-      ["coach", "assistant", "admin"].includes(r)
-    );
+    const isCoachOrAbove = user.roles.some((r) => ["coach", "assistant", "admin", "co_admin"].includes(r));
     if (!isCoachOrAbove) return;
 
-    const unsubscribe = onSnapshot(collection(db, "coach_chat"), (snap) => {
-      let unread = 0;
-      snap.forEach((docSnap) => {
-        const msg = docSnap.data();
-        if (
-          msg.senderId !== user.id &&
-          !(msg.readBy as string[] ?? []).includes(user.id)
-        ) {
-          unread++;
-        }
-      });
-      setCoachCount(unread);
+    let mounted = true;
+
+    supabase.from("coach_chat").select("id, sender_id").then(({ data }) => {
+      if (!mounted) return;
+      setCoachCount((data ?? []).filter((m) => m.sender_id !== user.id).length);
     });
 
-    return () => unsubscribe();
-  }, [user]);
+    const channel = supabase
+      .channel("unread-coach-chat")
+      .on("postgres_changes", { event: "*", schema: "public", table: "coach_chat" }, () => {
+        supabase.from("coach_chat").select("id, sender_id").then(({ data }) => {
+          if (!mounted) return;
+          setCoachCount((data ?? []).filter((m) => m.sender_id !== user.id).length);
+        });
+      })
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   return count + coachCount;
 }
