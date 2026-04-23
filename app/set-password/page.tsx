@@ -3,13 +3,14 @@
 import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { confirmPasswordReset, verifyPasswordResetCode } from "firebase/auth";
-import { auth } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
 function SetPasswordForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const oobCode = searchParams.get("oobCode") ?? "";
+  // Supabase puts the recovery token in the URL hash, which Next.js
+  // exposes as a query param after the redirect from the email link.
+  const oobCode = searchParams.get("oobCode") ?? searchParams.get("token") ?? "";
 
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -27,22 +28,21 @@ function SetPasswordForm() {
     setBusy(true);
     setError(null);
     try {
-      // Verify the code is still valid before resetting
-      await verifyPasswordResetCode(auth, oobCode);
-      await confirmPasswordReset(auth, oobCode, password);
-      setSuccess(true);
-      setTimeout(() => router.push("/login"), 3000);
-    } catch (err: unknown) {
-      const firebaseErr = err as { code?: string };
-      if (firebaseErr.code === "auth/expired-action-code") {
-        setError("Länken har gått ut. Be administratören skicka en ny inbjudan.");
-      } else if (firebaseErr.code === "auth/invalid-action-code") {
-        setError("Ogiltig länk. Kontrollera att du använder den senaste länken från mailet.");
-      } else if (firebaseErr.code === "auth/weak-password") {
-        setError("Lösenordet är för svagt. Använd minst 6 tecken.");
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        if (error.message.toLowerCase().includes("weak")) {
+          setError("Lösenordet är för svagt. Använd minst 6 tecken.");
+        } else if (error.message.toLowerCase().includes("expired") || error.message.toLowerCase().includes("invalid")) {
+          setError("Länken har gått ut. Be administratören skicka en ny inbjudan.");
+        } else {
+          setError("Något gick fel. Försök igen eller kontakta administratören.");
+        }
       } else {
-        setError("Något gick fel. Försök igen eller kontakta administratören.");
+        setSuccess(true);
+        setTimeout(() => router.push("/login"), 3000);
       }
+    } catch {
+      setError("Något gick fel. Försök igen eller kontakta administratören.");
     } finally {
       setBusy(false);
     }

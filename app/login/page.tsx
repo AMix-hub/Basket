@@ -9,28 +9,15 @@ export default function LoginPage() {
   const { login, user, loading } = useAuth();
   const router = useRouter();
 
-  const [email, setEmail]           = useState("");
-  const [password, setPassword]     = useState("");
-  const [error, setError]           = useState("");
-  const [busy, setBusy]             = useState(false);
-  const [loginAttempted, setLoginAttempted] = useState(false);
+  const [email, setEmail]       = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError]       = useState("");
+  const [busy, setBusy]         = useState(false);
 
-  // After a successful login the auth state updates asynchronously.
-  // Redirect to the dashboard once the user object is populated.
-  // If loading finishes but user is still null, something went wrong after
-  // Firebase auth succeeded (e.g. Firestore unreachable) – show an error.
+  // Redirect to home once user is loaded (handles page refresh too)
   useEffect(() => {
-    if (!loginAttempted || loading) return;
-    if (user) {
-      router.push("/");
-    } else {
-      setError(
-        "Inloggning lyckades men profilen kunde inte laddas. " +
-        "Kontrollera din internetanslutning och försök igen."
-      );
-      setLoginAttempted(false);
-    }
-  }, [loginAttempted, loading, user, router]);
+    if (!loading && user) router.push("/");
+  }, [loading, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +25,8 @@ export default function LoginPage() {
     setBusy(true);
     const err = await login(email.trim().toLowerCase(), password);
     setBusy(false);
-    if (err === null) {
-      setLoginAttempted(true);
-    } else {
-      setError(err);
-    }
+    if (err) setError(err);
+    // On success: onAuthStateChange fires → loadProfile → user set → effect above navigates
   };
 
   return (
@@ -95,10 +79,10 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={busy || (loginAttempted && loading)}
+              disabled={busy}
               className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold text-sm rounded-xl transition-colors"
             >
-              {busy || (loginAttempted && loading) ? "Loggar in…" : "Logga in"}
+              {busy ? "Loggar in…" : "Logga in"}
             </button>
           </form>
 

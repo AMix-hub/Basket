@@ -1,37 +1,24 @@
 /**
  * POST /api/create-user
  *
- * Creates a new Firebase Auth user and Firestore profile, then sends a
+ * Creates a new Supabase Auth user and profile, then sends a
  * password-reset e-mail so the new user can set their own password.
- *
- * Request body (JSON):
- * {
- *   email:    string   – e-mail address for the new account
- *   name:     string   – display name
- *   teamId:   string   – team ID to add the user to (optional)
- *   role:     string   – initial role (defaults to "player")
- *   adminId:  string   – ID of the admin creating the user
- * }
- *
- * Response:
- *   200 { uid: string }     – newly created user UID
- *   400 { error: string }   – bad request
- *   500 { error: string }   – server error
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { adminDb } from "../../../lib/firebaseAdmin";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin";
 import { sendEmail } from "../../../lib/email";
 
+function generateCode(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from(
+    crypto.getRandomValues(new Uint8Array(6)),
+    (b) => chars[b % chars.length]
+  ).join("");
+}
+
 export async function POST(req: NextRequest) {
-  /* ── 1. Parse + validate request body ── */
-  let body: {
-    email?: string;
-    name?: string;
-    teamId?: string;
-    role?: string;
-    adminId?: string;
-  };
+  let body: { email?: string; name?: string; teamId?: string; role?: string; adminId?: string };
   try {
     body = await req.json();
   } catch {
@@ -40,168 +27,97 @@ export async function POST(req: NextRequest) {
 
   const { email, name, teamId, role = "player", adminId } = body;
   if (!email || !name || !adminId) {
-    return NextResponse.json(
-      { error: "email, name, and adminId are required" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "email, name, and adminId are required" }, { status: 400 });
   }
 
-  if (!adminDb) {
-    return NextResponse.json(
-      { error: "Server not configured (FIREBASE_SERVICE_ACCOUNT missing)" },
-      { status: 500 }
-    );
+  if (!supabaseAdmin) {
+    return NextResponse.json({ error: "Server not configured (SUPABASE_SERVICE_ROLE_KEY missing)" }, { status: 500 });
+  }
+
+  // Verify the caller is a logged-in user via the Authorization header
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { data: { user: callerUser }, error: authErr } = await supabaseAdmin.auth.getUser(authHeader.slice(7));
+  if (authErr || !callerUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    // Import Firebase Admin Auth dynamically (server-only)
-    const { getAuth } = await import("firebase-admin/auth");
-    const { getApps } = await import("firebase-admin/app");
-    const apps = getApps();
-    if (apps.length === 0) {
-      return NextResponse.json(
-        { error: "Firebase Admin not initialized" },
-        { status: 500 }
-      );
-    }
-    const adminAuth = getAuth(apps[0]);
+    // Create the user (or look up existing)
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    let userId: string | null = null;
+    const existing = existingUsers?.users.find((u) => u.email === email);
 
-    // Verify the request comes from a logged-in user
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    try {
-      await adminAuth.verifyIdToken(authHeader.slice(7));
-    } catch {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Create the user in Firebase Auth
-    let userRecord;
-    try {
-      userRecord = await adminAuth.createUser({
+    if (existing) {
+      userId = existing.id;
+    } else {
+      const tempPassword = generateCode() + generateCode();
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
-        displayName: name,
-        // No password set – user will receive a reset link to set their own
+        password: tempPassword,
+        user_metadata: { name, role, admin_id: adminId },
+        email_confirm: true,
       });
-    } catch (err: unknown) {
-      const firebaseErr = err as { code?: string; message?: string };
-      if (firebaseErr.code === "auth/email-already-exists") {
-        // User already exists – fetch them instead
-        userRecord = await adminAuth.getUserByEmail(email);
-      } else {
-        throw err;
-      }
+      if (createErr) throw new Error(createErr.message);
+      userId = created.user.id;
     }
 
-    const uid = userRecord.uid;
+    if (!userId) throw new Error("Could not determine user ID");
 
-    // Create or update Firestore profile
-    const profileRef = adminDb.collection("profiles").doc(uid);
-    const existingProfile = await profileRef.get();
-    if (!existingProfile.exists) {
-      await profileRef.set({
-        name,
-        email,
-        roles: [role],
-        role,
-        teamId: teamId ?? null,
-        // Link the user to the inviting admin so the admin's registry shows them
-        adminId: adminId ?? null,
-        createdAt: new Date().toISOString(),
+    // Ensure profile exists
+    const { data: existingProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (!existingProfile) {
+      await supabaseAdmin.from("profiles").insert({
+        id: userId, name, email, role, roles: [role], admin_id: adminId,
       });
     }
 
-    // If teamId is provided, add to team_members and team's memberIds
+    // Add to team if provided
     if (teamId) {
-      const memberDocRef = adminDb.collection("team_members").doc(`${teamId}_${uid}`);
-      const existing = await memberDocRef.get();
-      if (!existing.exists) {
-        await memberDocRef.set({
-          teamId,
-          userId: uid,
-          role,
-          joinedAt: new Date().toISOString(),
-        });
-        // Update team's memberIds array
-        const teamRef = adminDb.collection("teams").doc(teamId);
-        const teamDoc = await teamRef.get();
-        if (teamDoc.exists) {
-          const memberIds: string[] = (teamDoc.data()?.memberIds as string[]) ?? [];
-          if (!memberIds.includes(uid)) {
-            await teamRef.update({
-              memberIds: [...memberIds, uid],
-            });
-          }
-        }
+      await supabaseAdmin.from("team_members")
+        .upsert({ team_id: teamId, user_id: userId }, { onConflict: "team_id,user_id" });
+      const { data: team } = await supabaseAdmin.from("teams").select("member_ids").eq("id", teamId).single();
+      if (team) {
+        const memberIds = [...new Set([...(team.member_ids ?? []), userId])];
+        await supabaseAdmin.from("teams").update({ member_ids: memberIds }).eq("id", teamId);
       }
     }
 
-    // Send password-reset email so user can set their own password
+    // Generate password reset link and send welcome email
     try {
-      // Normalize the base URL: strip trailing slash and remove any "www." prefix
-      // so that the link in the email always resolves correctly even if the env
-      // variable was accidentally set with "www." (e.g. https://www.sport-iq.se).
-      const rawBaseUrl =
-        process.env.NEXT_PUBLIC_APP_URL ??
-        process.env.NEXT_PUBLIC_BASE_URL ??
-        "https://sport-iq.se";
-      let baseUrl = rawBaseUrl.replace(/\/$/, "");
-      try {
-        const parsed = new URL(baseUrl);
-        parsed.hostname = parsed.hostname.replace(/^www\./, "");
-        baseUrl = parsed.toString().replace(/\/$/, "");
-      } catch {
-        // If URL parsing fails, proceed with the raw value
-      }
-
-      const firebaseResetLink = await adminAuth.generatePasswordResetLink(email, {
-        // Redirect the user to the app after Firebase has processed the action.
-        // This domain must be listed in Firebase Console →
-        // Authentication → Settings → Authorized domains.
-        url: baseUrl,
+      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://sport-iq.se").replace(/\/$/, "");
+      const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+        type: "recovery",
+        email,
+        options: { redirectTo: `${baseUrl}/set-password` },
       });
+      if (linkErr) throw linkErr;
 
-      // Build a direct link to the app's own set-password page using the
-      // oobCode from the Firebase password reset link.  This avoids any
-      // intermediate redirect through the Firebase-hosted action handler (which
-      // may be configured with a different domain) and lands the user directly
-      // on the correct page without www-related DNS issues.
-      let setPasswordUrl = firebaseResetLink;
-      try {
-        const parsedActionUrl = new URL(firebaseResetLink);
-        const oobCode = parsedActionUrl.searchParams.get("oobCode");
-        if (oobCode) {
-          setPasswordUrl = `${baseUrl}/set-password?oobCode=${encodeURIComponent(oobCode)}`;
-        }
-      } catch {
-        // Fallback: keep the original Firebase action URL
-      }
-
-      // Send welcome email directly via SendGrid
+      const setPasswordUrl = linkData?.properties?.action_link ?? `${baseUrl}/set-password`;
       await sendEmail({
         to: email,
         subject: "Välkommen – sätt ditt lösenord",
         html: `
           <p>Hej ${name},</p>
-          <p>Du har blivit inbjuden till appen. Klicka på länken nedan för att sätta ditt lösenord och aktivera ditt konto:</p>
+          <p>Du har blivit inbjuden till appen. Klicka på länken nedan för att sätta ditt lösenord:</p>
           <p><a href="${setPasswordUrl}">${setPasswordUrl}</a></p>
-          <p>Länken är giltig i en begränsad tid (Firebase standard).</p>
           <p>Välkommen!</p>
         `,
       });
     } catch (emailErr) {
-      // Non-fatal: user is created, just the email failed
       console.warn("[create-user] Failed to send welcome email:", emailErr);
     }
 
-    return NextResponse.json({ uid });
-  } catch (err: unknown) {
+    return NextResponse.json({ uid: userId });
+  } catch (err) {
     console.error("[create-user] Error:", err);
-    return NextResponse.json(
-      { error: "Kunde inte skapa användaren. Kontakta administratören." },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Kunde inte skapa användaren." }, { status: 500 });
   }
 }
