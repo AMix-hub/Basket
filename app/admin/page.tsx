@@ -6,22 +6,7 @@ import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
 import type { UserRole } from "../context/AuthContext";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-  updateDoc,
-  arrayRemove,
-  arrayUnion,
-  addDoc,
-  onSnapshot,
-} from "firebase/firestore";
-import { db, auth } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
 interface TeamRow {
   id: string;
@@ -112,136 +97,82 @@ export default function AdminPage() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
 
-  /* Real-time listener: any change to the admin's teams (create / update / delete)
-   * automatically refreshes the list, including the member + profile resolution. */
-  useEffect(() => {
+  const loadTeams = async () => {
     if (!user?.roles.includes("admin")) return;
-
-    // Build the set of admin IDs to query by. For root admins (adminId == null)
-    // this is just their own UID. For co-admins it includes both their own UID
-    // and the club's root admin UID so that teams are found even when the
-    // profile's adminId was incorrectly set or hasn't been healed yet.
     const adminIdSet = new Set([user.id]);
     if (user.adminId) adminIdSet.add(user.adminId);
     const adminIds = [...adminIdSet];
 
-    const q = adminIds.length === 1
-      ? query(collection(db, "teams"), where("adminId", "==", adminIds[0]))
-      : query(collection(db, "teams"), where("adminId", "in", adminIds));
+    const { data: teamData } = await supabase.from("teams").select("*").in("admin_id", adminIds);
+    if (!teamData?.length) { setTeams([]); return; }
 
-    const unsub = onSnapshot(q, async (teamSnap) => {
-      if (teamSnap.empty) {
-        setTeams([]);
-        return;
-      }
+    const teamRows: TeamRow[] = teamData.map((d) => ({
+      id: d.id,
+      name: d.name,
+      age_group: d.age_group ?? "",
+      coach_id: d.coach_id ?? null,
+      invite_code: d.invite_code ?? "",
+      parent_invite_code: d.parent_invite_code ?? "",
+      player_invite_code: d.player_invite_code ?? "",
+    }));
 
-      const teamRows = teamSnap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name as string,
-        age_group: d.data().ageGroup as string,
-        coach_id: (d.data().coachId as string | null) ?? null,
-        invite_code: (d.data().inviteCode as string) ?? "",
-        parent_invite_code: (d.data().parentInviteCode as string) ?? "",
-        player_invite_code: (d.data().playerInviteCode as string) ?? "",
-      }));
+    const teamIds = teamRows.map((t) => t.id);
+    const { data: memberData } = await supabase.from("team_members").select("team_id, user_id").in("team_id", teamIds);
+    const allMemberRows = (memberData ?? []).map((m) => ({ teamId: m.team_id, userId: m.user_id }));
+    const userIds = [...new Set(allMemberRows.map((m) => m.userId))];
 
-      /* Fetch members for each team via team_members collection
-       * Firestore supports up to 10 items in an "in" query, so we batch. */
-      const teamIds = teamRows.map((t) => t.id);
-      const allMemberRows: { teamId: string; userId: string }[] = [];
-      for (let i = 0; i < teamIds.length; i += 10) {
-        const chunk = teamIds.slice(i, i + 10);
-        const memberSnap = await getDocs(
-          query(collection(db, "team_members"), where("teamId", "in", chunk))
-        );
-        memberSnap.docs.forEach((d) => {
-          allMemberRows.push({
-            teamId: d.data().teamId as string,
-            userId: d.data().userId as string,
-          });
-        });
-      }
+    const profileMap: Record<string, ProfileRow> = {};
+    if (userIds.length > 0) {
+      const { data: profileData } = await supabase.from("profiles").select("id, name, roles, child_name").in("id", userIds);
+      (profileData ?? []).forEach((p) => {
+        profileMap[p.id] = { id: p.id, name: p.name, roles: p.roles ?? [], child_name: p.child_name ?? null };
+      });
+    }
 
-      const userIds = [...new Set(allMemberRows.map((m) => m.userId))];
-      const profileMap: Record<string, ProfileRow> = {};
-      if (userIds.length > 0) {
-        const profilePromises = userIds.map((id) => getDoc(doc(db, "profiles", id)));
-        const profileSnaps = await Promise.all(profilePromises);
-        profileSnaps.forEach((s) => {
-          if (s.exists()) {
-            const d = s.data();
-            profileMap[s.id] = {
-              id: s.id,
-              name: d.name as string,
-              roles:
-                d.roles && (d.roles as string[]).length > 0
-                  ? (d.roles as string[])
-                  : [d.role as string],
-              child_name: (d.childName as string | null) ?? null,
-            };
-          }
-        });
-      }
+    setTeams(teamRows.map((t) => ({
+      ...t,
+      members: allMemberRows.filter((m) => m.teamId === t.id).map((m) => profileMap[m.userId]).filter(Boolean),
+    })));
+  };
 
-      const enriched: TeamWithMembers[] = teamRows.map((t) => ({
-        ...t,
-        members: allMemberRows
-          .filter((m) => m.teamId === t.id)
-          .map((m) => profileMap[m.userId])
-          .filter(Boolean),
-      }));
-
-      setTeams(enriched);
-    });
-
-    return () => unsub();
-  }, [user]);
-
-  // Load halls for this admin
   useEffect(() => {
     if (!user?.roles.includes("admin")) return;
+    loadTeams();
+    const adminIdSet = new Set([user.id]);
+    if (user.adminId) adminIdSet.add(user.adminId);
     const effectiveAdminId = user.adminId ?? user.id;
-    const q = query(collection(db, "halls"), where("adminId", "==", effectiveAdminId));
-    const unsub = onSnapshot(q, (snap) => {
-      setHalls(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          address: (d.data().address as string | undefined) ?? undefined,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [user]);
 
-  // Load training-free periods for this admin
-  useEffect(() => {
-    if (!user?.roles.includes("admin")) return;
-    const effectiveAdminId = user.adminId ?? user.id;
-    const q = query(collection(db, "training_free_periods"), where("adminId", "==", effectiveAdminId));
-    const unsub = onSnapshot(q, (snap) => {
-      setFreePeriods(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          startDate: d.data().startDate as string,
-          endDate: d.data().endDate as string,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [user]);
+    const ch = supabase.channel("admin-data")
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, loadTeams)
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_members" }, loadTeams)
+      .on("postgres_changes", { event: "*", schema: "public", table: "halls", filter: `admin_id=eq.${effectiveAdminId}` },
+        () => supabase.from("halls").select("*").eq("admin_id", effectiveAdminId).then(({ data }) =>
+          setHalls((data ?? []).map((d) => ({ id: d.id, name: d.name, address: d.address ?? undefined })))
+        ))
+      .on("postgres_changes", { event: "*", schema: "public", table: "training_free_periods", filter: `admin_id=eq.${effectiveAdminId}` },
+        () => supabase.from("training_free_periods").select("*").eq("admin_id", effectiveAdminId).then(({ data }) =>
+          setFreePeriods((data ?? []).map((d) => ({ id: d.id, name: d.name, startDate: d.start_date, endDate: d.end_date })))
+        ))
+      .subscribe();
+
+    supabase.from("halls").select("*").eq("admin_id", effectiveAdminId)
+      .then(({ data }) => setHalls((data ?? []).map((d) => ({ id: d.id, name: d.name, address: d.address ?? undefined }))));
+    supabase.from("training_free_periods").select("*").eq("admin_id", effectiveAdminId)
+      .then(({ data }) => setFreePeriods((data ?? []).map((d) => ({ id: d.id, name: d.name, startDate: d.start_date, endDate: d.end_date }))));
+
+    return () => { supabase.removeChannel(ch); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleAddHall = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHallName.trim() || !user) return;
     setAddingHall(true);
     try {
-      await addDoc(collection(db, "halls"), {
+      await supabase.from("halls").insert({
         name: newHallName.trim(),
         address: newHallAddress.trim() || null,
-        adminId: user.adminId ?? user.id,
-        createdAt: new Date().toISOString(),
+        admin_id: user.adminId ?? user.id,
       });
       setNewHallName("");
       setNewHallAddress("");
@@ -255,7 +186,7 @@ export default function AdminPage() {
   const handleDeleteHall = async (hallId: string) => {
     if (!confirm("Är du säker på att du vill ta bort denna hall?")) return;
     try {
-      await deleteDoc(doc(db, "halls", hallId));
+      await supabase.from("halls").delete().eq("id", hallId);
     } catch {
       alert("Kunde inte ta bort hall. Försök igen.");
     }
@@ -270,12 +201,11 @@ export default function AdminPage() {
     }
     setAddingPeriod(true);
     try {
-      await addDoc(collection(db, "training_free_periods"), {
+      await supabase.from("training_free_periods").insert({
         name: newPeriodName.trim(),
-        startDate: newPeriodStart,
-        endDate: newPeriodEnd,
-        adminId: user.adminId ?? user.id,
-        createdAt: new Date().toISOString(),
+        start_date: newPeriodStart,
+        end_date: newPeriodEnd,
+        admin_id: user.adminId ?? user.id,
       });
       setNewPeriodName("");
       setNewPeriodStart("");
@@ -290,7 +220,7 @@ export default function AdminPage() {
   const handleDeleteFreePeriod = async (periodId: string) => {
     if (!confirm("Är du säker på att du vill ta bort denna period?")) return;
     try {
-      await deleteDoc(doc(db, "training_free_periods", periodId));
+      await supabase.from("training_free_periods").delete().eq("id", periodId);
     } catch {
       alert("Kunde inte ta bort period. Försök igen.");
     }
@@ -310,10 +240,7 @@ export default function AdminPage() {
     if (!confirm(`Är du säker på att du vill ta bort ${member.name} från ${team.name}?`)) return;
     setRemoving(member.id);
     try {
-      await deleteDoc(doc(db, "team_members", `${team.id}_${member.id}`)); // compound key: {teamId}_{userId}
-      await updateDoc(doc(db, "teams", team.id), {
-        memberIds: arrayRemove(member.id),
-      });
+      await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", member.id);
       setTeams((prev) =>
         prev
           ? prev.map((t) =>
@@ -337,46 +264,26 @@ export default function AdminPage() {
       newRoles = [...new Set([...current, role])];
     } else {
       newRoles = current.filter((r) => r !== role);
-      if (newRoles.length === 0) return; // must keep at least one role
+      if (newRoles.length === 0) return;
     }
-    // Determine primary role for backward-compat `role` field
-    const priority: UserRole[] = ["admin", "coach", "assistant", "parent", "player"];
-    const primary = priority.find((r) => newRoles.includes(r)) ?? newRoles[0];
 
     setChangingRole(member.id);
     try {
-      await updateDoc(doc(db, "profiles", member.id), {
-        roles: newRoles,
-        role: primary,
-        // When promoting to admin, copy club identity so the co-admin sees the
-        // correct club name/logo and creates teams with the right club data.
-        ...(checked && role === "admin" && user
-          ? {
-              adminId: user.adminId ?? user.id,
-              clubName: user.clubName ?? null,
-              clubLogoUrl: user.clubLogoUrl ?? null,
-              clubWebsiteUrl: user.clubWebsiteUrl ?? null,
-            }
-          : {}),
-      });
+      const updatePayload: Record<string, unknown> = { roles: newRoles };
+      if (checked && role === "admin" && user) {
+        updatePayload.admin_id = user.adminId ?? user.id;
+        updatePayload.club_name = user.clubName ?? null;
+        updatePayload.club_logo_url = user.clubLogoUrl ?? null;
+        updatePayload.club_website_url = user.clubWebsiteUrl ?? null;
+      }
+      await supabase.from("profiles").update(updatePayload).eq("id", member.id);
 
-      // Auto-enroll in all teams if the member is being given the "admin" role
       if (checked && role === "admin" && user && teams) {
         for (const t of teams) {
-          const memberDocId = `${t.id}_${member.id}`;
-          const memberDocRef = doc(db, "team_members", memberDocId);
-          const existing = await getDoc(memberDocRef);
-          if (!existing.exists()) {
-            await setDoc(memberDocRef, {
-              teamId: t.id,
-              userId: member.id,
-              role: "admin",
-              joinedAt: new Date().toISOString(),
-            });
-            await updateDoc(doc(db, "teams", t.id), {
-              memberIds: arrayUnion(member.id),
-            });
-          }
+          await supabase.from("team_members").upsert(
+            { team_id: t.id, user_id: member.id, role: "admin" },
+            { onConflict: "team_id,user_id" }
+          );
         }
       }
 
@@ -404,7 +311,8 @@ export default function AdminPage() {
     setInviteError(null);
     setInviteSuccess(null);
     try {
-      const token = (await auth.currentUser?.getIdToken()) ?? "";
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
       const res = await fetch("/api/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -521,7 +429,6 @@ export default function AdminPage() {
       setCreateTeamError(err);
     } else {
       setNewTeamName("");
-      // onSnapshot listener will automatically refresh the teams list
     }
     setCreatingTeam(false);
   };
@@ -1299,31 +1206,18 @@ export default function AdminPage() {
                                   title={isInTeam ? `Ta bort från ${t.name}` : `Lägg till i ${t.name}`}
                                   onClick={async () => {
                                     if (isInTeam) {
-                                      // Remove from team
                                       if (!confirm(`Ta bort ${member.name} från ${t.name}?`)) return;
                                       try {
-                                        await deleteDoc(doc(db, "team_members", `${t.id}_${member.id}`));
-                                        await updateDoc(doc(db, "teams", t.id), {
-                                          memberIds: arrayRemove(member.id),
-                                        });
-
+                                        await supabase.from("team_members").delete().eq("team_id", t.id).eq("user_id", member.id);
                                       } catch {
                                         alert("Kunde inte ta bort. Försök igen.");
                                       }
                                     } else {
-                                      // Add to team
                                       try {
-                                        const memberDocRef = doc(db, "team_members", `${t.id}_${member.id}`);
-                                        await setDoc(memberDocRef, {
-                                          teamId: t.id,
-                                          userId: member.id,
-                                          role: member.roles[0],
-                                          joinedAt: new Date().toISOString(),
-                                        });
-                                        await updateDoc(doc(db, "teams", t.id), {
-                                          memberIds: arrayUnion(member.id),
-                                        });
-
+                                        await supabase.from("team_members").upsert(
+                                          { team_id: t.id, user_id: member.id, role: member.roles[0] },
+                                          { onConflict: "team_id,user_id" }
+                                        );
                                       } catch {
                                         alert("Kunde inte lägga till. Försök igen.");
                                       }

@@ -3,17 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
-import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  onSnapshot,
-  query,
-  orderBy,
-} from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
 type DevItemCategory = "idea" | "change" | "todo";
 type DevItemPriority = "high" | "medium" | "low";
@@ -70,56 +60,61 @@ export default function DevPage() {
   const [addingComment, setAddingComment] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user?.roles.includes("admin")) return;
+    if (!user?.roles.some((r) => ["admin","co_admin"].includes(r))) return;
+    let mounted = true;
 
-    const q = query(collection(db, "dev_items"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setItems(
-        snap.docs.map((d) => ({
-          id: d.id,
-          text: d.data().text as string,
-          category: d.data().category as DevItemCategory,
-          priority: (d.data().priority as DevItemPriority | undefined) ?? "medium",
-          done: d.data().done as boolean,
-          createdAt: d.data().createdAt as string,
-          doneAt: d.data().doneAt as string | undefined,
-        }))
-      );
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [user]);
+    const loadItems = () =>
+      supabase.from("dev_items").select("*").order("created_at", { ascending: false })
+        .then(({ data }) => {
+          if (!mounted) return;
+          setItems((data ?? []).map((d) => ({
+            id: d.id, text: d.title ?? d.description ?? "",
+            category: (d.status as unknown as DevItemCategory) ?? "idea",
+            priority: (d.priority as DevItemPriority) ?? "medium",
+            done: d.status === "done",
+            createdAt: d.created_at,
+          })));
+          setLoading(false);
+        });
 
-  // Load comments for all dev items
+    loadItems();
+    const ch = supabase.channel("dev-items")
+      .on("postgres_changes", { event: "*", schema: "public", table: "dev_items" }, loadItems)
+      .subscribe();
+
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [user?.id]);
+
   useEffect(() => {
-    if (!user?.roles.includes("admin")) return;
-    const q = query(collection(db, "dev_item_comments"), orderBy("createdAt", "asc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setComments(
-        snap.docs.map((d) => ({
-          id: d.id,
-          itemId: d.data().itemId as string,
-          text: d.data().text as string,
-          authorId: d.data().authorId as string,
-          authorName: d.data().authorName as string,
-          createdAt: d.data().createdAt as string,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [user]);
+    if (!user?.roles.some((r) => ["admin","co_admin"].includes(r))) return;
+    let mounted = true;
+
+    const loadComments = () =>
+      supabase.from("dev_item_comments").select("*").order("created_at", { ascending: true })
+        .then(({ data }) => {
+          if (!mounted) return;
+          setComments((data ?? []).map((d) => ({
+            id: d.id, itemId: d.item_id, text: d.content,
+            authorId: d.author_id, authorName: "",
+            createdAt: d.created_at,
+          })));
+        });
+
+    loadComments();
+    const ch = supabase.channel("dev-comments")
+      .on("postgres_changes", { event: "*", schema: "public", table: "dev_item_comments" }, loadComments)
+      .subscribe();
+
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [user?.id]);
 
   const addComment = async (itemId: string) => {
     const text = (newCommentText[itemId] ?? "").trim();
     if (!text || !user) return;
     setAddingComment(itemId);
     try {
-      await addDoc(collection(db, "dev_item_comments"), {
-        itemId,
-        text,
-        authorId: user.id,
-        authorName: user.name,
-        createdAt: new Date().toISOString(),
+      await supabase.from("dev_item_comments").insert({
+        item_id: itemId, content: text, author_id: user.id,
       });
       setNewCommentText((prev) => ({ ...prev, [itemId]: "" }));
     } catch {
@@ -131,7 +126,7 @@ export default function DevPage() {
 
   const deleteComment = async (commentId: string) => {
     try {
-      await deleteDoc(doc(db, "dev_item_comments", commentId));
+      await supabase.from("dev_item_comments").delete().eq("id", commentId);
     } catch {
       alert("Det gick inte att ta bort kommentaren. Försök igen.");
     }
@@ -151,12 +146,8 @@ export default function DevPage() {
     if (!newText.trim()) return;
     setAdding(true);
     try {
-      await addDoc(collection(db, "dev_items"), {
-        text: newText.trim(),
-        category: newCategory,
-        priority: newPriority,
-        done: false,
-        createdAt: new Date().toISOString(),
+      await supabase.from("dev_items").insert({
+        title: newText.trim(), description: "", status: "open", priority: newPriority,
       });
       setNewText("");
     } catch {
@@ -168,10 +159,7 @@ export default function DevPage() {
 
   const toggleDone = async (item: DevItem) => {
     try {
-      await updateDoc(doc(db, "dev_items", item.id), {
-        done: !item.done,
-        doneAt: !item.done ? new Date().toISOString() : null,
-      });
+      await supabase.from("dev_items").update({ status: item.done ? "open" : "done" }).eq("id", item.id);
     } catch {
       alert("Det gick inte att uppdatera. Försök igen.");
     }
@@ -180,7 +168,7 @@ export default function DevPage() {
   const removeItem = async (item: DevItem) => {
     if (!confirm(`Ta bort "${item.text}"?`)) return;
     try {
-      await deleteDoc(doc(db, "dev_items", item.id));
+      await supabase.from("dev_items").delete().eq("id", item.id);
     } catch {
       alert("Det gick inte att ta bort. Försök igen.");
     }
@@ -215,11 +203,7 @@ export default function DevPage() {
       return;
     }
     try {
-      await updateDoc(doc(db, "dev_items", item.id), {
-        text: trimmed,
-        category: editCategory,
-        priority: editPriority,
-      });
+      await supabase.from("dev_items").update({ title: trimmed, priority: editPriority }).eq("id", item.id);
       cancelEdit();
     } catch {
       alert("Det gick inte att spara. Försök igen.");

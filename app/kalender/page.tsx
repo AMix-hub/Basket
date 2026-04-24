@@ -2,20 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  addDoc,
-  doc,
-  writeBatch,
-  setDoc,
-  deleteDoc,
-  getDocs,
-  getDoc,
-} from "firebase/firestore";
-import { db, auth } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
 import { autoTag, TAG_LABELS, TAG_COLORS } from "../../lib/exerciseTags";
@@ -308,167 +295,155 @@ export default function KalenderPage() {
     }
   }, [selectedDate]);
 
-  // Load halls belonging to the admin of this team (or current user if admin)
   useEffect(() => {
     if (!user) return;
-    const adminId = user.roles.includes("admin") ? user.id : team?.adminId;
+    const adminId = user.roles.includes("admin") ? (user.adminId ?? user.id) : team?.adminId;
     if (!adminId) return;
-    const q = query(collection(db, "halls"), where("adminId", "==", adminId));
-    const unsub = onSnapshot(q, (snap) => {
-      setHalls(snap.docs.map((d) => ({ id: d.id, name: d.data().name as string, adminId: d.data().adminId as string })));
-    });
-    return () => unsub();
-  }, [user, team]);
+    supabase.from("halls").select("id, name, admin_id").eq("admin_id", adminId)
+      .then(({ data }) => setHalls((data ?? []).map((d) => ({ id: d.id, name: d.name, adminId: d.admin_id }))));
+    supabase.from("training_free_periods").select("id, name, start_date, end_date, admin_id").eq("admin_id", adminId)
+      .then(({ data }) => setFreePeriods((data ?? []).map((d) => ({
+        id: d.id, name: d.name, startDate: d.start_date, endDate: d.end_date, adminId: d.admin_id,
+      }))));
+  }, [user?.id, team?.adminId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load training-free periods for the admin of this team
   useEffect(() => {
-    if (!user) return;
-    const adminId = user.roles.includes("admin") ? user.id : team?.adminId;
-    if (!adminId) return;
-    const q = query(collection(db, "training_free_periods"), where("adminId", "==", adminId));
-    const unsub = onSnapshot(q, (snap) => {
-      setFreePeriods(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          startDate: d.data().startDate as string,
-          endDate: d.data().endDate as string,
-          adminId: d.data().adminId as string,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [user, team]);
-
-  // Subscribe to Firestore sessions for this team (or all teams when "__all__" is selected)
-  useEffect(() => {
-    const mapSession = (d: import("firebase/firestore").QueryDocumentSnapshot): TrainingSession => ({
-      id: d.id,
-      teamId: (d.data().teamId as string | undefined) ?? undefined,
-      date: d.data().date as string,
-      title: d.data().title as string,
-      type: d.data().type as "träning" | "match",
-      time: d.data().time as string,
-      endTime: (d.data().endTime as string | undefined) ?? undefined,
-      hallId: (d.data().hallId as string | undefined) ?? undefined,
-      hallName: (d.data().hallName as string | undefined) ?? undefined,
-      recurringGroupId: (d.data().recurringGroupId as string | undefined) ?? undefined,
-      planYear: (d.data().planYear as number | undefined) ?? undefined,
-      planSessionNumber: (d.data().planSessionNumber as number | undefined) ?? undefined,
-      opponent: (d.data().opponent as string | undefined) ?? undefined,
-      location: (d.data().location as string | undefined) ?? undefined,
-      homeOrAway: (d.data().homeOrAway as "home" | "away" | undefined) ?? undefined,
-      result: (d.data().result as string | undefined) ?? undefined,
-      coachId: (d.data().coachId as string | undefined) ?? undefined,
-      coachName: (d.data().coachName as string | undefined) ?? undefined,
+    const mapSession = (d: Record<string, unknown>): TrainingSession => ({
+      id: d.id as string,
+      teamId: (d.team_id as string | undefined) ?? undefined,
+      date: d.date as string,
+      title: d.title as string,
+      type: d.type as "träning" | "match",
+      time: (d.time as string) ?? "",
+      endTime: (d.end_time as string | undefined) ?? undefined,
+      hallId: (d.hall_id as string | undefined) ?? undefined,
+      hallName: (d.hall_name as string | undefined) ?? undefined,
+      recurringGroupId: (d.recurring_group_id as string | undefined) ?? undefined,
+      planYear: (d.plan_year as number | undefined) ?? undefined,
+      planSessionNumber: (d.plan_session_number as number | undefined) ?? undefined,
+      opponent: (d.opponent as string | undefined) ?? undefined,
+      location: (d.location as string | undefined) ?? undefined,
+      homeOrAway: (d.home_or_away as "home" | "away" | undefined) ?? undefined,
+      result: (d.result as string | undefined) ?? undefined,
+      coachId: (d.coach_id as string | undefined) ?? undefined,
+      coachName: (d.coach_name as string | undefined) ?? undefined,
     });
 
-    if (selectedTeamId === "__all__" && allTeams.length > 0) {
-      // Firestore `in` operator supports at most 30 values
-      const teamIds = allTeams.map((t) => t.id).slice(0, 30);
-      const q = query(collection(db, "sessions"), where("teamId", "in", teamIds));
-      const unsubscribe = onSnapshot(q, (snap) => {
-        setSessions(snap.docs.map(mapSession));
-      });
-      return () => unsubscribe();
-    }
+    let mounted = true;
+    const load = async () => {
+      if (selectedTeamId === "__all__" && allTeams.length > 0) {
+        const teamIds = allTeams.map((t) => t.id);
+        const { data } = await supabase.from("sessions").select("*").in("team_id", teamIds);
+        if (mounted) setSessions((data ?? []).map(mapSession));
+        return;
+      }
+      if (!team) { if (mounted) setSessions([]); return; }
+      const { data } = await supabase.from("sessions").select("*").eq("team_id", team.id);
+      if (mounted) setSessions((data ?? []).map(mapSession));
+    };
+    load();
 
-    if (!team) {
-      setSessions([]);
-      return;
-    }
-    const q = query(collection(db, "sessions"), where("teamId", "==", team.id));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setSessions(snap.docs.map(mapSession));
-    });
-    return () => unsubscribe();
-  }, [team, selectedTeamId, allTeams]);
+    const channelId = team ? `kalender-sessions:${team.id}` : "kalender-sessions:__all__";
+    const filter = team ? `team_id=eq.${team.id}` : undefined;
+    const ch = supabase.channel(channelId)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions", ...(filter ? { filter } : {}) }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id, selectedTeamId, allTeams.map((t) => t.id).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to session_notes so we can show linked exercises in the calendar.
-  // Notes are keyed by `${planYear}_${sessionNumber}` for plan-linked sessions, or
-  // `session_${sessionId}` for standalone calendar sessions.
   useEffect(() => {
     if (!team) { setSessionNotes({}); return; }
-    const q = query(collection(db, "session_notes"), where("teamId", "==", team.id));
-    const unsub = onSnapshot(q, (snap) => {
-      const loaded: Record<string, SessionNote> = {};
-      snap.docs.forEach((d) => {
-        const planYear = d.data().planYear as number | null;
-        const sessionNumber = d.data().sessionNumber as number | null;
-        const sessionId = d.data().sessionId as string | null;
-        const note: SessionNote = {
-          subActivities: (d.data().subActivities as SubActivity[]) ?? [],
-          comment: (d.data().comment as string) ?? "",
-        };
-        if (planYear && sessionNumber) {
-          loaded[`${planYear}_${sessionNumber}`] = note;
-        } else if (sessionId) {
-          loaded[`session_${sessionId}`] = note;
-        }
-      });
-      setSessionNotes(loaded);
-    });
-    return () => unsub();
-  }, [team]);
+    let mounted = true;
+    const load = () =>
+      supabase.from("session_notes").select("session_id, plan_year, plan_session_number, sub_activities, comment").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          const loaded: Record<string, SessionNote> = {};
+          (data ?? []).forEach((d) => {
+            const note: SessionNote = { subActivities: (d.sub_activities as SubActivity[]) ?? [], comment: d.comment ?? "" };
+            if (d.plan_year && d.plan_session_number) {
+              loaded[`${d.plan_year}_${d.plan_session_number}`] = note;
+            } else if (d.session_id) {
+              loaded[`session_${d.session_id}`] = note;
+            }
+          });
+          setSessionNotes(loaded);
+        });
+    load();
+    const ch = supabase.channel(`kalender-notes:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "session_notes", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to Firestore attendance for the current team's sessions
   useEffect(() => {
     if (!team) { setAttendance([]); return; }
-    const q = query(collection(db, "attendance"), where("teamId", "==", team.id));
-    const unsub = onSnapshot(q, (snap) => {
-      setAttendance(
-        snap.docs.map((d) => ({
-          sessionId: d.data().sessionId as string,
-          playerId: d.data().playerId as string,
-          status: d.data().status as AttendanceStatus,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [team]);
+    let mounted = true;
+    const load = () =>
+      supabase.from("attendance").select("session_id, player_id, status").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          setAttendance((data ?? []).map((d) => ({ sessionId: d.session_id, playerId: d.player_id, status: d.status as AttendanceStatus })));
+        });
+    load();
+    const ch = supabase.channel(`kalender-attendance:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to the current user's RSVPs for this team's sessions
   useEffect(() => {
     if (!user || !team) { setMyRsvps({}); return; }
-    const q = query(collection(db, "rsvps"), where("teamId", "==", team.id), where("userId", "==", user.id));
-    const unsub = onSnapshot(q, (snap) => {
-      const loaded: Record<string, RsvpStatus> = {};
-      snap.docs.forEach((d) => { loaded[d.data().sessionId as string] = d.data().status as RsvpStatus; });
-      setMyRsvps(loaded);
-    });
-    return () => unsub();
-  }, [user, team]);
+    let mounted = true;
+    const load = () =>
+      supabase.from("rsvps").select("session_id, status").eq("team_id", team.id).eq("user_id", user.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          const loaded: Record<string, RsvpStatus> = {};
+          (data ?? []).forEach((d) => { loaded[d.session_id] = d.status as RsvpStatus; });
+          setMyRsvps(loaded);
+        });
+    load();
+    const ch = supabase.channel(`kalender-rsvps-me:${team.id}:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rsvps", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [user?.id, team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to all RSVPs so coaches/admins can see totals
   useEffect(() => {
     if (!team || !canEdit) { setRsvpCounts({}); return; }
-    const q = query(collection(db, "rsvps"), where("teamId", "==", team.id));
-    const unsub = onSnapshot(q, (snap) => {
-      const counts: Record<string, { coming: number; not_coming: number; maybe: number }> = {};
-      snap.docs.forEach((d) => {
-        const sid = d.data().sessionId as string;
-        const st = d.data().status as RsvpStatus;
-        if (!counts[sid]) counts[sid] = { coming: 0, not_coming: 0, maybe: 0 };
-        counts[sid][st]++;
-      });
-      setRsvpCounts(counts);
-    });
-    return () => unsub();
-  }, [team, canEdit]);
+    let mounted = true;
+    const load = () =>
+      supabase.from("rsvps").select("session_id, status").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          const counts: Record<string, { coming: number; not_coming: number; maybe: number }> = {};
+          (data ?? []).forEach((d) => {
+            const sid = d.session_id;
+            const st = d.status as RsvpStatus;
+            if (!counts[sid]) counts[sid] = { coming: 0, not_coming: 0, maybe: 0 };
+            counts[sid][st]++;
+          });
+          setRsvpCounts(counts);
+        });
+    load();
+    const ch = supabase.channel(`kalender-rsvps-all:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rsvps", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id, canEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load coaches/assistants in the current team for session assignment
   useEffect(() => {
     if (!team) { setTeamCoaches([]); return; }
-    (async () => {
-      const snap = await getDocs(query(collection(db, "team_members"), where("teamId", "==", team.id)));
-      const coachIds = snap.docs
-        .filter((d) => ["coach", "assistant"].includes(d.data().role as string))
-        .map((d) => d.data().userId as string);
-      if (coachIds.length === 0) { setTeamCoaches([]); return; }
-      const profiles = await Promise.all(coachIds.map((id) => getDoc(doc(db, "profiles", id))));
-      setTeamCoaches(profiles.filter((p) => p.exists()).map((p) => ({ id: p.id, name: p.data()!.name as string })));
-    })();
-  }, [team]);
+    supabase.from("team_members").select("user_id, role, profiles(name)").eq("team_id", team.id)
+      .in("role", ["coach", "assistant"])
+      .then(({ data }) => {
+        setTeamCoaches((data ?? []).map((d) => ({
+          id: d.user_id,
+          name: (Array.isArray(d.profiles) ? (d.profiles[0] as { name: string } | undefined)?.name : (d.profiles as { name: string } | null)?.name) ?? "",
+        })));
+      });
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const savePlayers = (updated: Player[]) => {
     setPlayers(updated);
@@ -517,46 +492,29 @@ export default function KalenderPage() {
     if (isRecurring) {
       if (!recurStartDate || !recurEndDate || recurEndDate < recurStartDate) return;
       const allDates = getRecurringDates(recurStartDate, recurEndDate, recurWeekday);
-      // Skip training-free periods
       const dates = allDates.filter((d) => !isInFreePeriod(d, freePeriods));
       if (dates.length === 0) return;
       const groupId = crypto.randomUUID();
-      // Firestore batches support up to 500 operations; commit all in parallel
-      const BATCH_SIZE = 500;
-      const batchPromises: Promise<void>[] = [];
-      for (let i = 0; i < dates.length; i += BATCH_SIZE) {
-        const batch = writeBatch(db);
-        dates.slice(i, i + BATCH_SIZE).forEach((date) => {
-          batch.set(doc(collection(db, "sessions")), {
-            teamId: targetTeam.id,
-            date,
-            title: newTitle.trim(),
-            type: newType,
-            time: newTime,
-            endTime: newEndTime || null,
-            ...hallFields,
-            ...matchFields,
-            ...coachFields,
-            createdBy: user.id,
-            recurringGroupId: groupId,
-          });
-        });
-        batchPromises.push(batch.commit());
-      }
-      await Promise.all(batchPromises);
+      const rows = dates.map((date) => ({
+        team_id: targetTeam.id, date, title: newTitle.trim(), type: newType,
+        time: newTime, end_time: newEndTime || null,
+        hall_id: selectedHall?.id ?? null, hall_name: selectedHall?.name ?? null,
+        ...(newType === "match" ? { opponent: newOpponent.trim() || null, location: newLocation.trim() || null, home_or_away: newHomeOrAway } : {}),
+        coach_id: teamCoaches.find((c) => c.id === newCoachId)?.id ?? null,
+        coach_name: teamCoaches.find((c) => c.id === newCoachId)?.name ?? null,
+        created_by: user.id, recurring_group_id: groupId,
+      }));
+      await supabase.from("sessions").insert(rows);
     } else {
       if (!createModalDate) return;
-      await addDoc(collection(db, "sessions"), {
-        teamId: targetTeam.id,
-        date: createModalDate,
-        title: newTitle.trim(),
-        type: newType,
-        time: newTime,
-        endTime: newEndTime || null,
-        ...hallFields,
-        ...matchFields,
-        ...coachFields,
-        createdBy: user.id,
+      await supabase.from("sessions").insert({
+        team_id: targetTeam.id, date: createModalDate, title: newTitle.trim(), type: newType,
+        time: newTime, end_time: newEndTime || null,
+        hall_id: selectedHall?.id ?? null, hall_name: selectedHall?.name ?? null,
+        ...(newType === "match" ? { opponent: newOpponent.trim() || null, location: newLocation.trim() || null, home_or_away: newHomeOrAway } : {}),
+        coach_id: teamCoaches.find((c) => c.id === newCoachId)?.id ?? null,
+        coach_name: teamCoaches.find((c) => c.id === newCoachId)?.name ?? null,
+        created_by: user.id,
       });
     }
 
@@ -603,69 +561,28 @@ export default function KalenderPage() {
         idsToDelete = [cancellingSession.id];
       }
 
-      // Delete in Firestore batches (max 500 per batch)
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < idsToDelete.length; i += BATCH_SIZE) {
-        const batch = writeBatch(db);
-        idsToDelete.slice(i, i + BATCH_SIZE).forEach((id) =>
-          batch.delete(doc(db, "sessions", id))
-        );
-        await batch.commit();
-      }
-
-      // Clean up Firestore attendance for deleted sessions
+      await supabase.from("sessions").delete().in("id", idsToDelete);
+      // Attendance is cascade-deleted via FK, but clean up locally
       const deletedSet = new Set(idsToDelete);
-      const attendanceToDelete = attendance.filter((a) => deletedSet.has(a.sessionId));
-      if (attendanceToDelete.length > 0) {
-        const attendanceBatchSize = 500;
-        for (let i = 0; i < attendanceToDelete.length; i += attendanceBatchSize) {
-          const abatch = writeBatch(db);
-          attendanceToDelete.slice(i, i + attendanceBatchSize).forEach((a) => {
-            abatch.delete(doc(db, "attendance", `${a.sessionId}_${a.playerId}`));
-          });
-          // Non-critical: attendance cleanup failure doesn't block session deletion
-          await abatch.commit().catch((err) => {
-            console.warn("[attendance cleanup] batch delete failed:", err);
-          });
-        }
-      }
       if (selectedSession && deletedSet.has(selectedSession.id)) setSelectedSession(null);
 
-      // Post cancellation message to team chat (only if we have a team)
       if (notifyTeam) {
-        const dateLabel = new Date(
-          cancellingSession.date + "T12:00:00"
-        ).toLocaleDateString("sv-SE", {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-        });
+        const dateLabel = new Date(cancellingSession.date + "T12:00:00").toLocaleDateString("sv-SE", { weekday: "long", month: "long", day: "numeric" });
         const countNote = idsToDelete.length > 1 ? ` (${idsToDelete.length} pass)` : "";
-        await addDoc(collection(db, "messages"), {
-          teamId: notifyTeam.id,
-          senderId: user.id,
-          senderName: user.name,
-          recipientId: null,
+        await supabase.from("messages").insert({
+          team_id: notifyTeam.id, sender_id: user.id, sender_name: user.name,
+          recipient_id: null,
           text: `⚠️ ${cancellingSession.title}${countNote} (${dateLabel} ${cancellingSession.time}) är inställt. Anledning: ${cancelReason.trim()}`,
-          sentAt: new Date().toISOString(),
-          readBy: [user.id],
+          sent_at: new Date().toISOString(), read_by: [user.id],
         });
 
-        // Send push notification + email (fire-and-forget)
-        const notifyToken = await auth.currentUser?.getIdToken().catch(() => "") ?? "";
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+        const notifyToken = authSession?.access_token ?? "";
         fetch("/api/notify", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${notifyToken}` },
-          body: JSON.stringify({
-            teamId: notifyTeam.id,
-            sessionTitle: cancellingSession.title,
-            sessionDate: cancellingSession.date,
-            sessionTime: cancellingSession.time,
-            reason: cancelReason.trim(),
-          }),
-        }).catch((err) => {
-          console.warn("[notify] Push/email notification failed:", err);
-        });
+          body: JSON.stringify({ teamId: notifyTeam.id, sessionTitle: cancellingSession.title, sessionDate: cancellingSession.date, sessionTime: cancellingSession.time, reason: cancelReason.trim() }),
+        }).catch((err) => { console.warn("[notify]", err); });
       }
     } finally {
       setCancelBusy(false);
@@ -714,25 +631,18 @@ export default function KalenderPage() {
         title: editTitle.trim(),
         type: editType,
         time: editTime,
-        endTime: editEndTime || null,
-        hallId: selectedHall?.id ?? null,
-        hallName: selectedHall?.name ?? null,
+        end_time: editEndTime || null,
+        hall_id: selectedHall?.id ?? null,
+        hall_name: selectedHall?.name ?? null,
         opponent: editType === "match" ? (editOpponent.trim() || null) : null,
         location: editType === "match" ? (editLocation.trim() || null) : null,
-        homeOrAway: editType === "match" ? editHomeOrAway : null,
+        home_or_away: editType === "match" ? editHomeOrAway : null,
         result: editResult.trim() || null,
-        coachId: selectedCoachEdit?.id ?? null,
-        coachName: selectedCoachEdit?.name ?? null,
+        coach_id: selectedCoachEdit?.id ?? null,
+        coach_name: selectedCoachEdit?.name ?? null,
       };
 
-      const BATCH_SIZE = 500;
-      for (let i = 0; i < idsToEdit.length; i += BATCH_SIZE) {
-        const batch = writeBatch(db);
-        idsToEdit.slice(i, i + BATCH_SIZE).forEach((id) =>
-          batch.update(doc(db, "sessions", id), updates)
-        );
-        await batch.commit();
-      }
+      await supabase.from("sessions").update(updates).in("id", idsToEdit);
 
       // Update selectedSession if it was edited
       if (selectedSession && idsToEdit.includes(selectedSession.id)) {
@@ -771,51 +681,31 @@ export default function KalenderPage() {
     );
   };
 
-  const setPlayerAttendance = async (
-    sessionId: string,
-    playerId: string,
-    status: AttendanceStatus
-  ) => {
+  const setPlayerAttendance = async (sessionId: string, playerId: string, status: AttendanceStatus) => {
     if (!team) return;
-    const docId = `${sessionId}_${playerId}`;
-    try {
-      await setDoc(doc(db, "attendance", docId), {
-        sessionId,
-        playerId,
-        status,
-        teamId: team.id,
-        updatedBy: user?.id ?? "",
-        updatedAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.warn("[attendance] Firestore write failed, falling back to local:", err);
-      // Optimistic local fallback
+    const { error } = await supabase.from("attendance").upsert(
+      { session_id: sessionId, player_id: playerId, status, team_id: team.id, updated_by: user?.id ?? null },
+      { onConflict: "session_id,player_id" }
+    );
+    if (error) {
       setAttendance((prev) => {
-        const filtered = prev.filter(
-          (a) => !(a.sessionId === sessionId && a.playerId === playerId)
-        );
+        const filtered = prev.filter((a) => !(a.sessionId === sessionId && a.playerId === playerId));
         return [...filtered, { sessionId, playerId, status }];
       });
     }
   };
 
-  /* ── RSVP ── */
   const submitRsvp = async (sessionId: string, status: RsvpStatus) => {
     if (!user || !team || rsvpBusy) return;
     setRsvpBusy(sessionId);
     try {
-      const docId = `${sessionId}_${user.id}`;
       if (myRsvps[sessionId] === status) {
-        await deleteDoc(doc(db, "rsvps", docId));
+        await supabase.from("rsvps").delete().eq("session_id", sessionId).eq("user_id", user.id);
       } else {
-        await setDoc(doc(db, "rsvps", docId), {
-          sessionId,
-          userId: user.id,
-          userName: user.name,
-          teamId: team.id,
-          status,
-          updatedAt: new Date().toISOString(),
-        });
+        await supabase.from("rsvps").upsert(
+          { session_id: sessionId, user_id: user.id, user_name: user.name, team_id: team.id, status },
+          { onConflict: "session_id,user_id" }
+        );
       }
     } finally {
       setRsvpBusy(null);
@@ -943,7 +833,8 @@ export default function KalenderPage() {
     if (!team || sendingReminder) return;
     setSendingReminder(s.id);
     try {
-      const token = (await auth.currentUser?.getIdToken()) ?? "";
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const token = authSession?.access_token ?? "";
       await fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -970,16 +861,12 @@ export default function KalenderPage() {
     if (!name) return;
     setSavingCalExercise(sessionId);
     try {
-      const docId = `session_${sessionId}`;
       const existing = sessionNotes[`session_${sessionId}`] ?? { subActivities: [], comment: "" };
       const newSub: SubActivity = { id: crypto.randomUUID(), name, description };
-      await setDoc(doc(db, "session_notes", docId), {
-        teamId: team.id,
-        sessionId,
-        subActivities: [...existing.subActivities, newSub],
-        comment: existing.comment,
-        updatedAt: new Date().toISOString(),
-      });
+      await supabase.from("session_notes").upsert(
+        { team_id: team.id, session_id: sessionId, sub_activities: [...existing.subActivities, newSub], comment: existing.comment, updated_by: user.id },
+        { onConflict: "session_id" }
+      );
       setCalExerciseName((prev) => ({ ...prev, [sessionId]: "" }));
       setCalExerciseDesc((prev) => ({ ...prev, [sessionId]: "" }));
       setAddingExerciseFor(null);
@@ -990,16 +877,12 @@ export default function KalenderPage() {
 
   const deleteCalendarExercise = async (sessionId: string, subId: string) => {
     if (!team || !user) return;
-    const docId = `session_${sessionId}`;
     const existing = sessionNotes[`session_${sessionId}`];
     if (!existing) return;
-    await setDoc(doc(db, "session_notes", docId), {
-      teamId: team.id,
-      sessionId,
-      subActivities: existing.subActivities.filter((sub) => sub.id !== subId),
-      comment: existing.comment,
-      updatedAt: new Date().toISOString(),
-    });
+    await supabase.from("session_notes").upsert(
+      { team_id: team.id, session_id: sessionId, sub_activities: existing.subActivities.filter((sub) => sub.id !== subId), comment: existing.comment, updated_by: user.id },
+      { onConflict: "session_id" }
+    );
   };
 
   // Pre-compute recurring group sessions to avoid repeated filter calls in render

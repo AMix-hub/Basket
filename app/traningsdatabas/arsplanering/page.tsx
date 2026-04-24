@@ -3,18 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
-import {
-  collection,
-  query,
-  where,
-  doc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  onSnapshot,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "../../../lib/firebaseClient";
+import { supabase } from "../../../lib/supabase";
 import { autoTag, TAG_LABELS, TAG_COLORS, ALL_TAGS } from "../../../lib/exerciseTags";
 import type { ExerciseTag } from "../../data/types";
 import { year1Plan } from "../../data/year1";
@@ -100,26 +89,23 @@ export default function ArsplaneringPage() {
       setLoadingPlans(false);
       return;
     }
-    const q = query(
-      collection(db, "custom_season_plans"),
-      where("teamId", "==", team.id)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setPlans(
-        snap.docs.map((d) => ({
-          id: d.id,
-          teamId: d.data().teamId as string,
-          name: d.data().name as string,
-          description: (d.data().description as string) ?? "",
-          sessions: (d.data().sessions as PlanSession[]) ?? [],
-          createdBy: d.data().createdBy as string,
-          createdAt: d.data().createdAt as string,
-          updatedAt: d.data().updatedAt as string,
-        }))
-      );
-      setLoadingPlans(false);
-    });
-    return () => unsub();
+    let mounted = true;
+    const load = () =>
+      supabase.from("custom_season_plans").select("*").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          setPlans((data ?? []).map((d) => ({
+            id: d.id, teamId: d.team_id, name: d.name,
+            description: "", sessions: (d.data?.sessions as PlanSession[]) ?? [],
+            createdBy: d.created_by ?? "", createdAt: d.created_at, updatedAt: d.updated_at,
+          })));
+          setLoadingPlans(false);
+        });
+    load();
+    const ch = supabase.channel(`season-plans:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "custom_season_plans", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
   }, [team]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Team custom exercises ────────────────────────────────────────────────
@@ -127,21 +113,16 @@ export default function ArsplaneringPage() {
 
   useEffect(() => {
     if (!team) return;
-    const q = query(collection(db, "team_exercises"), where("teamId", "==", team.id));
-    const unsub = onSnapshot(q, (snap) => {
-      setTeamExercises(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          description: (d.data().description as string) ?? "",
-          durationMinutes: (d.data().durationMinutes as number | undefined) ?? undefined,
-          intensityLevel: (d.data().intensityLevel as 1 | 2 | 3 | undefined) ?? undefined,
-          createdBy: d.data().createdBy as string,
-          createdAt: d.data().createdAt as string,
-        }))
-      );
-    });
-    return () => unsub();
+    let mounted2 = true;
+    supabase.from("team_exercises").select("*").eq("team_id", team.id)
+      .then(({ data }) => {
+        if (!mounted2) return;
+        setTeamExercises((data ?? []).map((d) => ({
+          id: d.id, name: d.title, description: d.description ?? "",
+          createdBy: d.created_by ?? "", createdAt: d.created_at,
+        })));
+      });
+    return () => { mounted2 = false; };
   }, [team]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── All browsable exercises (db + extra + custom) ────────────────────────
@@ -189,14 +170,11 @@ export default function ArsplaneringPage() {
         title: `Träning ${i + 1}`,
         activities: [],
       }));
-      await addDoc(collection(db, "custom_season_plans"), {
-        teamId: team.id,
+      await supabase.from("custom_season_plans").insert({
+        team_id: team.id,
         name: newPlanName.trim(),
-        description: newPlanDesc.trim(),
-        sessions,
-        createdBy: user.id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        data: { sessions },
+        created_by: user.id,
       });
       setShowCreateModal(false);
       setNewPlanName("");
@@ -211,7 +189,7 @@ export default function ArsplaneringPage() {
     if (!canEdit) return;
     if (!confirm("Är du säker på att du vill ta bort årsplaneringen? Detta kan inte ångras."))
       return;
-    await deleteDoc(doc(db, "custom_season_plans", planId));
+    await supabase.from("custom_season_plans").delete().eq("id", planId);
   };
 
   // ── Plan editor state ────────────────────────────────────────────────────
@@ -258,10 +236,7 @@ export default function ArsplaneringPage() {
         ],
       };
     });
-    await updateDoc(doc(db, "custom_season_plans", editingPlan.id), {
-      sessions: updated,
-      updatedAt: new Date().toISOString(),
-    });
+    await supabase.from("custom_season_plans").update({ data: { sessions: updated } }).eq("id", editingPlan.id);
   };
 
   const removeActivityFromSession = async (sessionIdx: number, activityIdx: number) => {
@@ -273,10 +248,7 @@ export default function ArsplaneringPage() {
         activities: s.activities.filter((_, ai) => ai !== activityIdx),
       };
     });
-    await updateDoc(doc(db, "custom_season_plans", editingPlan.id), {
-      sessions: updated,
-      updatedAt: new Date().toISOString(),
-    });
+    await supabase.from("custom_season_plans").update({ data: { sessions: updated } }).eq("id", editingPlan.id);
   };
 
   const renameSession = async (sessionIdx: number, newTitle: string) => {
@@ -284,10 +256,7 @@ export default function ArsplaneringPage() {
     const updated = editingPlan.sessions.map((s, idx) =>
       idx === sessionIdx ? { ...s, title: newTitle } : s
     );
-    await updateDoc(doc(db, "custom_season_plans", editingPlan.id), {
-      sessions: updated,
-      updatedAt: new Date().toISOString(),
-    });
+    await supabase.from("custom_season_plans").update({ data: { sessions: updated } }).eq("id", editingPlan.id);
     setRenamingSessionIdx(null);
     setRenameDraft("");
   };

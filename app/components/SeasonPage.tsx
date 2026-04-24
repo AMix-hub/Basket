@@ -6,19 +6,7 @@ import { usePathname } from "next/navigation";
 import type { SeasonPlan } from "../data/types";
 import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
-import {
-  collection,
-  query,
-  where,
-  doc,
-  getDocs,
-  onSnapshot,
-  setDoc,
-  addDoc,
-  deleteDoc,
-  writeBatch,
-} from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 import { SPORTS } from "../../lib/sports";
 import { autoTag, TAG_LABELS, TAG_COLORS } from "../../lib/exerciseTags";
 
@@ -145,46 +133,47 @@ export default function SeasonPage({ plan }: Props) {
 
   useEffect(() => {
     if (!team) return;
-    const q = query(
-      collection(db, "session_notes"),
-      where("teamId", "==", team.id),
-      where("planYear", "==", plan.year)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const loaded: Record<number, SessionNote> = {};
-      snap.docs.forEach((d) => {
-        const num = d.data().sessionNumber as number;
-        loaded[num] = {
-          subActivities: (d.data().subActivities as SubActivity[]) ?? [],
-          comment: (d.data().comment as string) ?? "",
-        };
-      });
-      setNotes(loaded);
-    });
-    return () => unsub();
-  }, [team, plan.year]);
+    let mounted = true;
+    const load = () =>
+      supabase.from("session_notes").select("plan_session_number, sub_activities, comment")
+        .eq("team_id", team.id).eq("plan_year", plan.year)
+        .then(({ data }) => {
+          if (!mounted) return;
+          const loaded: Record<number, SessionNote> = {};
+          (data ?? []).forEach((d) => {
+            if (d.plan_session_number == null) return;
+            loaded[d.plan_session_number] = {
+              subActivities: (d.sub_activities as SubActivity[]) ?? [],
+              comment: d.comment ?? "",
+            };
+          });
+          setNotes(loaded);
+        });
+    load();
+    const ch = supabase.channel(`session-notes:${team.id}:${plan.year}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "session_notes", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id, plan.year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;
     const isAdmin = user.roles.includes("admin");
     if (isAdmin) {
-      // Co-admins have adminId pointing to the original club admin; use that
-      // to find the correct club teams.
       const effectiveAdminId = user.adminId ?? user.id;
-      // Query admin's teams directly using already-imported Firestore functions
-      getDocs(query(collection(db, "teams"), where("adminId", "==", effectiveAdminId))).then((snap) => {
-        const adminTeams = snap.docs.map((d) => ({
+      supabase.from("teams").select("*").eq("admin_id", effectiveAdminId).then(({ data }) => {
+        const adminTeams = (data ?? []).map((d) => ({
           id: d.id,
-          name: d.data().name as string,
-          ageGroup: d.data().ageGroup as string,
-          coachId: (d.data().coachId as string) ?? "",
-          adminId: d.data().adminId as string,
-          clubName: (d.data().clubName as string) ?? "",
-          sport: ((d.data().sport as string) ?? "basket") as import("../../lib/sports").SportId,
-          memberIds: (d.data().memberIds as string[]) ?? [],
-          inviteCode: (d.data().inviteCode as string) ?? "",
-          parentInviteCode: (d.data().parentInviteCode as string) ?? "",
-          playerInviteCode: (d.data().playerInviteCode as string) ?? "",
+          name: d.name,
+          ageGroup: d.age_group ?? "",
+          coachId: d.coach_id ?? "",
+          adminId: d.admin_id ?? "",
+          clubName: d.club_name ?? "",
+          sport: ((d.sport as string) ?? "basket") as import("../../lib/sports").SportId,
+          memberIds: [] as string[],
+          inviteCode: d.invite_code ?? "",
+          parentInviteCode: d.parent_invite_code ?? "",
+          playerInviteCode: d.player_invite_code ?? "",
         }));
         setAllTeams(adminTeams);
         if (adminTeams.length > 0) setSchedTeam((prev) => prev || adminTeams[0].id);
@@ -193,66 +182,40 @@ export default function SeasonPage({ plan }: Props) {
       setAllTeams([team]);
       setSchedTeam((prev) => prev || team.id);
     }
-  }, [user?.id, user?.roles, team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (!user) return;
-    // For co-admins, use their adminId (the club's root admin) so they see the
-    // right training-free periods. Fall back to team's adminId for non-admins.
-    const adminId = user.roles.includes("admin")
-      ? (user.adminId ?? user.id)
-      : team?.adminId;
-    if (!adminId) return;
-    const q = query(collection(db, "training_free_periods"), where("adminId", "==", adminId));
-    const unsub = onSnapshot(q, (snap) => {
-      setFreePeriods(
-        snap.docs.map((d) => ({
-          startDate: d.data().startDate as string,
-          endDate: d.data().endDate as string,
-          adminId: d.data().adminId as string,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [user?.id, user?.roles, team?.adminId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!user) return;
     const adminId = user.roles.includes("admin") ? (user.adminId ?? user.id) : team?.adminId;
     if (!adminId) return;
-    const q = query(collection(db, "halls"), where("adminId", "==", adminId));
-    const unsub = onSnapshot(q, (snap) => {
-      setHalls(snap.docs.map((d) => ({
-        id: d.id,
-        name: d.data().name as string,
-        adminId: d.data().adminId as string,
-      })));
-    });
-    return () => unsub();
-  }, [user?.id, user?.roles, team?.adminId]); // eslint-disable-line react-hooks/exhaustive-deps
+    supabase.from("training_free_periods").select("start_date, end_date, admin_id").eq("admin_id", adminId)
+      .then(({ data }) => setFreePeriods((data ?? []).map((d) => ({
+        startDate: d.start_date, endDate: d.end_date, adminId: d.admin_id,
+      }))));
+    supabase.from("halls").select("id, name, admin_id").eq("admin_id", adminId)
+      .then(({ data }) => setHalls((data ?? []).map((d) => ({ id: d.id, name: d.name, adminId: d.admin_id }))));
+  }, [user?.id, team?.adminId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load custom exercises created by this team for this plan year
   useEffect(() => {
     if (!team) return;
-    const q = query(
-      collection(db, "team_exercises"),
-      where("teamId", "==", team.id),
-      where("planYear", "==", plan.year)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setCustomExercises(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          description: (d.data().description as string) ?? "",
-          durationMinutes: (d.data().durationMinutes as number | undefined) ?? undefined,
-          intensityLevel: (d.data().intensityLevel as 1 | 2 | 3 | undefined) ?? undefined,
-          createdBy: d.data().createdBy as string,
-          createdAt: d.data().createdAt as string,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [team, plan.year]); // eslint-disable-line react-hooks/exhaustive-deps
+    let mounted = true;
+    const load = () =>
+      supabase.from("team_exercises").select("*").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          setCustomExercises((data ?? []).map((d) => ({
+            id: d.id,
+            name: d.title,
+            description: d.description ?? "",
+            durationMinutes: undefined,
+            intensityLevel: undefined,
+            createdBy: d.created_by ?? "",
+            createdAt: d.created_at,
+          })));
+        });
+    load();
+    return () => { mounted = false; };
+  }, [team?.id, plan.year]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetExerciseForm = () => {
     setNewExName("");
@@ -266,18 +229,13 @@ export default function SeasonPage({ plan }: Props) {
     if (!team || !user) return;
     const name = newExName.trim();
     if (!name) return;
-    const parsedDuration = newExDuration ? parseInt(newExDuration, 10) : null;
     setSavingExercise(true);
     try {
-      await addDoc(collection(db, "team_exercises"), {
-        teamId: team.id,
-        planYear: plan.year,
-        name,
+      await supabase.from("team_exercises").insert({
+        team_id: team.id,
+        title: name,
         description: newExDesc.trim(),
-        durationMinutes: parsedDuration !== null && !isNaN(parsedDuration) ? parsedDuration : null,
-        intensityLevel: newExIntensity || null,
-        createdBy: user.id,
-        createdAt: new Date().toISOString(),
+        created_by: user.id,
       });
       resetExerciseForm();
     } finally {
@@ -287,26 +245,25 @@ export default function SeasonPage({ plan }: Props) {
 
   const deleteCustomExercise = async (id: string) => {
     if (!team || !user) return;
-    await deleteDoc(doc(db, "team_exercises", id));
+    await supabase.from("team_exercises").delete().eq("id", id);
   };
 
-  const getNoteDocId = (sessionNumber: number) =>
-    `${team?.id}_${plan.year}_${sessionNumber}`;
+  const upsertSessionNote = async (sessionNumber: number, update: Partial<SessionNote>) => {
+    if (!team || !user) return;
+    const existing = notes[sessionNumber] ?? { subActivities: [], comment: "" };
+    const merged = { ...existing, ...update };
+    await supabase.from("session_notes").upsert(
+      { team_id: team.id, plan_year: plan.year, plan_session_number: sessionNumber,
+        sub_activities: merged.subActivities, comment: merged.comment, updated_by: user.id },
+      { onConflict: "team_id,plan_year,plan_session_number" }
+    );
+  };
 
   const saveComment = async (sessionNumber: number) => {
     if (!team || !user) return;
     setSavingComment(sessionNumber);
     try {
-      const docId = getNoteDocId(sessionNumber);
-      const existing = notes[sessionNumber] ?? { subActivities: [], comment: "" };
-      await setDoc(doc(db, "session_notes", docId), {
-        teamId: team.id,
-        planYear: plan.year,
-        sessionNumber,
-        subActivities: existing.subActivities,
-        comment: editingComment[sessionNumber] ?? "",
-        updatedAt: new Date().toISOString(),
-      });
+      await upsertSessionNote(sessionNumber, { comment: editingComment[sessionNumber] ?? "" });
       setExpandedSession(null);
     } finally {
       setSavingComment(null);
@@ -320,17 +277,9 @@ export default function SeasonPage({ plan }: Props) {
     if (!name) return;
     setSavingSubActivity(sessionNumber);
     try {
-      const docId = getNoteDocId(sessionNumber);
       const existing = notes[sessionNumber] ?? { subActivities: [], comment: "" };
       const newSub: SubActivity = { id: crypto.randomUUID(), name, description };
-      await setDoc(doc(db, "session_notes", docId), {
-        teamId: team.id,
-        planYear: plan.year,
-        sessionNumber,
-        subActivities: [...existing.subActivities, newSub],
-        comment: existing.comment,
-        updatedAt: new Date().toISOString(),
-      });
+      await upsertSessionNote(sessionNumber, { subActivities: [...existing.subActivities, newSub] });
       setNewSubName((prev) => ({ ...prev, [sessionNumber]: "" }));
       setNewSubDesc((prev) => ({ ...prev, [sessionNumber]: "" }));
     } finally {
@@ -342,15 +291,7 @@ export default function SeasonPage({ plan }: Props) {
     if (!team || !user) return;
     const existing = notes[sessionNumber];
     if (!existing) return;
-    const docId = getNoteDocId(sessionNumber);
-    await setDoc(doc(db, "session_notes", docId), {
-      teamId: team.id,
-      planYear: plan.year,
-      sessionNumber,
-      subActivities: existing.subActivities.filter((s) => s.id !== subId),
-      comment: existing.comment,
-      updatedAt: new Date().toISOString(),
-    });
+    await upsertSessionNote(sessionNumber, { subActivities: existing.subActivities.filter((s) => s.id !== subId) });
   };
 
   const handleGenerateSeason = async () => {
@@ -360,34 +301,27 @@ export default function SeasonPage({ plan }: Props) {
     try {
       const dates = generateSeasonDates(schedStartDate, schedWeekday, plan.sessions.length, freePeriods);
       const selectedHall = halls.find((h) => h.id === schedHallId);
-      const hallFields = selectedHall
-        ? { hallId: selectedHall.id, hallName: selectedHall.name }
-        : {};
-      const BATCH_SIZE = 500;
-      const batchPromises: Promise<void>[] = [];
       const groupId = crypto.randomUUID();
-      for (let i = 0; i < dates.length; i += BATCH_SIZE) {
-        const batch = writeBatch(db);
-        dates.slice(i, i + BATCH_SIZE).forEach((date, idx) => {
-          const session = plan.sessions[i + idx];
-          if (!session) return;
-          batch.set(doc(collection(db, "sessions")), {
-            teamId: targetTeamId,
-            date,
-            title: session.title,
-            type: "träning",
-            time: schedTime,
-            endTime: schedEndTime || null,
-            ...hallFields,
-            createdBy: user.id,
-            planYear: plan.year,
-            planSessionNumber: session.number,
-            recurringGroupId: groupId,
-          });
-        });
-        batchPromises.push(batch.commit());
-      }
-      await Promise.all(batchPromises);
+      const rows = dates.map((date, idx) => {
+        const session = plan.sessions[idx];
+        if (!session) return null;
+        return {
+          team_id: targetTeamId,
+          date,
+          title: session.title,
+          type: "träning",
+          time: schedTime,
+          end_time: schedEndTime || null,
+          hall_id: selectedHall?.id ?? null,
+          hall_name: selectedHall?.name ?? null,
+          created_by: user.id,
+          plan_year: plan.year,
+          plan_session_number: session.number,
+          recurring_group_id: groupId,
+        };
+      }).filter(Boolean);
+      const { error } = await supabase.from("sessions").insert(rows as Record<string, unknown>[]);
+      if (error) throw error;
       setSchedDone(true);
     } catch (err) {
       console.error("Failed to generate season schedule:", err);

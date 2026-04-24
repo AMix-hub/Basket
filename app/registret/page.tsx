@@ -5,21 +5,7 @@ import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  arrayUnion,
-  addDoc,
-  onSnapshot,
-  orderBy,
-} from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
 interface PlayerNote {
   id: string;
@@ -48,31 +34,36 @@ function PlayerNotesModal({ member, teamId, coachId, coachName, onClose }: Playe
   const today = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "player_notes"),
-      where("teamId", "==", teamId),
-      where("playerId", "==", member.id),
-      orderBy("createdAt", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() } as PlayerNote)));
-    });
-    return () => unsub();
+    let mounted = true;
+    const load = () =>
+      supabase.from("player_notes").select("*")
+        .eq("team_id", teamId).eq("player_id", member.id).order("created_at", { ascending: false })
+        .then(({ data }) => {
+          if (!mounted) return;
+          setNotes((data ?? []).map((d) => ({
+            id: d.id, teamId: d.team_id, playerId: d.player_id, playerName: d.player_name ?? "",
+            coachId: d.coach_id ?? "", coachName: d.coach_name ?? "", note: d.note, date: d.date ?? "", createdAt: d.created_at,
+          })));
+        });
+    load();
+    const ch = supabase.channel(`player-notes:${teamId}:${member.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "player_notes", filter: `team_id=eq.${teamId}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
   }, [teamId, member.id]);
 
   const saveNote = async () => {
     if (!newNote.trim() || saving) return;
     setSaving(true);
     try {
-      await addDoc(collection(db, "player_notes"), {
-        teamId,
-        playerId: member.id,
-        playerName: member.name,
-        coachId,
-        coachName,
+      await supabase.from("player_notes").insert({
+        team_id: teamId,
+        player_id: member.id,
+        player_name: member.name,
+        coach_id: coachId,
+        coach_name: coachName,
         note: newNote.trim(),
         date: today,
-        createdAt: new Date().toISOString(),
       });
       setNewNote("");
     } finally {
@@ -251,124 +242,64 @@ export default function RegistretPage() {
   const effectiveAdminId = user?.adminId ?? user?.id;
 
   useEffect(() => {
-    if (!user) return;
-    if (!isAdmin && !isCoach) return;
+    if (!user || (!isAdmin && !isCoach)) return;
 
     (async () => {
       const results: TeamWithMembers[] = [];
-
-      // For admins: load ALL teams they administer (may include teams not in getMyTeams)
-      // For coaches: use teams from getMyTeams()
       let teamsToLoad: { id: string; name: string; ageGroup?: string }[];
 
       if (isAdmin) {
-        // Build the set of admin IDs to query by. For root admins (adminId ==
-        // null) this is just their own UID. For co-admins it includes both
-        // their own UID and the club's root admin UID so that teams are found
-        // even when the profile's adminId was incorrectly set or not yet healed.
         const adminIds = [...new Set([effectiveAdminId, user.id].filter(Boolean))] as string[];
-
-        const adminTeamsSnap = await getDocs(
-          adminIds.length === 1
-            ? query(collection(db, "teams"), where("adminId", "==", adminIds[0]))
-            : query(collection(db, "teams"), where("adminId", "in", adminIds))
-        );
-        teamsToLoad = adminTeamsSnap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          ageGroup: (d.data().ageGroup as string | undefined) ?? undefined,
-        }));
+        const { data: adminTeamsData } = await supabase.from("teams").select("id, name, age_group").in("admin_id", adminIds);
+        teamsToLoad = (adminTeamsData ?? []).map((d) => ({ id: d.id, name: d.name, ageGroup: d.age_group ?? undefined }));
         setAdminTeams(teamsToLoad);
       } else {
-        // Coach: only their own teams
-        teamsToLoad = teams.map((t: Team) => ({
-          id: t.id,
-          name: t.name,
-          ageGroup: t.ageGroup,
-        }));
+        teamsToLoad = teams.map((t: Team) => ({ id: t.id, name: t.name, ageGroup: t.ageGroup }));
       }
 
-      await Promise.all(
-        teamsToLoad.map(async (team) => {
-          const memberSnap = await getDocs(
-            query(collection(db, "team_members"), where("teamId", "==", team.id))
-          );
-          const ids = memberSnap.docs.map((d) => d.data().userId as string);
-          if (ids.length === 0) {
-            results.push({ ...team, members: [] });
-            return;
-          }
-          const profileSnaps = await Promise.all(
-            ids.map((id) => getDoc(doc(db, "profiles", id)))
-          );
-          const members: ProfileRow[] = profileSnaps
-            .filter((s) => s.exists())
-            .map((s) => {
-              const d = s.data()!;
-              return {
-                id: s.id,
-                name: d.name as string,
-                roles:
-                  d.roles && (d.roles as string[]).length > 0
-                    ? (d.roles as string[])
-                    : [d.role as string],
-                child_name: (d.childName as string | null) ?? null,
-              };
-            });
-          results.push({ ...team, members });
-        })
-      );
+      const teamIds = teamsToLoad.map((t) => t.id);
+      const { data: memberRows } = await supabase.from("team_members").select("team_id, user_id").in("team_id", teamIds);
+      const userIds = [...new Set((memberRows ?? []).map((m) => m.user_id))];
 
-      // For admins: also include users linked directly via adminId in their profile.
-      // This covers users who were invited by the admin but not assigned to a team.
+      const profileMap: Record<string, ProfileRow> = {};
+      if (userIds.length > 0) {
+        const { data: profileData } = await supabase.from("profiles").select("id, name, roles, child_name").in("id", userIds);
+        (profileData ?? []).forEach((p) => {
+          profileMap[p.id] = { id: p.id, name: p.name, roles: p.roles ?? [], child_name: p.child_name ?? null };
+        });
+      }
+
+      teamsToLoad.forEach((team) => {
+        const members = (memberRows ?? [])
+          .filter((m) => m.team_id === team.id)
+          .map((m) => profileMap[m.user_id])
+          .filter(Boolean);
+        results.push({ ...team, members });
+      });
+
       if (isAdmin) {
         const adminIds = [...new Set([effectiveAdminId, user.id].filter(Boolean))] as string[];
-        const directProfilesSnap = await getDocs(
-          adminIds.length === 1
-            ? query(collection(db, "profiles"), where("adminId", "==", adminIds[0]))
-            : query(collection(db, "profiles"), where("adminId", "in", adminIds))
-        );
-        const existingMemberIds = new Set(
-          results.flatMap((t) => t.members.map((m) => m.id))
-        );
-        const unassigned: ProfileRow[] = [];
-        directProfilesSnap.docs.forEach((s) => {
-          if (!existingMemberIds.has(s.id)) {
-            const d = s.data();
-            unassigned.push({
-              id: s.id,
-              name: d.name as string,
-              roles:
-                d.roles && (d.roles as string[]).length > 0
-                  ? (d.roles as string[])
-                  : [d.role as string],
-              child_name: (d.childName as string | null) ?? null,
-            });
-          }
-        });
+        const { data: directProfiles } = await supabase.from("profiles").select("id, name, roles, child_name").in("admin_id", adminIds);
+        const existingMemberIds = new Set(results.flatMap((t) => t.members.map((m) => m.id)));
+        const unassigned: ProfileRow[] = (directProfiles ?? [])
+          .filter((p) => !existingMemberIds.has(p.id))
+          .map((p) => ({ id: p.id, name: p.name, roles: p.roles ?? [], child_name: p.child_name ?? null }));
         if (unassigned.length > 0) {
-          // Add unassigned members as a virtual group so they appear in allMembersForAdmin
           results.push({ id: "__unassigned__", name: "", members: unassigned });
         }
       }
 
-      // Sort teams by name
       results.sort((a, b) => a.name.localeCompare(b.name, "sv"));
       setTeamData(results);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, effectiveAdminId, teams.map((t: Team) => t.id).join(",")]);
+  }, [user?.id, effectiveAdminId, teams.map((t: Team) => t.id).join(",")]);
 
   const addMemberToTeam = async (memberId: string, teamId: string) => {
-    await setDoc(doc(db, "team_members", `${teamId}_${memberId}`), {
-      teamId,
-      userId: memberId,
-      joinedAt: new Date().toISOString(),
-    });
-    await updateDoc(doc(db, "teams", teamId), {
-      memberIds: arrayUnion(memberId),
-    });
-    // Update local teamData to reflect the new membership
+    await supabase.from("team_members").upsert(
+      { team_id: teamId, user_id: memberId },
+      { onConflict: "team_id,user_id" }
+    );
     setTeamData((prev) => {
       if (!prev) return prev;
       const allMembers = prev.flatMap((t) => t.members);

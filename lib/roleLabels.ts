@@ -2,6 +2,7 @@ import type { UserRole } from "../app/context/AuthContext";
 
 export const roleLabel: Record<UserRole, string> = {
   admin: "🏛 Admin",
+  co_admin: "🏛 Medadmin",
   coach: "🎽 Coach",
   assistant: "👋 Assistent",
   parent: "👪 Förälder",

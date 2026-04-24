@@ -10,16 +10,7 @@ import { year1Plan } from "../data/year1";
 import { year2Plan } from "../data/year2";
 import { year3Plan } from "../data/year3";
 import { extraExercises } from "../data/extraExercises";
-import {
-  collection,
-  query,
-  where,
-  doc,
-  addDoc,
-  deleteDoc,
-  onSnapshot,
-} from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
 interface TeamExercise {
   id: string;
@@ -96,23 +87,22 @@ export default function TraningsdatabasPage() {
 
   useEffect(() => {
     if (!team) return;
-    const q = query(collection(db, "team_exercises"), where("teamId", "==", team.id));
-    const unsub = onSnapshot(q, (snap) => {
-      setTeamExercises(
-        snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name as string,
-          description: (d.data().description as string) ?? "",
-          tips: (d.data().tips as string | undefined) ?? undefined,
-          durationMinutes: (d.data().durationMinutes as number | undefined) ?? undefined,
-          intensityLevel: (d.data().intensityLevel as 1 | 2 | 3 | undefined) ?? undefined,
-          createdBy: d.data().createdBy as string,
-          createdAt: d.data().createdAt as string,
-        }))
-      );
-    });
-    return () => unsub();
-  }, [team]); // eslint-disable-line react-hooks/exhaustive-deps
+    let mounted = true;
+    const load = () =>
+      supabase.from("team_exercises").select("*").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          setTeamExercises((data ?? []).map((d) => ({
+            id: d.id, name: d.title, description: d.description ?? "",
+            createdBy: d.created_by ?? "", createdAt: d.created_at,
+          })));
+        });
+    load();
+    const ch = supabase.channel(`team-exercises:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_exercises", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id]);
 
   const resetExerciseForm = () => {
     setNewExName("");
@@ -128,16 +118,9 @@ export default function TraningsdatabasPage() {
     const parsedDuration = newExDuration ? parseInt(newExDuration, 10) : null;
     setSavingExercise(true);
     try {
-      await addDoc(collection(db, "team_exercises"), {
-        teamId: team.id,
-        name: newExName.trim(),
-        description: newExDesc.trim(),
-        tips: newExTips.trim() || null,
-        durationMinutes:
-          parsedDuration !== null && !isNaN(parsedDuration) ? parsedDuration : null,
-        intensityLevel: newExIntensity || null,
-        createdBy: user.id,
-        createdAt: new Date().toISOString(),
+      await supabase.from("team_exercises").insert({
+        team_id: team.id, title: newExName.trim(),
+        description: newExDesc.trim(), created_by: user.id,
       });
       resetExerciseForm();
     } finally {
@@ -147,7 +130,7 @@ export default function TraningsdatabasPage() {
 
   const deleteCustomExercise = async (id: string) => {
     if (!canEdit) return;
-    await deleteDoc(doc(db, "team_exercises", id));
+    await supabase.from("team_exercises").delete().eq("id", id);
   };
 
   function yearHref(year: number) {

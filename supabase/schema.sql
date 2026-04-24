@@ -250,28 +250,34 @@ CREATE TABLE attendance (
 -- 13. session_notes
 -- =========================================================
 CREATE TABLE session_notes (
-  id           UUID  PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id   UUID  NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
-  team_id      UUID  NOT NULL REFERENCES teams(id)    ON DELETE CASCADE,
-  content      TEXT  NOT NULL DEFAULT '',
-  sub_activities JSONB NOT NULL DEFAULT '[]',
-  updated_by   UUID  REFERENCES profiles(id) ON DELETE SET NULL,
-  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                  UUID  PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id             UUID  NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  session_id          UUID  REFERENCES sessions(id) ON DELETE CASCADE,
+  plan_year           INT,
+  plan_session_number INT,
+  sub_activities      JSONB NOT NULL DEFAULT '[]',
+  comment             TEXT  NOT NULL DEFAULT '',
+  updated_by          UUID  REFERENCES profiles(id) ON DELETE SET NULL,
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX session_notes_session_id_idx ON session_notes (session_id);
+CREATE UNIQUE INDEX session_notes_session_idx ON session_notes (session_id) WHERE session_id IS NOT NULL;
+CREATE UNIQUE INDEX session_notes_plan_idx    ON session_notes (team_id, plan_year, plan_session_number) WHERE plan_year IS NOT NULL;
 
 
 -- =========================================================
 -- 14. player_notes
 -- =========================================================
 CREATE TABLE player_notes (
-  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  team_id    UUID        NOT NULL REFERENCES teams(id)    ON DELETE CASCADE,
-  player_id  UUID        NOT NULL REFERENCES players(id)  ON DELETE CASCADE,
-  coach_id   UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  content    TEXT        NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id     UUID        NOT NULL REFERENCES teams(id)    ON DELETE CASCADE,
+  player_id   UUID        NOT NULL REFERENCES players(id)  ON DELETE CASCADE,
+  player_name TEXT        NOT NULL DEFAULT '',
+  coach_id    UUID        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  coach_name  TEXT        NOT NULL DEFAULT '',
+  note        TEXT        NOT NULL,
+  date        DATE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX player_notes_team_id_player_id_idx ON player_notes (team_id, player_id);
@@ -282,12 +288,12 @@ CREATE INDEX player_notes_created_at_idx        ON player_notes (created_at DESC
 -- 15. tactics
 -- =========================================================
 CREATE TABLE tactics (
-  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       TEXT        NOT NULL,
-  team_id    UUID        NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  players    JSONB       NOT NULL DEFAULT '[]',
-  arrows     JSONB       NOT NULL DEFAULT '[]',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT        NOT NULL,
+  team_id     UUID        NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  steps       JSONB       NOT NULL DEFAULT '[]',
+  coach_notes TEXT        NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX tactics_team_id_idx ON tactics (team_id);
@@ -299,7 +305,10 @@ CREATE INDEX tactics_team_id_idx ON tactics (team_id);
 CREATE TABLE tactic_live_state (
   team_id              UUID    PRIMARY KEY REFERENCES teams(id) ON DELETE CASCADE,
   players              JSONB   NOT NULL DEFAULT '[]',
-  arrows               JSONB   NOT NULL DEFAULT '[]',
+  drawings             JSONB   NOT NULL DEFAULT '[]',
+  steps                JSONB   NOT NULL DEFAULT '[]',
+  current_step_idx     INTEGER NOT NULL DEFAULT 0,
+  coach_notes          TEXT    NOT NULL DEFAULT '',
   animation_playing    BOOLEAN NOT NULL DEFAULT FALSE,
   animation_start_time TEXT,
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),

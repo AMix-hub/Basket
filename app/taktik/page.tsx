@@ -2,18 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
-import {
-  doc,
-  setDoc,
-  addDoc,
-  deleteDoc,
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-} from "firebase/firestore";
-import { db } from "@/lib/firebaseClient";
+import { supabase } from "@/lib/supabase";
 import { useCast } from "@/app/hooks/useCast";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
@@ -452,18 +441,18 @@ export default function TaktikPage() {
       const step = s[ci] ?? s[0];
       if (!step) return;
       suppressRef.current += 1;
-      await setDoc(doc(db, "tactic_live_state", activeTeam.id), {
-        teamId: activeTeam.id,
+      await supabase.from("tactic_live_state").upsert({
+        team_id: activeTeam.id,
         players: step.players,
         drawings: step.drawings,
         steps: s,
-        currentStepIdx: ci,
-        coachNotes: cn,
-        animationPlaying: false,
-        animationStartTime: null,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.id,
-      });
+        current_step_idx: ci,
+        coach_notes: cn,
+        animation_playing: false,
+        animation_start_time: null,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      }, { onConflict: "team_id" });
     }, 150);
   }, [isOnline, user, activeTeam]);
 
@@ -636,6 +625,15 @@ export default function TaktikPage() {
       pushUndo();
       removePlayer(id);
       pushLive();
+    } else if (tool === "arrow" || tool === "dashed") {
+      const player = currentStep?.players.find(p => p.id === id);
+      if (player) {
+        const coords = { x: player.x, y: player.y };
+        setDrawStart(coords);
+        setDrawCursor(coords);
+        freehandPointsRef.current = [coords];
+        svgRef.current?.setPointerCapture(e.pointerId);
+      }
     }
   };
 
@@ -661,18 +659,18 @@ export default function TaktikPage() {
     setPlayProgress(0);
     if (isOnline && user && activeTeam) {
       suppressRef.current += 1;
-      setDoc(doc(db, "tactic_live_state", activeTeam.id), {
-        teamId: activeTeam.id,
+      supabase.from("tactic_live_state").upsert({
+        team_id: activeTeam.id,
         players: steps[0].players,
         drawings: steps[0].drawings,
         steps,
-        currentStepIdx,
-        coachNotes,
-        animationPlaying: true,
-        animationStartTime: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.id,
-      });
+        current_step_idx: currentStepIdx,
+        coach_notes: coachNotes,
+        animation_playing: true,
+        animation_start_time: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      }, { onConflict: "team_id" });
     }
   };
 
@@ -748,18 +746,15 @@ export default function TaktikPage() {
     setSyncStatus("connecting");
     let cancelled = false;
 
-    const liveUnsub = onSnapshot(doc(db, "tactic_live_state", activeTeam!.id), snap => {
-      if (!snap.exists() || cancelled) return;
-      if (snap.metadata.hasPendingWrites) return;
-      if (suppressRef.current > 0) { suppressRef.current -= 1; return; }
-      const live = snap.data();
-      if (live.steps?.length) {
-        const liveSteps = live.steps as Step[];
+    const mapLive = (live: Record<string, unknown>) => {
+      if (!live) return;
+      const liveSteps = live.steps as Step[] | undefined;
+      if (liveSteps?.length) {
         setSteps(liveSteps);
-        if (typeof live.currentStepIdx === "number") setCurrentStepIdx(live.currentStepIdx);
-        if (typeof live.coachNotes === "string") setCoachNotes(live.coachNotes);
-        if (live.animationPlaying && live.animationStartTime && liveSteps.length >= 2) {
-          const elapsed = Date.now() - new Date(live.animationStartTime as string).getTime();
+        if (typeof live.current_step_idx === "number") setCurrentStepIdx(live.current_step_idx);
+        if (typeof live.coach_notes === "string") setCoachNotes(live.coach_notes);
+        if (live.animation_playing && live.animation_start_time && liveSteps.length >= 2) {
+          const elapsed = Date.now() - new Date(live.animation_start_time as string).getTime();
           const total   = (liveSteps.length - 1) * ANIM_MS;
           if (elapsed < total) {
             const si          = Math.min(Math.floor(elapsed / ANIM_MS), liveSteps.length - 2);
@@ -772,35 +767,56 @@ export default function TaktikPage() {
             setPlayStepIdx(si);
             setIsPlaying(true);
           }
-        } else if (!live.animationPlaying) {
+        } else if (!live.animation_playing) {
           stopAnimation();
         }
       }
       if (!cancelled) setSyncStatus("live");
-    });
+    };
 
-    const tacticsUnsub = onSnapshot(
-      query(collection(db, "tactics"), where("teamId", "==", activeTeam!.id), orderBy("createdAt", "desc")),
-      snap => {
+    supabase.from("tactic_live_state").select("*").eq("team_id", activeTeam!.id).single()
+      .then(({ data }) => { if (data && !cancelled) mapLive(data as Record<string, unknown>); });
+
+    supabase.from("tactics").select("*").eq("team_id", activeTeam!.id).order("created_at", { ascending: false })
+      .then(({ data }) => {
         if (cancelled) return;
-        setSavedTactics(snap.docs.map(d => {
-          const data = d.data();
-          return {
+        setSavedTactics((data ?? []).map(d => ({
+          id: d.id,
+          name: d.name as string,
+          teamId: d.team_id as string,
+          steps: (d.steps as Step[]) ?? [],
+          coachNotes: (d.coach_notes as string) ?? "",
+          createdAt: d.created_at as string,
+        })));
+      });
+
+    const loadTactics = () =>
+      supabase.from("tactics").select("*").eq("team_id", activeTeam!.id).order("created_at", { ascending: false })
+        .then(({ data }) => {
+          if (cancelled) return;
+          setSavedTactics((data ?? []).map(d => ({
             id: d.id,
-            name: data.name as string,
-            teamId: data.teamId as string,
-            steps: (data.steps as Step[]) ?? [],
-            coachNotes: (data.coachNotes as string) ?? "",
-            createdAt: data.createdAt as string,
-          };
-        }));
-      }
-    );
+            name: d.name as string,
+            teamId: d.team_id as string,
+            steps: (d.steps as Step[]) ?? [],
+            coachNotes: (d.coach_notes as string) ?? "",
+            createdAt: d.created_at as string,
+          })));
+        });
+
+    const ch = supabase.channel(`taktik:${activeTeam!.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tactic_live_state", filter: `team_id=eq.${activeTeam!.id}` },
+        ({ new: row }) => {
+          if (suppressRef.current > 0) { suppressRef.current -= 1; return; }
+          mapLive(row as Record<string, unknown>);
+        })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tactics", filter: `team_id=eq.${activeTeam!.id}` },
+        loadTactics)
+      .subscribe();
 
     return () => {
       cancelled = true;
-      liveUnsub();
-      tacticsUnsub();
+      supabase.removeChannel(ch);
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -808,17 +824,22 @@ export default function TaktikPage() {
 
   const saveTactic = async () => {
     if (!tacticName.trim()) return;
-    const payload = {
-      name: tacticName.trim(),
-      teamId: activeTeam?.id ?? "offline",
-      steps,
-      coachNotes,
-      createdAt: new Date().toISOString(),
-    };
     if (isOnline && activeTeam) {
-      await addDoc(collection(db, "tactics"), payload);
+      await supabase.from("tactics").insert({
+        name: tacticName.trim(),
+        team_id: activeTeam.id,
+        steps,
+        coach_notes: coachNotes,
+      });
     } else {
-      const newDoc: TacticDoc = { ...payload, id: crypto.randomUUID() };
+      const newDoc: TacticDoc = {
+        id: crypto.randomUUID(),
+        name: tacticName.trim(),
+        teamId: (activeTeam as { id: string } | null)?.id ?? "offline",
+        steps,
+        coachNotes,
+        createdAt: new Date().toISOString(),
+      };
       const updated = [newDoc, ...savedTactics];
       setSavedTactics(updated);
       localStorage.setItem("basketball_tactics_v2", JSON.stringify(updated));
@@ -841,7 +862,7 @@ export default function TaktikPage() {
 
   const deleteTactic = async (id: string) => {
     if (isOnline) {
-      await deleteDoc(doc(db, "tactics", id));
+      await supabase.from("tactics").delete().eq("id", id);
     } else {
       const updated = savedTactics.filter(t => t.id !== id);
       setSavedTactics(updated);

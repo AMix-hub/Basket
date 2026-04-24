@@ -5,21 +5,7 @@ import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  onSnapshot,
-  arrayUnion,
-  arrayRemove,
-} from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 
 interface ProfileRow {
   id: string;
@@ -62,60 +48,51 @@ export default function LagPage() {
       const results: Record<string, ProfileRow[]> = {};
       await Promise.all(
         teams.map(async (team: Team) => {
-          const memberSnap = await getDocs(
-            query(collection(db, "team_members"), where("teamId", "==", team.id))
-          );
-          const ids = memberSnap.docs.map((d) => d.data().userId as string);
+          const { data: memberships } = await supabase
+            .from("team_members").select("user_id").eq("team_id", team.id);
+          const ids = (memberships ?? []).map((m: { user_id: string }) => m.user_id);
           if (ids.length === 0) { results[team.id] = []; return; }
-
-          const profileSnaps = await Promise.all(
-            ids.map((id) => getDoc(doc(db, "profiles", id)))
-          );
-          results[team.id] = profileSnaps
-            .filter((s) => s.exists())
-            .map((s) => {
-              const d = s.data()!;
-              return {
-                id: s.id,
-                name: d.name as string,
-                roles:
-                  d.roles && (d.roles as string[]).length > 0
-                    ? (d.roles as string[])
-                    : [d.role as string],
-                child_name: (d.childName as string | null) ?? null,
-              };
-            });
+          const { data: profiles } = await supabase.from("profiles").select("id, name, roles, role, child_name").in("id", ids);
+          results[team.id] = (profiles ?? []).map((p) => ({
+            id: p.id, name: p.name,
+            roles: p.roles?.length > 0 ? p.roles : [p.role],
+            child_name: p.child_name ?? null,
+          }));
         })
       );
       setMembersByTeam(results);
-      // Auto-expand all teams on first load
       setExpandedTeams(new Set(teams.map((t: Team) => t.id)));
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teams.map((t) => t.id).join(",")]); // re-run when team IDs change
+  }, [teams.map((t) => t.id).join(",")]);
 
   /* Subscribe to player groups for all teams */
   useEffect(() => {
     if (teams.length === 0) return;
-    const unsubscribers: (() => void)[] = [];
-    teams.forEach((team: Team) => {
-      const q = query(collection(db, "player_groups"), where("teamId", "==", team.id));
-      const unsub = onSnapshot(q, (snap) => {
-        setGroupsByTeam((prev) => ({
-          ...prev,
-          [team.id]: snap.docs.map((d) => ({
-            id: d.id,
-            teamId: d.data().teamId as string,
-            name: d.data().name as string,
-            memberIds: (d.data().memberIds as string[]) ?? [],
-          })),
-        }));
-      });
-      unsubscribers.push(unsub);
-    });
-    return () => unsubscribers.forEach((u) => u());
+    let mounted = true;
+    const teamIds = teams.map((t: Team) => t.id);
+
+    const loadGroups = () =>
+      supabase.from("player_groups").select("*").in("team_id", teamIds)
+        .then(({ data }) => {
+          if (!mounted) return;
+          const byTeam: Record<string, PlayerGroup[]> = {};
+          (data ?? []).forEach((g) => {
+            if (!byTeam[g.team_id]) byTeam[g.team_id] = [];
+            byTeam[g.team_id].push({ id: g.id, teamId: g.team_id, name: g.name, memberIds: g.player_ids ?? [] });
+          });
+          setGroupsByTeam(byTeam);
+        });
+
+    loadGroups();
+    const channels = teamIds.map((tid) =>
+      supabase.channel(`groups:${tid}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "player_groups", filter: `team_id=eq.${tid}` }, loadGroups)
+        .subscribe()
+    );
+    return () => { mounted = false; channels.forEach((c) => supabase.removeChannel(c)); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teams.map((t) => t.id).join(",")]);
+  }, [teams.map((t: Team) => t.id).join(",")]);
 
   const copyToClipboard = async (text: string, key: string) => {
     try {
@@ -147,12 +124,7 @@ export default function LagPage() {
     if (!name) return;
     setAddingGroup(teamId);
     try {
-      await addDoc(collection(db, "player_groups"), {
-        teamId,
-        name,
-        memberIds: [],
-        createdAt: new Date().toISOString(),
-      });
+      await supabase.from("player_groups").insert({ team_id: teamId, name, player_ids: [] });
       setNewGroupName((prev) => ({ ...prev, [teamId]: "" }));
     } catch {
       alert("Det gick inte att skapa gruppen. Försök igen.");
@@ -164,7 +136,7 @@ export default function LagPage() {
   const deleteGroup = async (groupId: string) => {
     if (!confirm("Ta bort gruppen?")) return;
     try {
-      await deleteDoc(doc(db, "player_groups", groupId));
+      await supabase.from("player_groups").delete().eq("id", groupId);
     } catch {
       alert("Det gick inte att ta bort gruppen. Försök igen.");
     }
@@ -173,9 +145,10 @@ export default function LagPage() {
   const toggleGroupMember = async (group: PlayerGroup, memberId: string) => {
     const isMember = group.memberIds.includes(memberId);
     try {
-      await updateDoc(doc(db, "player_groups", group.id), {
-        memberIds: isMember ? arrayRemove(memberId) : arrayUnion(memberId),
-      });
+      const newIds = isMember
+        ? group.memberIds.filter((id) => id !== memberId)
+        : [...group.memberIds, memberId];
+      await supabase.from("player_groups").update({ player_ids: newIds }).eq("id", group.id);
     } catch {
       alert("Det gick inte att uppdatera gruppmedlemmar. Försök igen.");
     }

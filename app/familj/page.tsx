@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { collection, query, where, onSnapshot, doc, setDoc, deleteDoc, orderBy } from "firebase/firestore";
-import { db } from "../../lib/firebaseClient";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
 /* ─── Types mirrored from kalender/page.tsx ─────────────────── */
@@ -72,78 +71,69 @@ export default function FamiljPage() {
   // Suppress unused-setter warnings – setters kept for future use
   void setAttendance; void setPlayers;
 
-  // Subscribe to Firestore sessions for this team
   useEffect(() => {
-    if (!team) {
-      setSessions([]);
-      return;
-    }
-    const q = query(collection(db, "sessions"), where("teamId", "==", team.id));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const loaded: TrainingSession[] = snap.docs.map((d) => ({
-        id: d.id,
-        date: d.data().date as string,
-        title: d.data().title as string,
-        type: d.data().type as "träning" | "match",
-        time: d.data().time as string,
-        opponent: (d.data().opponent as string | undefined) ?? undefined,
-        homeOrAway: (d.data().homeOrAway as "home" | "away" | undefined) ?? undefined,
-      }));
-      setSessions(loaded);
-    });
-    return () => unsubscribe();
-  }, [team]);
+    if (!team) { setSessions([]); return; }
+    let mounted = true;
+    const load = () =>
+      supabase.from("sessions").select("id, date, title, type, time, opponent, home_or_away").eq("team_id", team.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          setSessions((data ?? []).map((d) => ({
+            id: d.id, date: d.date, title: d.title,
+            type: d.type as "träning" | "match", time: d.time ?? "",
+            opponent: d.opponent ?? undefined, homeOrAway: d.home_or_away ?? undefined,
+          })));
+        });
+    load();
+    const ch = supabase.channel(`familj-sessions:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "sessions", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to RSVPs for current user
   useEffect(() => {
     if (!user || !team) { setMyRsvps({}); return; }
-    const q = query(collection(db, "rsvps"), where("teamId", "==", team.id), where("userId", "==", user.id));
-    const unsub = onSnapshot(q, (snap) => {
-      const loaded: Record<string, RsvpStatus> = {};
-      snap.docs.forEach((d) => { loaded[d.data().sessionId as string] = d.data().status as RsvpStatus; });
-      setMyRsvps(loaded);
-    });
-    return () => unsub();
-  }, [user, team]);
+    let mounted = true;
+    const load = () =>
+      supabase.from("rsvps").select("session_id, status").eq("team_id", team.id).eq("user_id", user.id)
+        .then(({ data }) => {
+          if (!mounted) return;
+          const loaded: Record<string, RsvpStatus> = {};
+          (data ?? []).forEach((d) => { loaded[d.session_id] = d.status as RsvpStatus; });
+          setMyRsvps(loaded);
+        });
+    load();
+    const ch = supabase.channel(`familj-rsvps:${team.id}:${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "rsvps", filter: `team_id=eq.${team.id}` }, load)
+      .subscribe();
+    return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [user?.id, team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Subscribe to player notes for the child (matched by Firebase UID lookup via profiles)
   useEffect(() => {
     if (!user || !team) { setPlayerNotes([]); return; }
-    // Parents see notes for their child; players see their own notes
-    const targetId = user.id;
-    const q = query(
-      collection(db, "player_notes"),
-      where("teamId", "==", team.id),
-      where("playerId", "==", targetId),
-      orderBy("createdAt", "desc")
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setPlayerNotes(snap.docs.map((d) => ({
-        id: d.id,
-        note: d.data().note as string,
-        coachName: d.data().coachName as string,
-        date: d.data().date as string,
-      })));
-    });
-    return () => unsub();
-  }, [user, team]);
+    let mounted = true;
+    supabase.from("player_notes").select("id, note, coach_name, date")
+      .eq("team_id", team.id).eq("player_id", user.id).order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (!mounted) return;
+        setPlayerNotes((data ?? []).map((d) => ({
+          id: d.id, note: d.note, coachName: d.coach_name ?? "", date: d.date ?? "",
+        })));
+      });
+    return () => { mounted = false; };
+  }, [user?.id, team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submitRsvp = async (sessionId: string, status: RsvpStatus) => {
     if (!user || !team || rsvpBusy) return;
     setRsvpBusy(sessionId);
     try {
-      const docId = `${sessionId}_${user.id}`;
       if (myRsvps[sessionId] === status) {
-        await deleteDoc(doc(db, "rsvps", docId));
+        await supabase.from("rsvps").delete().eq("session_id", sessionId).eq("user_id", user.id);
       } else {
-        await setDoc(doc(db, "rsvps", docId), {
-          sessionId,
-          userId: user.id,
-          userName: user.name,
-          teamId: team.id,
-          status,
-          updatedAt: new Date().toISOString(),
-        });
+        await supabase.from("rsvps").upsert(
+          { session_id: sessionId, user_id: user.id, user_name: user.name, team_id: team.id, status },
+          { onConflict: "session_id,user_id" }
+        );
       }
     } finally {
       setRsvpBusy(null);
