@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 
@@ -39,32 +39,27 @@ export default function DevPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("dev_items").select("*").order("created_at", { ascending: false });
+    setItems((data ?? []).map((d) => ({
+      id: d.id,
+      title: d.title,
+      description: d.description ?? "",
+      status: d.status as Status,
+      priority: d.priority as Priority,
+      createdAt: d.created_at,
+    })));
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
-    let mounted = true;
-
-    const load = () =>
-      supabase.from("dev_items").select("*").order("created_at", { ascending: false })
-        .then(({ data }) => {
-          if (!mounted) return;
-          setItems((data ?? []).map((d) => ({
-            id: d.id,
-            title: d.title,
-            description: d.description ?? "",
-            status: d.status as Status,
-            priority: d.priority as Priority,
-            createdAt: d.created_at,
-          })));
-          setLoading(false);
-        });
-
     load();
     const ch = supabase.channel("dev-items")
       .on("postgres_changes", { event: "*", schema: "public", table: "dev_items" }, load)
       .subscribe();
-
-    return () => { mounted = false; supabase.removeChannel(ch); };
-  }, [user?.id]);
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id, load]);
 
   const addItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,21 +75,25 @@ export default function DevPage() {
     setNewDesc("");
     setNewPriority("medium");
     inputRef.current?.focus();
+    load();
   };
 
   const cycleStatus = async (item: Item) => {
     const next = STATUS[item.status].next;
     await supabase.from("dev_items").update({ status: next }).eq("id", item.id);
+    load();
   };
 
   const cyclePriority = async (item: Item) => {
     const order: Priority[] = ["high", "medium", "low"];
     const next = order[(order.indexOf(item.priority) + 1) % order.length];
     await supabase.from("dev_items").update({ priority: next }).eq("id", item.id);
+    load();
   };
 
   const deleteItem = async (id: string) => {
     await supabase.from("dev_items").delete().eq("id", id);
+    load();
   };
 
   if (!user) {

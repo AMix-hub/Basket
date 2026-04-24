@@ -168,6 +168,7 @@ export default function KalenderPage() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
 
+  const reloadSessionsRef = useRef<(() => void) | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
@@ -341,6 +342,7 @@ export default function KalenderPage() {
       const { data } = await supabase.from("sessions").select("*").eq("team_id", team.id);
       if (mounted) setSessions((data ?? []).map(mapSession));
     };
+    reloadSessionsRef.current = load;
     load();
 
     const channelId = team ? `kalender-sessions:${team.id}` : "kalender-sessions:__all__";
@@ -518,6 +520,7 @@ export default function KalenderPage() {
       });
     }
 
+    reloadSessionsRef.current?.();
     setNewTitle("");
     setNewType("träning");
     setNewTime("17:00");
