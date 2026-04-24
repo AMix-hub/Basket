@@ -2053,7 +2053,19 @@ export default function KalenderPage() {
           {/* Attendance panel */}
           {selectedSession && players.length > 0 && (
             <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
-              <h3 className="font-bold text-slate-100 mb-1">Närvaro</h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="font-bold text-slate-100">Närvaro</h3>
+                <button
+                  onClick={async () => {
+                    for (const p of players) {
+                      await setPlayerAttendance(selectedSession.id, p.id, "present");
+                    }
+                  }}
+                  className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 rounded-lg font-semibold transition-colors"
+                >
+                  ✓ Markera alla
+                </button>
+              </div>
               <p className="text-sm text-slate-500 mb-3">
                 {selectedSession.title}
               </p>

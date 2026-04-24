@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import type { Team } from "../context/AuthContext";
 import { roleLabel } from "../../lib/roleLabels";
 import { supabase } from "../../lib/supabase";
+import { toast } from "../../lib/toast";
 
 interface ProfileRow {
   id: string;
@@ -124,10 +125,10 @@ export default function LagPage() {
     if (!name) return;
     setAddingGroup(teamId);
     try {
-      await supabase.from("player_groups").insert({ team_id: teamId, name, player_ids: [] });
+      const { error } = await supabase.from("player_groups").insert({ team_id: teamId, name, player_ids: [] });
+      if (error) { toast("Kunde inte skapa gruppen.", "error"); return; }
       setNewGroupName((prev) => ({ ...prev, [teamId]: "" }));
-    } catch {
-      alert("Det gick inte att skapa gruppen. Försök igen.");
+      toast("Grupp skapad!", "success");
     } finally {
       setAddingGroup(null);
     }
@@ -135,11 +136,8 @@ export default function LagPage() {
 
   const deleteGroup = async (groupId: string) => {
     if (!confirm("Ta bort gruppen?")) return;
-    try {
-      await supabase.from("player_groups").delete().eq("id", groupId);
-    } catch {
-      alert("Det gick inte att ta bort gruppen. Försök igen.");
-    }
+    const { error } = await supabase.from("player_groups").delete().eq("id", groupId);
+    if (error) toast("Kunde inte ta bort gruppen.", "error");
   };
 
   const toggleGroupMember = async (group: PlayerGroup, memberId: string) => {

@@ -233,6 +233,7 @@ export default function RegistretPage() {
   const [adminTeams, setAdminTeams] = useState<{ id: string; name: string; ageGroup?: string }[]>([]);
   const [assigningMember, setAssigningMember] = useState<{ member: ProfileRow; teamIds: string[] } | null>(null);
   const [notesTarget, setNotesTarget] = useState<{ member: ProfileRow; teamId: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const isAdmin = user?.roles.includes("admin") ?? false;
   const isCoach = user?.roles.includes("coach") ?? false;
@@ -416,9 +417,15 @@ export default function RegistretPage() {
         /* Admin view: flat list of all unique members with team info */
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
           <h2 className="font-bold text-slate-100 mb-1">👥 Användarregister</h2>
-          <p className="text-slate-400 text-sm mb-4">
+          <p className="text-slate-400 text-sm mb-3">
             {(allMembersForAdmin ?? []).length} unika medlemmar i {teamData.filter((t) => t.id !== "__unassigned__").length} lag.
           </p>
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Sök namn…"
+            className="w-full mb-4 bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
+          />
           {(allMembersForAdmin ?? []).length === 0 ? (
             <p className="text-slate-400 text-sm">Inga medlemmar registrerade ännu.</p>
           ) : (
@@ -433,7 +440,9 @@ export default function RegistretPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50">
-                  {(allMembersForAdmin ?? []).map(({ member, teamNames, teamIds }) => (
+                  {(allMembersForAdmin ?? []).filter(({ member }) =>
+                    !searchQuery.trim() || member.name.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map(({ member, teamNames, teamIds }) => (
                     <tr key={member.id} className="hover:bg-slate-700/30">
                       <td className="py-2 pr-4">
                         <span className="font-medium text-slate-200">
@@ -505,6 +514,12 @@ export default function RegistretPage() {
       ) : (
         /* Coach view: members grouped by team */
         <div className="space-y-4">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Sök namn…"
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
+          />
           {teamData.map((team) => (
             <div
               key={team.id}
@@ -536,6 +551,7 @@ export default function RegistretPage() {
                     <tbody className="divide-y divide-slate-700/50">
                       {team.members
                         .sort((a, b) => a.name.localeCompare(b.name, "sv"))
+                        .filter((m) => !searchQuery.trim() || m.name.toLowerCase().includes(searchQuery.toLowerCase()))
                         .map((member) => (
                           <tr key={member.id} className="hover:bg-slate-700/30">
                             <td className="py-2 pr-4">

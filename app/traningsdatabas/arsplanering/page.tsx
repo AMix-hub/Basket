@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
+import { toast } from "../../../lib/toast";
 import { autoTag, TAG_LABELS, TAG_COLORS, ALL_TAGS } from "../../../lib/exerciseTags";
 import type { ExerciseTag } from "../../data/types";
 import { year1Plan } from "../../data/year1";
@@ -170,12 +171,14 @@ export default function ArsplaneringPage() {
         title: `Träning ${i + 1}`,
         activities: [],
       }));
-      await supabase.from("custom_season_plans").insert({
+      const { error } = await supabase.from("custom_season_plans").insert({
         team_id: team.id,
         name: newPlanName.trim(),
         data: { sessions },
         created_by: user.id,
       });
+      if (error) { toast("Kunde inte skapa planeringen.", "error"); return; }
+      toast("Årsplanering skapad!", "success");
       setShowCreateModal(false);
       setNewPlanName("");
       setNewPlanDesc("");
@@ -189,7 +192,9 @@ export default function ArsplaneringPage() {
     if (!canEdit) return;
     if (!confirm("Är du säker på att du vill ta bort årsplaneringen? Detta kan inte ångras."))
       return;
-    await supabase.from("custom_season_plans").delete().eq("id", planId);
+    const { error } = await supabase.from("custom_season_plans").delete().eq("id", planId);
+    if (error) { toast("Kunde inte ta bort planeringen.", "error"); return; }
+    toast("Årsplanering borttagen.", "info");
   };
 
   // ── Plan editor state ────────────────────────────────────────────────────

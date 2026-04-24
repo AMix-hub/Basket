@@ -11,6 +11,7 @@ import { year2Plan } from "../data/year2";
 import { year3Plan } from "../data/year3";
 import { extraExercises } from "../data/extraExercises";
 import { supabase } from "../../lib/supabase";
+import { toast } from "../../lib/toast";
 
 interface TeamExercise {
   id: string;
@@ -115,13 +116,14 @@ export default function TraningsdatabasPage() {
 
   const saveCustomExercise = async () => {
     if (!team || !user || !newExName.trim()) return;
-    const parsedDuration = newExDuration ? parseInt(newExDuration, 10) : null;
     setSavingExercise(true);
     try {
-      await supabase.from("team_exercises").insert({
+      const { error } = await supabase.from("team_exercises").insert({
         team_id: team.id, title: newExName.trim(),
         description: newExDesc.trim(), created_by: user.id,
       });
+      if (error) { toast("Kunde inte spara övningen.", "error"); return; }
+      toast("Övning sparad!", "success");
       resetExerciseForm();
     } finally {
       setSavingExercise(false);
@@ -130,7 +132,9 @@ export default function TraningsdatabasPage() {
 
   const deleteCustomExercise = async (id: string) => {
     if (!canEdit) return;
-    await supabase.from("team_exercises").delete().eq("id", id);
+    const { error } = await supabase.from("team_exercises").delete().eq("id", id);
+    if (error) { toast("Kunde inte ta bort övningen.", "error"); return; }
+    toast("Övning borttagen.", "info");
   };
 
   function yearHref(year: number) {

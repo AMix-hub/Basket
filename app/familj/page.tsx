@@ -31,10 +31,6 @@ interface Player {
   number: number;
 }
 
-/* ─── Storage keys (players & attendance stay local) ────────── */
-const ATTENDANCE_KEY = "basketball_attendance";
-const PLAYERS_KEY = "basketball_players";
-
 const MONTHS_SV = [
   "Januari", "Februari", "Mars", "April", "Maj", "Juni",
   "Juli", "Augusti", "September", "Oktober", "November", "December",
@@ -54,22 +50,11 @@ export default function FamiljPage() {
   const team = getMyTeam();
 
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
-  const [attendance, setAttendance] = useState<Attendance[]>(() => {
-    if (typeof window === "undefined") return [];
-    const a = localStorage.getItem(ATTENDANCE_KEY);
-    return a ? (JSON.parse(a) as Attendance[]) : [];
-  });
-  const [players, setPlayers] = useState<Player[]>(() => {
-    if (typeof window === "undefined") return [];
-    const p = localStorage.getItem(PLAYERS_KEY);
-    return p ? (JSON.parse(p) as Player[]) : [];
-  });
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [myRsvps, setMyRsvps] = useState<Record<string, RsvpStatus>>({});
   const [rsvpBusy, setRsvpBusy] = useState<string | null>(null);
   const [playerNotes, setPlayerNotes] = useState<Array<{ id: string; note: string; coachName: string; date: string }>>([]);
-
-  // Suppress unused-setter warnings – setters kept for future use
-  void setAttendance; void setPlayers;
 
   useEffect(() => {
     if (!team) { setSessions([]); return; }
@@ -89,6 +74,28 @@ export default function FamiljPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "sessions", filter: `team_id=eq.${team.id}` }, load)
       .subscribe();
     return () => { mounted = false; supabase.removeChannel(ch); };
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!team) { setPlayers([]); return; }
+    let mounted = true;
+    supabase.from("players").select("id, name, number").eq("team_id", team.id)
+      .then(({ data }) => {
+        if (!mounted) return;
+        setPlayers((data ?? []).map((d) => ({ id: d.id, name: d.name, number: d.number ?? 0 })));
+      });
+    return () => { mounted = false; };
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!team) { setAttendance([]); return; }
+    let mounted = true;
+    supabase.from("attendance").select("session_id, player_id, status").eq("team_id", team.id)
+      .then(({ data }) => {
+        if (!mounted) return;
+        setAttendance((data ?? []).map((d) => ({ sessionId: d.session_id, playerId: d.player_id, status: d.status as AttendanceStatus })));
+      });
+    return () => { mounted = false; };
   }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
