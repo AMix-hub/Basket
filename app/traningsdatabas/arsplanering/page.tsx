@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../lib/supabase";
@@ -81,33 +81,29 @@ export default function ArsplaneringPage() {
   const canEdit =
     user?.roles.some((r) => r === "coach" || r === "admin" || r === "assistant") ?? false;
 
-  // ── Custom plans from Firestore ──────────────────────────────────────────
+  // ── Custom plans ─────────────────────────────────────────────────────────
   const [plans, setPlans] = useState<CustomSeasonPlan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
 
+  const loadPlans = useCallback(async () => {
+    if (!team) { setLoadingPlans(false); return; }
+    const { data } = await supabase.from("custom_season_plans").select("*").eq("team_id", team.id);
+    setPlans((data ?? []).map((d) => ({
+      id: d.id, teamId: d.team_id, name: d.name,
+      description: "", sessions: (d.data?.sessions as PlanSession[]) ?? [],
+      createdBy: d.created_by ?? "", createdAt: d.created_at, updatedAt: d.updated_at,
+    })));
+    setLoadingPlans(false);
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
-    if (!team) {
-      setLoadingPlans(false);
-      return;
-    }
-    let mounted = true;
-    const load = () =>
-      supabase.from("custom_season_plans").select("*").eq("team_id", team.id)
-        .then(({ data }) => {
-          if (!mounted) return;
-          setPlans((data ?? []).map((d) => ({
-            id: d.id, teamId: d.team_id, name: d.name,
-            description: "", sessions: (d.data?.sessions as PlanSession[]) ?? [],
-            createdBy: d.created_by ?? "", createdAt: d.created_at, updatedAt: d.updated_at,
-          })));
-          setLoadingPlans(false);
-        });
-    load();
+    if (!team) { setLoadingPlans(false); return; }
+    loadPlans();
     const ch = supabase.channel(`season-plans:${team.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "custom_season_plans", filter: `team_id=eq.${team.id}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "custom_season_plans", filter: `team_id=eq.${team.id}` }, loadPlans)
       .subscribe();
-    return () => { mounted = false; supabase.removeChannel(ch); };
-  }, [team]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { supabase.removeChannel(ch); };
+  }, [team?.id, loadPlans]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Team custom exercises ────────────────────────────────────────────────
   const [teamExercises, setTeamExercises] = useState<TeamExercise[]>([]);
@@ -179,6 +175,7 @@ export default function ArsplaneringPage() {
       });
       if (error) { toast("Kunde inte skapa planeringen.", "error"); return; }
       toast("Årsplanering skapad!", "success");
+      loadPlans();
       setShowCreateModal(false);
       setNewPlanName("");
       setNewPlanDesc("");
@@ -195,6 +192,7 @@ export default function ArsplaneringPage() {
     const { error } = await supabase.from("custom_season_plans").delete().eq("id", planId);
     if (error) { toast("Kunde inte ta bort planeringen.", "error"); return; }
     toast("Årsplanering borttagen.", "info");
+    loadPlans();
   };
 
   // ── Plan editor state ────────────────────────────────────────────────────
