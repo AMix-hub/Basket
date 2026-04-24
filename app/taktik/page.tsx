@@ -1057,10 +1057,10 @@ export default function TaktikPage() {
             >
               <AllMarkerDefs />
               <BasketballCourt />
-              {displayDrawings.filter(d => d.type === "zone").map(d => (
+              {displayDrawings.filter(d => d.type === "zone" && d.color).map(d => (
                 <DrawingEl key={d.id} d={d} erasable={tool === "erase" && !isPlaying} onErase={() => handleDrawingClick(d.id)} />
               ))}
-              {displayDrawings.filter(d => d.type !== "zone").map(d => (
+              {displayDrawings.filter(d => d.type !== "zone" && d.color).map(d => (
                 <DrawingEl key={d.id} d={d} erasable={tool === "erase" && !isPlaying} onErase={() => handleDrawingClick(d.id)} />
               ))}
               {drawStart && drawCursor && (() => {

@@ -205,11 +205,15 @@ CREATE TABLE sessions (
   opponent         TEXT,
   home_or_away     TEXT        CHECK (home_or_away IN ('home','away')),
   result           TEXT,
+  end_time         TEXT,
+  hall_name        TEXT,
   -- recurring
   recurring        BOOLEAN     NOT NULL DEFAULT FALSE,
   recurrence_rule  TEXT,
+  recurring_group_id UUID,
   cancelled        BOOLEAN     NOT NULL DEFAULT FALSE,
   notes            TEXT,
+  created_by       UUID        REFERENCES profiles(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
