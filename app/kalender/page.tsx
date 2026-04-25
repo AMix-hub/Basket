@@ -571,8 +571,9 @@ export default function KalenderPage() {
       }
 
       await supabase.from("sessions").delete().in("id", idsToDelete);
-      // Attendance is cascade-deleted via FK, but clean up locally
+      // Remove deleted sessions from state immediately
       const deletedSet = new Set(idsToDelete);
+      setSessions((prev) => prev.filter((s) => !deletedSet.has(s.id)));
       if (selectedSession && deletedSet.has(selectedSession.id)) setSelectedSession(null);
 
       if (notifyTeam) {
@@ -653,23 +654,29 @@ export default function KalenderPage() {
 
       await supabase.from("sessions").update(updates).in("id", idsToEdit);
 
+      const sessionPatch = {
+        title: editTitle.trim(),
+        type: editType,
+        time: editTime,
+        endTime: editEndTime || undefined,
+        hallId: selectedHall?.id,
+        hallName: selectedHall?.name,
+        opponent: editType === "match" ? (editOpponent.trim() || undefined) : undefined,
+        location: editType === "match" ? (editLocation.trim() || undefined) : undefined,
+        homeOrAway: editType === "match" ? editHomeOrAway : undefined,
+        result: editResult.trim() || undefined,
+        coachId: selectedCoachEdit?.id,
+        coachName: selectedCoachEdit?.name,
+      };
+
+      // Update sessions list in-place so calendar reflects changes immediately
+      setSessions((prev) =>
+        prev.map((s) => (idsToEdit.includes(s.id) ? { ...s, ...sessionPatch } : s))
+      );
+
       // Update selectedSession if it was edited
       if (selectedSession && idsToEdit.includes(selectedSession.id)) {
-        setSelectedSession({
-          ...selectedSession,
-          title: editTitle.trim(),
-          type: editType,
-          time: editTime,
-          endTime: editEndTime || undefined,
-          hallId: selectedHall?.id,
-          hallName: selectedHall?.name,
-          opponent: editType === "match" ? (editOpponent.trim() || undefined) : undefined,
-          location: editType === "match" ? (editLocation.trim() || undefined) : undefined,
-          homeOrAway: editType === "match" ? editHomeOrAway : undefined,
-          result: editResult.trim() || undefined,
-          coachId: selectedCoachEdit?.id,
-          coachName: selectedCoachEdit?.name,
-        });
+        setSelectedSession({ ...selectedSession, ...sessionPatch });
       }
 
       setEditingSession(null);
