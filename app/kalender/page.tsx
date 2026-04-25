@@ -1764,30 +1764,40 @@ export default function KalenderPage() {
                           </span>
                         )}
                       </div>
-                      {canEdit && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              requestEditSession(s);
-                            }}
-                            className="text-slate-400 hover:text-orange-500 transition-colors text-sm px-1"
-                            title="Redigera"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              requestDeleteSession(s);
-                            }}
-                            className="text-slate-400 hover:text-red-500 transition-colors text-sm"
-                            title="Ställ in"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1">
+                        <Link
+                          href={`/session/${s.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-slate-400 hover:text-orange-400 transition-colors text-sm px-1"
+                          title="Öppna träningssida"
+                        >
+                          ↗
+                        </Link>
+                        {canEdit && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                requestEditSession(s);
+                              }}
+                              className="text-slate-400 hover:text-orange-500 transition-colors text-sm px-1"
+                              title="Redigera"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                requestDeleteSession(s);
+                              }}
+                              className="text-slate-400 hover:text-red-500 transition-colors text-sm"
+                              title="Ställ in"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <p className="font-semibold text-sm text-slate-200 mt-1">
                       {s.title}
@@ -1858,6 +1868,14 @@ export default function KalenderPage() {
                     {/* Expanded session detail: plan exercises + notes + reminder */}
                     {isExpanded && (
                       <div className="mt-2 border-t border-orange-200 pt-2 space-y-2" onClick={(e) => e.stopPropagation()}>
+
+                        {/* Link to session detail page */}
+                        <Link
+                          href={`/session/${s.id}`}
+                          className="flex items-center justify-center gap-2 w-full py-1.5 text-xs font-semibold bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg transition-colors"
+                        >
+                          Öppna träningssida →
+                        </Link>
 
                         {/* RSVP buttons for non-coach users on upcoming sessions */}
                         {!canEdit && s.date >= toYMD(today) && (

@@ -24,6 +24,7 @@ interface Session {
   focusArea: string;
   material: string;
   reflection: string;
+  result: string;
 }
 
 interface PlanItem {
@@ -100,10 +101,15 @@ export default function SessionDetailPage() {
   const [newItemDesc, setNewItemDesc] = useState("");
   const [addingItem, setAddingItem] = useState(false);
 
+  // Match result
+  const [editingResult, setEditingResult] = useState(false);
+  const [resultDraft, setResultDraft] = useState("");
+  const [savingResult, setSavingResult] = useState(false);
+
   /* ── Load session ── */
   const loadSession = useCallback(async () => {
     const { data } = await supabase.from("sessions")
-      .select("id, team_id, date, title, type, time, end_time, hall_name, opponent, home_or_away, coach_name, theme, focus_area, material, reflection")
+      .select("id, team_id, date, title, type, time, end_time, hall_name, opponent, home_or_away, coach_name, theme, focus_area, material, reflection, result")
       .eq("id", id).single();
     if (!data) { setLoading(false); return; }
     setSession({
@@ -114,6 +120,7 @@ export default function SessionDetailPage() {
       coachName: data.coach_name ?? "",
       theme: data.theme ?? "", focusArea: data.focus_area ?? "",
       material: data.material ?? "", reflection: data.reflection ?? "",
+      result: data.result ?? "",
     });
     setLoading(false);
   }, [id]);
@@ -174,12 +181,24 @@ export default function SessionDetailPage() {
     toast("Sparat!", "success");
   };
 
+  /* ── Save match result ── */
+  const saveResult = async () => {
+    if (!session) return;
+    setSavingResult(true);
+    const { error } = await supabase.from("sessions").update({ result: resultDraft.trim() || null }).eq("id", session.id);
+    setSavingResult(false);
+    if (error) { toast("Kunde inte spara resultatet.", "error"); return; }
+    setSession((prev) => prev ? { ...prev, result: resultDraft.trim() } : prev);
+    setEditingResult(false);
+    toast("Resultat sparat!", "success");
+  };
+
   /* ── Add plan item ── */
   const addPlanItem = async () => {
-    if (!newItemTitle.trim()) return;
+    if (!newItemTitle.trim() || !session) return;
     const sortOrder = planItems.length;
     const { error } = await supabase.from("session_plan_items").insert({
-      session_id: id, title: newItemTitle.trim(),
+      session_id: id, team_id: session.teamId, title: newItemTitle.trim(),
       duration_minutes: parseInt(newItemDuration) || 15,
       description: newItemDesc.trim() || null, sort_order: sortOrder,
     });
@@ -267,6 +286,40 @@ export default function SessionDetailPage() {
               <p className="text-sm text-red-300 mt-1">
                 {session.homeOrAway === "home" ? "🏠 Hemma" : "✈️ Borta"} mot {session.opponent}
               </p>
+            )}
+            {isMatch && isPast && (
+              <div className="mt-2">
+                {editingResult ? (
+                  <div className="flex gap-2 items-center">
+                    <input
+                      autoFocus
+                      value={resultDraft}
+                      onChange={(e) => setResultDraft(e.target.value)}
+                      placeholder="T.ex. 78-65"
+                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1 text-sm text-slate-100 w-28 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      onKeyDown={(e) => { if (e.key === "Enter") saveResult(); if (e.key === "Escape") setEditingResult(false); }}
+                    />
+                    <button onClick={saveResult} disabled={savingResult} className="text-xs px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors">
+                      {savingResult ? "…" : "Spara"}
+                    </button>
+                    <button onClick={() => setEditingResult(false)} className="text-xs text-slate-500 hover:text-slate-300">Avbryt</button>
+                  </div>
+                ) : session.result ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-extrabold text-emerald-300">{session.result}</span>
+                    {canEdit && (
+                      <button onClick={() => { setResultDraft(session.result); setEditingResult(true); }} className="text-xs text-slate-500 hover:text-slate-300">✏️</button>
+                    )}
+                  </div>
+                ) : canEdit ? (
+                  <button
+                    onClick={() => { setResultDraft(""); setEditingResult(true); }}
+                    className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded-lg transition-colors"
+                  >
+                    + Lägg till resultat
+                  </button>
+                ) : null}
+              </div>
             )}
             <div className="flex flex-wrap gap-3 mt-2 text-sm text-slate-400">
               <span>📅 {formatDate(session.date)}</span>
