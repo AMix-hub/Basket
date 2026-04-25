@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 export async function POST(req: NextRequest) {
   const { players, duration, focus, equipment, sport } = await req.json();
 
@@ -32,6 +30,12 @@ Regler:
 - Anpassa svårighetsgrad för ungdomar
 - Svara ENDAST med JSON, inga backticks, inga förklaringar`;
 
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY saknas på servern." }, { status: 500 });
+  }
+
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
   try {
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -42,7 +46,9 @@ Regler:
     const raw = (message.content[0] as { type: string; text: string }).text.trim();
     const parsed = JSON.parse(raw);
     return NextResponse.json(parsed);
-  } catch {
-    return NextResponse.json({ error: "Kunde inte generera träningsplan." }, { status: 500 });
+  } catch (err) {
+    console.error("[generate-plan]", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
