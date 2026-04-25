@@ -11,13 +11,20 @@ import { roleEmoji } from "../../lib/roleLabels";
 import { getSport } from "../../lib/sports";
 
 const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }[] = [
-  { href: "/taktik", label: "Taktiktavla", restrictedRoles: [] },
+  { href: "/taktik", label: "Taktik", restrictedRoles: [] },
   { href: "/kalender", label: "Kalender", restrictedRoles: [] },
+  { href: "/spelare", label: "Spelare", restrictedRoles: [] },
   { href: "/nyheter", label: "Nyheter", restrictedRoles: [] },
-  { href: "/traningsdatabas", label: "Träningsdatabas", restrictedRoles: ["player", "parent"] },
-  { href: "/statistik", label: "Statistik", restrictedRoles: ["player", "parent"] },
-  { href: "/videor", label: "Videor", restrictedRoles: [] },
-  { href: "/dokument", label: "Dokument", restrictedRoles: [] },
+  { href: "/traningsdatabas", label: "Träning", restrictedRoles: ["player", "parent"] },
+  { href: "/cup", label: "Cuper", restrictedRoles: [] },
+  { href: "/betalningar", label: "Betalningar", restrictedRoles: ["player", "parent"] },
+];
+
+const merDropdownLinks: { href: string; label: string; restrictedRoles: UserRole[] }[] = [
+  { href: "/statistik", label: "📊 Statistik", restrictedRoles: ["player", "parent"] },
+  { href: "/mallar", label: "📋 Mallar", restrictedRoles: ["player", "parent"] },
+  { href: "/videor", label: "🎬 Videor", restrictedRoles: [] },
+  { href: "/dokument", label: "📁 Dokument", restrictedRoles: [] },
 ];
 
 const adminDropdownLinks = [
@@ -34,7 +41,9 @@ export default function Navbar() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
+  const [merDropdownOpen, setMerDropdownOpen] = useState(false);
   const adminDropdownRef = useRef<HTMLDivElement>(null);
+  const merDropdownRef = useRef<HTMLDivElement>(null);
 
   const sportId = user?.sport ?? "basket";
   const sport = getSport(sportId);
@@ -50,15 +59,13 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   };
 
-  /* Close admin dropdown when clicking outside */
+  /* Close dropdowns when clicking outside */
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        adminDropdownRef.current &&
-        !adminDropdownRef.current.contains(event.target as Node)
-      ) {
+      if (adminDropdownRef.current && !adminDropdownRef.current.contains(event.target as Node))
         setAdminDropdownOpen(false);
-      }
+      if (merDropdownRef.current && !merDropdownRef.current.contains(event.target as Node))
+        setMerDropdownOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -68,6 +75,7 @@ export default function Navbar() {
   useEffect(() => {
     setMobileMenuOpen(false);
     setAdminDropdownOpen(false);
+    setMerDropdownOpen(false);
   }, [pathname]);
 
   const isAdmin = user?.roles.includes("admin") ?? false;
@@ -78,6 +86,10 @@ export default function Navbar() {
 
   /* Filter main links based on user role */
   const mainLinks = allMainLinks.filter(
+    ({ restrictedRoles }) =>
+      !user || !restrictedRoles.some((r) => user.roles.includes(r))
+  );
+  const merLinks = merDropdownLinks.filter(
     ({ restrictedRoles }) =>
       !user || !restrictedRoles.some((r) => user.roles.includes(r))
   );
@@ -174,6 +186,45 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+              {/* Mer dropdown */}
+              {merLinks.length > 0 && (
+                <div className="relative" ref={merDropdownRef}>
+                  <button
+                    onClick={() => setMerDropdownOpen((o) => !o)}
+                    className={`flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                      merLinks.some((l) => pathname === l.href)
+                        ? "text-orange-400"
+                        : "text-gray-300 hover:text-white"
+                    }`}
+                    aria-expanded={merDropdownOpen}
+                    aria-haspopup="true"
+                  >
+                    Mer
+                    <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${merDropdownOpen ? "rotate-180" : ""}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {merDropdownOpen && (
+                    <div className="absolute left-0 mt-1 w-40 rounded-lg shadow-xl bg-gray-800 border border-gray-700 py-1 z-50">
+                      {merLinks.map(({ href, label }) => (
+                        <Link
+                          key={href}
+                          href={href}
+                          onClick={() => setMerDropdownOpen(false)}
+                          className={`block px-4 py-2 text-sm transition-colors ${
+                            pathname === href
+                              ? "text-orange-400 bg-gray-700"
+                              : "text-gray-300 hover:text-white hover:bg-gray-700"
+                          }`}
+                        >
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -383,6 +434,26 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            {/* Mer links (mobile) */}
+            {merLinks.length > 0 && (
+              <>
+                <div className="h-px bg-gray-700 my-2" />
+                {merLinks.map(({ href, label }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      pathname === href
+                        ? "text-orange-400 bg-gray-800"
+                        : "text-gray-300 hover:text-white hover:bg-gray-800"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </>
+            )}
 
             {/* Admin links (mobile) */}
             {isAdmin && (

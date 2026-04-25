@@ -53,6 +53,12 @@ export default function MeddelandenPage() {
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
 
+  // Broadcast / utskick
+  const [showBroadcast, setShowBroadcast] = useState(false);
+  const [broadcastText, setBroadcastText] = useState("");
+  const [broadcastTarget, setBroadcastTarget] = useState<"alla" | "föräldrar" | "spelare">("alla");
+  const [sendingBroadcast, setSendingBroadcast] = useState(false);
+
   /* ── Load all teams the user belongs to ── */
   useEffect(() => {
     if (!user) return;
@@ -287,6 +293,26 @@ export default function MeddelandenPage() {
     (m) => m.senderId !== user?.id && !m.readBy.includes(user?.id ?? "")
   ).length;
 
+  /* ── Send broadcast ── */
+  const sendBroadcast = async () => {
+    if (!broadcastText.trim() || !user || !activeTeam) return;
+    setSendingBroadcast(true);
+    const targetLabel = broadcastTarget === "alla" ? "Alla" : broadcastTarget === "föräldrar" ? "Föräldrar" : "Spelare";
+    const text = `📢 *Utskick till ${targetLabel}*\n\n${broadcastText.trim()}`;
+    try {
+      await supabase.from("messages").insert({
+        team_id: activeTeam.id, sender_id: user.id, sender_name: user.name,
+        recipient_id: null, text,
+        sent_at: new Date().toISOString(), read_by: [user.id],
+      });
+      setBroadcastText(""); setShowBroadcast(false);
+    } catch {
+      setSendError("Utskicket kunde inte skickas.");
+    } finally {
+      setSendingBroadcast(false);
+    }
+  };
+
   /* ── Send message ── */
   const sendMessage = async () => {
     if (!draft.trim() || !user) return;
@@ -363,12 +389,59 @@ export default function MeddelandenPage() {
   return (
     <div>
       <div className="mb-5">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="text-3xl">💬</span>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">Meddelanden</h1>
+        <div className="flex items-start justify-between flex-wrap gap-3 mb-1">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">💬</span>
+            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">Meddelanden</h1>
+          </div>
+          {isCoachOrAbove && (
+            <button
+              onClick={() => setShowBroadcast((v) => !v)}
+              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              {showBroadcast ? "Avbryt" : "📢 Skicka utskick"}
+            </button>
+          )}
         </div>
         <p className="text-slate-500 text-sm">Chatta med laget eller skicka direktmeddelanden.</p>
       </div>
+
+      {/* ── Broadcast compose ── */}
+      {showBroadcast && isCoachOrAbove && (
+        <div className="bg-slate-800 border border-orange-500/30 rounded-2xl p-4 mb-5">
+          <p className="text-sm font-bold text-orange-300 mb-3">📢 Nytt utskick</p>
+          <div className="flex gap-2 mb-3">
+            {(["alla", "föräldrar", "spelare"] as const).map((t) => (
+              <button key={t} onClick={() => setBroadcastTarget(t)}
+                className={`px-3 py-1 text-xs font-semibold rounded-full capitalize transition-colors ${
+                  broadcastTarget === t ? "bg-orange-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                }`}>
+                {t === "alla" ? "Alla" : t === "föräldrar" ? "Föräldrar" : "Spelare"}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={broadcastText}
+            onChange={(e) => setBroadcastText(e.target.value)}
+            rows={3}
+            placeholder={`Skriv ett meddelande till ${broadcastTarget === "alla" ? "hela laget" : broadcastTarget}…`}
+            className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none mb-2"
+          />
+          <div className="flex gap-2">
+            <button onClick={sendBroadcast} disabled={sendingBroadcast || !broadcastText.trim() || !activeTeam}
+              className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors">
+              {sendingBroadcast ? "Skickar…" : "Skicka utskick"}
+            </button>
+            <button onClick={() => { setShowBroadcast(false); setBroadcastText(""); }}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+              Avbryt
+            </button>
+          </div>
+          {!activeTeam && (
+            <p className="text-xs text-amber-400 mt-2">Välj ett lag i sidebaren innan du skickar utskick.</p>
+          )}
+        </div>
+      )}
 
       <div
         className="flex flex-col gap-3 md:flex-row md:gap-4"

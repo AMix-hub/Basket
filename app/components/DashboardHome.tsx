@@ -467,16 +467,18 @@ export default function DashboardHome() {
       {user?.roles.some((r) => ["coach", "admin", "assistant"].includes(r)) && (
         <div className="bg-[#1e293b] border border-white/5 rounded-2xl p-5">
           <p className="font-semibold text-slate-200 mb-3">Snabbåtgärder</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[
               { href: "/kalender", label: "Skapa träning", icon: "📅", color: "bg-sky-500/10 hover:bg-sky-500/20 text-sky-300" },
-              { href: "/taktik",   label: "Taktiktavla",  icon: "🎯", color: "bg-violet-500/10 hover:bg-violet-500/20 text-violet-300" },
-              { href: "/traningsdatabas", label: "Övningsbank", icon: "🏋️", color: "bg-orange-500/10 hover:bg-orange-500/20 text-orange-300" },
-              { href: "/meddelanden", label: "Skicka meddelande", icon: "💬", color: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300" },
+              { href: "/kalender", label: "Skapa match",   icon: "🏆", color: "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300" },
+              { href: "/spelare",  label: "Spelartruppen", icon: "🏀", color: "bg-orange-500/10 hover:bg-orange-500/20 text-orange-300" },
+              { href: "/taktik",   label: "Taktiktavla",   icon: "🎯", color: "bg-violet-500/10 hover:bg-violet-500/20 text-violet-300" },
+              { href: "/meddelanden", label: "Meddelanden", icon: "💬", color: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300" },
+              { href: "/betalningar", label: "Betalningar", icon: "💰", color: "bg-pink-500/10 hover:bg-pink-500/20 text-pink-300" },
             ].map((a) => (
-              <Link key={a.href} href={a.href}
+              <Link key={a.label} href={a.href}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors ${a.color}`}>
-                <span className="text-xl">{a.icon}</span>
+                <span className="text-2xl">{a.icon}</span>
                 <span className="text-xs font-semibold leading-tight">{a.label}</span>
               </Link>
             ))}

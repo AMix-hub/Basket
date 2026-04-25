@@ -31,6 +31,9 @@ export interface User {
   sport?: SportId;
   createdAt: string;
   adminId?: string | null;
+  phone?: string;
+  bio?: string;
+  position?: string;
 }
 
 export interface Team {
@@ -68,7 +71,8 @@ interface AuthContextType {
   updateClubLogoUrl:    (url: string) => Promise<string | null>;
   updateClubWebsiteUrl: (url: string) => Promise<string | null>;
   updateAvatar:         (file: File) => Promise<string | null>;
-  updateProfile:        (fields: { name?: string; childName?: string }) => Promise<string | null>;
+  updateProfile:        (fields: { name?: string; childName?: string; phone?: string; bio?: string; position?: string }) => Promise<string | null>;
+  changePassword:       (newPassword: string) => Promise<string | null>;
   requestPushPermission: () => Promise<void>;
 }
 
@@ -89,6 +93,9 @@ interface DbProfile {
   child_name: string | null;
   avatar_url: string | null;
   created_at: string;
+  phone: string | null;
+  bio: string | null;
+  position: string | null;
 }
 
 interface DbTeam {
@@ -128,6 +135,9 @@ function toUser(p: DbProfile): User {
     sport:           (p.sport as SportId) ?? "basket",
     createdAt:       p.created_at,
     adminId:         p.admin_id,
+    phone:           p.phone ?? undefined,
+    bio:             p.bio ?? undefined,
+    position:        p.position ?? undefined,
   };
 }
 
@@ -575,14 +585,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   /* ── updateProfile ── */
-  const updateProfile = async (fields: { name?: string; childName?: string }): Promise<string | null> => {
+  const updateProfile = async (fields: { name?: string; childName?: string; phone?: string; bio?: string; position?: string }): Promise<string | null> => {
     if (!user) return "Inte inloggad.";
-    const patch: Record<string, string> = {};
-    if (fields.name !== undefined) patch.name = fields.name;
+    const patch: Record<string, string | null> = {};
+    if (fields.name      !== undefined) patch.name       = fields.name;
     if (fields.childName !== undefined) patch.child_name = fields.childName;
+    if (fields.phone     !== undefined) patch.phone      = fields.phone || null;
+    if (fields.bio       !== undefined) patch.bio        = fields.bio || null;
+    if (fields.position  !== undefined) patch.position   = fields.position || null;
     const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
     if (error) return translateError(error.message);
     setUser((prev) => prev ? { ...prev, ...fields } : prev);
+    return null;
+  };
+
+  /* ── changePassword ── */
+  const changePassword = async (newPassword: string): Promise<string | null> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return translateError(error.message);
     return null;
   };
 
@@ -605,7 +625,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, logout, register,
       joinTeam, getMyTeam, getMyTeams, getAllTeams,
       createTeam, updateClubLogo, updateClubLogoUrl,
-      updateClubWebsiteUrl, updateAvatar, updateProfile, requestPushPermission,
+      updateClubWebsiteUrl, updateAvatar, updateProfile, changePassword, requestPushPermission,
     }}>
       {children}
     </AuthContext.Provider>

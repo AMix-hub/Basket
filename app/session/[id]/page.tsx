@@ -6,6 +6,10 @@ import Link from "next/link";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "../../../lib/toast";
+import { year1Plan } from "../../data/year1";
+import { year2Plan } from "../../data/year2";
+import { year3Plan } from "../../data/year3";
+import type { Session as PlanSession } from "../../data/types";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 interface Session {
@@ -25,6 +29,8 @@ interface Session {
   material: string;
   reflection: string;
   result: string;
+  planYear?: number;
+  planSessionNumber?: number;
 }
 
 interface PlanItem {
@@ -109,6 +115,29 @@ export default function SessionDetailPage() {
   const [resultDraft, setResultDraft] = useState("");
   const [savingResult, setSavingResult] = useState(false);
 
+  // Match lineup (which players are called up)
+  const [lineup, setLineup] = useState<Set<string>>(new Set());
+  const [savingLineup, setSavingLineup] = useState(false);
+
+  // Copy plan from another session
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copyableSessions, setCopyableSessions] = useState<{ id: string; title: string; date: string; planCount: number }[]>([]);
+  const [loadingCopy, setLoadingCopy] = useState(false);
+  const [copyingFrom, setCopyingFrom] = useState<string | null>(null);
+
+  // Templates
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templates, setTemplates] = useState<{ id: string; name: string; itemCount: number }[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState<string | null>(null);
+
+  // Carpool
+  const [carpools, setCarpools] = useState<{ id: string; userId: string; userName: string; type: "needs_ride" | "offers_ride" }[]>([]);
+  const [savingCarpool, setSavingCarpool] = useState(false);
+
   // My RSVP (for non-coach users)
   const [myRsvp, setMyRsvp] = useState<"coming" | "not_coming" | "maybe" | null>(null);
   const [myRsvpComment, setMyRsvpComment] = useState("");
@@ -117,7 +146,7 @@ export default function SessionDetailPage() {
   /* ── Load session ── */
   const loadSession = useCallback(async () => {
     const { data } = await supabase.from("sessions")
-      .select("id, team_id, date, title, type, time, end_time, hall_name, opponent, home_or_away, coach_name, theme, focus_area, material, reflection, result")
+      .select("id, team_id, date, title, type, time, end_time, hall_name, opponent, home_or_away, coach_name, theme, focus_area, material, reflection, result, lineup_player_ids, plan_year, plan_session_number")
       .eq("id", id).single();
     if (!data) { setLoading(false); return; }
     setSession({
@@ -129,7 +158,10 @@ export default function SessionDetailPage() {
       theme: data.theme ?? "", focusArea: data.focus_area ?? "",
       material: data.material ?? "", reflection: data.reflection ?? "",
       result: data.result ?? "",
+      planYear: data.plan_year ?? undefined,
+      planSessionNumber: data.plan_session_number ?? undefined,
     });
+    setLineup(new Set(data.lineup_player_ids ?? []));
     setLoading(false);
   }, [id]);
 
@@ -180,8 +212,18 @@ export default function SessionDetailPage() {
     setTeamExercises((exs ?? []).map((d) => ({ id: d.id, name: d.title, description: d.description ?? "" })));
   }, [id, session?.teamId]);
 
+  /* ── Load carpools ── */
+  const loadCarpools = useCallback(async () => {
+    const { data } = await supabase.from("session_carpools")
+      .select("id, user_id, user_name, type").eq("session_id", id);
+    setCarpools((data ?? []).map((d) => ({
+      id: d.id, userId: d.user_id, userName: d.user_name ?? "Okänd",
+      type: d.type as "needs_ride" | "offers_ride",
+    })));
+  }, [id]);
+
   useEffect(() => { loadSession(); }, [loadSession]);
-  useEffect(() => { if (session) { loadPlanItems(); loadRsvps(); loadAttendanceAndPlayers(); } }, [session?.id, loadPlanItems, loadRsvps, loadAttendanceAndPlayers]);
+  useEffect(() => { if (session) { loadPlanItems(); loadRsvps(); loadAttendanceAndPlayers(); loadCarpools(); } }, [session?.id, loadPlanItems, loadRsvps, loadAttendanceAndPlayers, loadCarpools]);
 
   /* ── Save meta ── */
   const saveMeta = async () => {
@@ -244,6 +286,147 @@ export default function SessionDetailPage() {
     });
   };
 
+  /* ── Save lineup ── */
+  const saveLineup = async () => {
+    if (!session) return;
+    setSavingLineup(true);
+    const { error } = await supabase.from("sessions")
+      .update({ lineup_player_ids: [...lineup] })
+      .eq("id", session.id);
+    setSavingLineup(false);
+    if (error) { toast("Kunde inte spara laguttagning.", "error"); return; }
+    toast("Laguttagning sparad!", "success");
+  };
+
+  /* ── Open copy plan modal ── */
+  const openCopyModal = async () => {
+    if (!session) return;
+    setLoadingCopy(true);
+    setShowCopyModal(true);
+    // Load recent training sessions for this team (not the current one)
+    const { data: sessions } = await supabase
+      .from("sessions")
+      .select("id, title, date")
+      .eq("team_id", session.teamId)
+      .eq("type", "träning")
+      .neq("id", id)
+      .order("date", { ascending: false })
+      .limit(30);
+    if (!sessions) { setLoadingCopy(false); return; }
+    // Count plan items per session in a single query
+    const sessionIds = sessions.map((s) => s.id);
+    const { data: counts } = await supabase
+      .from("session_plan_items")
+      .select("session_id")
+      .in("session_id", sessionIds);
+    const countMap: Record<string, number> = {};
+    for (const row of counts ?? []) {
+      countMap[row.session_id] = (countMap[row.session_id] ?? 0) + 1;
+    }
+    setCopyableSessions(
+      sessions
+        .filter((s) => (countMap[s.id] ?? 0) > 0)
+        .map((s) => ({ id: s.id, title: s.title, date: s.date, planCount: countMap[s.id] ?? 0 }))
+    );
+    setLoadingCopy(false);
+  };
+
+  /* ── Copy plan items from another session ── */
+  const copyPlanFrom = async (sourceId: string) => {
+    if (!session || copyingFrom) return;
+    setCopyingFrom(sourceId);
+    const { data: items } = await supabase
+      .from("session_plan_items")
+      .select("title, duration_minutes, description, sort_order")
+      .eq("session_id", sourceId)
+      .order("sort_order");
+    if (!items || items.length === 0) { setCopyingFrom(null); return; }
+    const startOrder = planItems.length;
+    const inserts = items.map((item, i) => ({
+      session_id: id,
+      team_id: session.teamId,
+      title: item.title,
+      duration_minutes: item.duration_minutes,
+      description: item.description ?? null,
+      sort_order: startOrder + i,
+    }));
+    const { error } = await supabase.from("session_plan_items").insert(inserts);
+    setCopyingFrom(null);
+    if (error) { toast("Kunde inte kopiera träningsplanen.", "error"); return; }
+    setShowCopyModal(false);
+    loadPlanItems();
+    toast(`${items.length} moment kopierade!`, "success");
+  };
+
+  /* ── Save current plan as template ── */
+  const saveAsTemplate = async () => {
+    if (!newTemplateName.trim() || !session || planItems.length === 0) return;
+    setSavingTemplate(true);
+    const items = planItems.map((i) => ({
+      title: i.title, duration_minutes: i.durationMinutes, description: i.description || null,
+    }));
+    const { error } = await supabase.from("session_templates").insert({
+      team_id: session.teamId, name: newTemplateName.trim(), items, created_by: user?.id ?? null,
+    });
+    setSavingTemplate(false);
+    if (error) { toast("Kunde inte spara mallen.", "error"); return; }
+    setShowSaveTemplateModal(false);
+    setNewTemplateName("");
+    toast("Mall sparad!", "success");
+  };
+
+  /* ── Load and open template picker ── */
+  const openTemplateModal = async () => {
+    if (!session) return;
+    setLoadingTemplates(true);
+    setShowTemplateModal(true);
+    const { data } = await supabase.from("session_templates")
+      .select("id, name, items").eq("team_id", session.teamId).order("created_at", { ascending: false });
+    setTemplates((data ?? []).map((t) => ({
+      id: t.id, name: t.name,
+      itemCount: Array.isArray(t.items) ? t.items.length : 0,
+    })));
+    setLoadingTemplates(false);
+  };
+
+  /* ── Apply template items to this session ── */
+  const applyTemplate = async (templateId: string) => {
+    if (!session || applyingTemplate) return;
+    setApplyingTemplate(templateId);
+    const { data } = await supabase.from("session_templates")
+      .select("items").eq("id", templateId).single();
+    if (!data?.items || !Array.isArray(data.items)) { setApplyingTemplate(null); return; }
+    const startOrder = planItems.length;
+    const inserts = (data.items as { title: string; duration_minutes: number; description: string | null }[]).map((item, i) => ({
+      session_id: id, team_id: session.teamId, title: item.title,
+      duration_minutes: item.duration_minutes || 15, description: item.description ?? null,
+      sort_order: startOrder + i,
+    }));
+    const { error } = await supabase.from("session_plan_items").insert(inserts);
+    setApplyingTemplate(null);
+    if (error) { toast("Kunde inte tillämpa mallen.", "error"); return; }
+    setShowTemplateModal(false);
+    loadPlanItems();
+    toast(`${inserts.length} moment tillagda från mall!`, "success");
+  };
+
+  /* ── Toggle carpool status ── */
+  const toggleCarpool = async (type: "needs_ride" | "offers_ride") => {
+    if (!user || !session || savingCarpool) return;
+    setSavingCarpool(true);
+    const existing = carpools.find((c) => c.userId === user.id);
+    if (existing?.type === type) {
+      await supabase.from("session_carpools").delete().eq("id", existing.id);
+    } else {
+      await supabase.from("session_carpools").upsert(
+        { session_id: id, team_id: session.teamId, user_id: user.id, user_name: user.name, type },
+        { onConflict: "session_id,user_id" }
+      );
+    }
+    setSavingCarpool(false);
+    loadCarpools();
+  };
+
   /* ── Submit own RSVP ── */
   const submitRsvp = async (status: "coming" | "not_coming" | "maybe") => {
     if (!user || !session || rsvpBusy) return;
@@ -292,6 +475,13 @@ export default function SessionDetailPage() {
   }
 
   const isMatch = session.type === "match";
+
+  /* ── Linked yearly plan session ── */
+  const linkedPlanSession: PlanSession | null = (() => {
+    if (!session.planYear || !session.planSessionNumber) return null;
+    const plans: Record<number, { sessions: PlanSession[] }> = { 1: year1Plan, 2: year2Plan, 3: year3Plan };
+    return plans[session.planYear]?.sessions.find((s) => s.number === session.planSessionNumber) ?? null;
+  })();
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-5 pb-10">
@@ -474,12 +664,26 @@ export default function SessionDetailPage() {
               )}
             </div>
             {canEdit && (
-              <button
-                onClick={() => setAddingItem(!addingItem)}
-                className="text-xs px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors"
-              >
-                + Lägg till
-              </button>
+              <div className="flex gap-1.5 flex-wrap justify-end">
+                {planItems.length > 0 && (
+                  <button onClick={() => { setNewTemplateName(""); setShowSaveTemplateModal(true); }}
+                    className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+                    💾 Mall
+                  </button>
+                )}
+                <button onClick={openTemplateModal}
+                  className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+                  📁 Från mall
+                </button>
+                <button onClick={openCopyModal}
+                  className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+                  📋 Kopiera
+                </button>
+                <button onClick={() => setAddingItem(!addingItem)}
+                  className="text-xs px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors">
+                  + Lägg till
+                </button>
+              </div>
             )}
           </div>
 
@@ -607,6 +811,102 @@ export default function SessionDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Linked yearly plan ── */}
+      {linkedPlanSession && !isMatch && (
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-bold text-slate-100">Årsplan – pass {session.planSessionNumber}</h2>
+              <p className="text-xs text-slate-500 mt-0.5">År {session.planYear} · {linkedPlanSession.title}</p>
+            </div>
+            <Link href={`/ar${session.planYear}`}
+              className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+              Se hela årsplanen ↗
+            </Link>
+          </div>
+          <div className="space-y-2">
+            {linkedPlanSession.activities.map((act, i) => (
+              <div key={i} className="flex items-start gap-3 bg-slate-900/40 rounded-xl px-3 py-2.5">
+                <div className="w-6 h-6 rounded-md bg-violet-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold text-violet-400">{i + 1}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-slate-200">{act.name}</span>
+                    {act.durationMinutes && (
+                      <span className="text-xs text-slate-500 shrink-0">{act.durationMinutes} min</span>
+                    )}
+                  </div>
+                  {act.description && (
+                    <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{act.description}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Match lineup ── */}
+      {isMatch && players.length > 0 && (
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="font-bold text-slate-100">Laguttagning</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {lineup.size > 0 ? `${lineup.size} spelare uttagna` : "Inga uttagna ännu"}
+              </p>
+            </div>
+            {canEdit && (
+              <button
+                onClick={saveLineup}
+                disabled={savingLineup}
+                className="text-xs px-3 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors"
+              >
+                {savingLineup ? "Sparar…" : "Spara uttag"}
+              </button>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            {players.map((p) => {
+              const inLineup = lineup.has(p.id);
+              return (
+                <button
+                  key={p.id}
+                  disabled={!canEdit}
+                  onClick={() => {
+                    if (!canEdit) return;
+                    setLineup((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(p.id)) next.delete(p.id);
+                      else next.add(p.id);
+                      return next;
+                    });
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-left ${
+                    inLineup
+                      ? "bg-emerald-900/40 border border-emerald-700/50"
+                      : "bg-slate-700/40 border border-slate-700/40 hover:bg-slate-700"
+                  } ${!canEdit ? "cursor-default" : "cursor-pointer"}`}
+                >
+                  <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
+                    inLineup ? "bg-emerald-500 text-white" : "bg-slate-600 text-slate-400"
+                  }`}>
+                    {inLineup ? "✓" : ""}
+                  </span>
+                  <span className={`text-sm flex-1 ${inLineup ? "text-slate-100 font-semibold" : "text-slate-400"}`}>
+                    #{p.number} {p.name}
+                  </span>
+                  {inLineup && (
+                    <span className="text-xs text-emerald-400 font-medium">Uttagen</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -744,6 +1044,166 @@ export default function SessionDetailPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Samåkning ── */}
+      {session.date >= today && (
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+          <h2 className="font-bold text-slate-100 mb-3">Samåkning</h2>
+          {user && (
+            <div className="mb-4">
+              <p className="text-xs text-slate-500 mb-2">Hur tar du dig dit?</p>
+              <div className="flex gap-2">
+                {([
+                  ["needs_ride", "🙋 Behöver skjuts", "amber"],
+                  ["offers_ride", "🚗 Erbjuder skjuts", "emerald"],
+                ] as const).map(([type, label, color]) => {
+                  const mine = carpools.find((c) => c.userId === user.id);
+                  const active = mine?.type === type;
+                  return (
+                    <button key={type} disabled={savingCarpool} onClick={() => toggleCarpool(type)}
+                      className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
+                        active
+                          ? color === "amber" ? "bg-amber-500 text-white" : "bg-emerald-600 text-white"
+                          : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                      }`}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {carpools.length > 0 ? (
+            <div className="space-y-1.5">
+              {carpools.filter((c) => c.type === "offers_ride").map((c) => (
+                <div key={c.id} className="flex items-center gap-2 text-sm">
+                  <span>🚗</span>
+                  <span className="text-slate-200 flex-1">{c.userName}</span>
+                  <span className="text-xs text-emerald-400">erbjuder skjuts</span>
+                </div>
+              ))}
+              {carpools.filter((c) => c.type === "needs_ride").map((c) => (
+                <div key={c.id} className="flex items-center gap-2 text-sm">
+                  <span>🙋</span>
+                  <span className="text-slate-200 flex-1">{c.userName}</span>
+                  <span className="text-xs text-amber-400">behöver skjuts</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 italic">Ingen har anmält sig för samåkning ännu.</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Save as template modal ── */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-5">
+            <h3 className="font-bold text-slate-100 mb-3">Spara som mall</h3>
+            <p className="text-xs text-slate-500 mb-3">Sparar {planItems.length} moment som en återanvändbar mall för ditt lag.</p>
+            <input
+              autoFocus
+              value={newTemplateName}
+              onChange={(e) => setNewTemplateName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveAsTemplate(); if (e.key === "Escape") setShowSaveTemplateModal(false); }}
+              placeholder="T.ex. Passningsfokus 60 min"
+              className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 mb-3"
+            />
+            <div className="flex gap-2">
+              <button onClick={saveAsTemplate} disabled={savingTemplate || !newTemplateName.trim()}
+                className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors">
+                {savingTemplate ? "Sparar…" : "Spara mall"}
+              </button>
+              <button onClick={() => setShowSaveTemplateModal(false)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pick template modal ── */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <h3 className="font-bold text-slate-100">Välj mall</h3>
+              <button onClick={() => setShowTemplateModal(false)} className="text-slate-400 hover:text-slate-200 text-xl leading-none">✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-3">
+              {loadingTemplates ? (
+                <p className="text-slate-500 text-sm text-center py-8">Laddar mallar…</p>
+              ) : templates.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-8">Inga mallar sparade ännu. Skapa en mall från ett träningspass med moment.</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500 mb-3">Momenteten läggs till efter eventuella befintliga.</p>
+                  {templates.map((t) => (
+                    <button key={t.id} onClick={() => applyTemplate(t.id)} disabled={!!applyingTemplate}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-700/60 hover:bg-slate-700 disabled:opacity-50 rounded-xl transition-colors text-left">
+                      <p className="text-sm font-semibold text-slate-200">{t.name}</p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-slate-400">{t.itemCount} moment</span>
+                        {applyingTemplate === t.id
+                          ? <span className="text-xs text-orange-400">Lägger till…</span>
+                          : <span className="text-xs text-orange-400 font-semibold">Använd →</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Copy plan modal ── */}
+      {showCopyModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-slate-700">
+              <h3 className="font-bold text-slate-100">Kopiera träningsplan</h3>
+              <button onClick={() => setShowCopyModal(false)} className="text-slate-400 hover:text-slate-200 text-xl leading-none">✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1 p-3">
+              {loadingCopy ? (
+                <p className="text-slate-500 text-sm text-center py-8">Laddar pass…</p>
+              ) : copyableSessions.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-8">Inga tidigare träningspass med plan hittades.</p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500 mb-3">
+                    Välj ett pass att kopiera momenteten ifrån. De läggs till efter eventuella befintliga moment.
+                  </p>
+                  {copyableSessions.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => copyPlanFrom(s.id)}
+                      disabled={!!copyingFrom}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-700/60 hover:bg-slate-700 disabled:opacity-50 rounded-xl transition-colors text-left"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-slate-200">{s.title}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{formatDate(s.date)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-slate-400">{s.planCount} moment</span>
+                        {copyingFrom === s.id ? (
+                          <span className="text-xs text-orange-400">Kopierar…</span>
+                        ) : (
+                          <span className="text-xs text-orange-400 font-semibold">Kopiera →</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
