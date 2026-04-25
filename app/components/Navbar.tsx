@@ -17,6 +17,7 @@ const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }
   { href: "/traningsdatabas", label: "Träningsdatabas", restrictedRoles: ["player", "parent"] },
   { href: "/statistik", label: "Statistik", restrictedRoles: ["player", "parent"] },
   { href: "/videor", label: "Videor", restrictedRoles: [] },
+  { href: "/dokument", label: "Dokument", restrictedRoles: [] },
 ];
 
 const adminDropdownLinks = [
