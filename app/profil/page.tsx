@@ -7,7 +7,7 @@ import { roleLabel } from "../../lib/roleLabels";
 import Image from "next/image";
 
 export default function ProfilPage() {
-  const { user, loading, requestPushPermission, updateAvatar } = useAuth();
+  const { user, loading, requestPushPermission, updateAvatar, updateProfile } = useAuth();
   const router = useRouter();
 
   const [requesting, setRequesting] = useState(false);
@@ -15,6 +15,36 @@ export default function ProfilPage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Profile editing
+  const [editingName, setEditingName] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editingChildName, setEditingChildName] = useState(false);
+  const [editChildName, setEditChildName] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState(false);
+
+  const saveName = async () => {
+    if (!editName.trim()) return;
+    setSavingProfile(true); setProfileError(null); setProfileSuccess(false);
+    const err = await updateProfile({ name: editName.trim() });
+    setSavingProfile(false);
+    if (err) { setProfileError(err); return; }
+    setProfileSuccess(true);
+    setEditingName(false);
+    setTimeout(() => setProfileSuccess(false), 3000);
+  };
+
+  const saveChildName = async () => {
+    setSavingProfile(true); setProfileError(null); setProfileSuccess(false);
+    const err = await updateProfile({ childName: editChildName.trim() });
+    setSavingProfile(false);
+    if (err) { setProfileError(err); return; }
+    setProfileSuccess(true);
+    setEditingChildName(false);
+    setTimeout(() => setProfileSuccess(false), 3000);
+  };
 
   /* Redirect to login if not authenticated */
   useEffect(() => {
@@ -221,10 +251,31 @@ export default function ProfilPage() {
           </div>
 
           {/* Name and email */}
-          <div className="min-w-0">
-            <p className="text-4xl font-extrabold text-white tracking-tight leading-none">
-              {user.name}
-            </p>
+          <div className="min-w-0 flex-1">
+            {editingName ? (
+              <div className="flex gap-2 items-center">
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
+                  className="flex-1 bg-slate-700 border border-slate-500 rounded-lg px-3 py-1.5 text-lg font-bold text-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+                />
+                <button onClick={saveName} disabled={savingProfile} className="px-3 py-1.5 bg-orange-500 text-white text-sm font-semibold rounded-lg hover:bg-orange-600 disabled:opacity-50">
+                  {savingProfile ? "…" : "Spara"}
+                </button>
+                <button onClick={() => setEditingName(false)} className="text-slate-400 hover:text-slate-200 text-sm">✕</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <p className="text-4xl font-extrabold text-white tracking-tight leading-none">{user.name}</p>
+                <button
+                  onClick={() => { setEditName(user.name); setEditingName(true); }}
+                  className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition-opacity text-sm"
+                  title="Ändra namn"
+                >✏️</button>
+              </div>
+            )}
             <p className="text-sm text-slate-400 mt-1 truncate">{user.email}</p>
           </div>
         </div>
@@ -248,11 +299,45 @@ export default function ProfilPage() {
           ))}
         </div>
 
-        {user.childName && (
+        {/* Child name — editable for parents */}
+        {user.roles.includes("parent") && (
+          <div className="text-sm">
+            {editingChildName ? (
+              <div className="flex gap-2 items-center">
+                <span className="font-medium text-slate-400 shrink-0">Barn:</span>
+                <input
+                  autoFocus
+                  value={editChildName}
+                  onChange={(e) => setEditChildName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveChildName(); if (e.key === "Escape") setEditingChildName(false); }}
+                  placeholder="Barnets namn…"
+                  className="flex-1 bg-slate-700 border border-slate-500 rounded-lg px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+                />
+                <button onClick={saveChildName} disabled={savingProfile} className="px-3 py-1 bg-orange-500 text-white text-xs font-semibold rounded-lg hover:bg-orange-600 disabled:opacity-50">
+                  {savingProfile ? "…" : "Spara"}
+                </button>
+                <button onClick={() => setEditingChildName(false)} className="text-slate-400 text-xs">✕</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <span className="font-medium text-slate-400">Barn:</span>
+                <span className="text-slate-500">{user.childName || <span className="italic text-slate-600">Inte angett</span>}</span>
+                <button
+                  onClick={() => { setEditChildName(user.childName ?? ""); setEditingChildName(true); }}
+                  className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition-opacity text-xs"
+                  title="Ändra barnets namn"
+                >✏️</button>
+              </div>
+            )}
+          </div>
+        )}
+        {!user.roles.includes("parent") && user.childName && (
           <p className="text-sm text-slate-500">
             <span className="font-medium text-slate-400">Barn:</span> {user.childName}
           </p>
         )}
+        {profileError && <p className="text-xs text-red-400 bg-red-900/20 rounded-lg px-3 py-2">{profileError}</p>}
+        {profileSuccess && <p className="text-xs text-emerald-400 bg-emerald-900/20 rounded-lg px-3 py-2">✓ Sparad!</p>}
         {user.clubName && (
           <p className="text-sm text-slate-500">
             <span className="font-medium text-slate-400">Klubb:</span> {user.clubName}

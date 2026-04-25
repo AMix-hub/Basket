@@ -234,6 +234,8 @@ export default function RegistretPage() {
   const [assigningMember, setAssigningMember] = useState<{ member: ProfileRow; teamIds: string[] } | null>(null);
   const [notesTarget, setNotesTarget] = useState<{ member: ProfileRow; teamId: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleTarget, setRoleTarget] = useState<ProfileRow | null>(null);
+  const [savingRole, setSavingRole] = useState(false);
 
   const isAdmin = user?.roles.includes("admin") ?? false;
   const isCoach = user?.roles.includes("coach") ?? false;
@@ -295,6 +297,26 @@ export default function RegistretPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, effectiveAdminId, teams.map((t: Team) => t.id).join(",")]);
+
+  const changeRole = async (memberId: string, newRole: string) => {
+    setSavingRole(true);
+    await supabase.from("profiles").update({ roles: [newRole], role: newRole }).eq("id", memberId);
+    setSavingRole(false);
+    setRoleTarget(null);
+    // Refresh data
+    setTeamData((prev) => prev ? prev.map((t) => ({
+      ...t,
+      members: t.members.map((m) => m.id === memberId ? { ...m, roles: [newRole] } : m),
+    })) : prev);
+  };
+
+  const removeMemberFromTeam = async (memberId: string, teamId: string) => {
+    if (!confirm("Ta bort personen från laget?")) return;
+    await supabase.from("team_members").delete().eq("team_id", teamId).eq("user_id", memberId);
+    setTeamData((prev) => prev ? prev.map((t) =>
+      t.id === teamId ? { ...t, members: t.members.filter((m) => m.id !== memberId) } : t
+    ) : prev);
+  };
 
   const addMemberToTeam = async (memberId: string, teamId: string) => {
     await supabase.from("team_members").upsert(
@@ -382,6 +404,37 @@ export default function RegistretPage() {
           onAdd={addMemberToTeam}
           onClose={() => setAssigningMember(null)}
         />
+      )}
+      {/* Role change modal */}
+      {roleTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="bg-[#1e293b] border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-slate-100">Ändra roll</h3>
+                <p className="text-sm text-slate-400 mt-0.5">{roleTarget.name}</p>
+              </div>
+              <button onClick={() => setRoleTarget(null)} className="text-slate-500 hover:text-slate-300 text-xl">✕</button>
+            </div>
+            <div className="space-y-2">
+              {(["player", "parent", "assistant", "coach", "co_admin", "admin"] as const).map((r) => (
+                <button
+                  key={r}
+                  disabled={savingRole || roleTarget.roles[0] === r}
+                  onClick={() => changeRole(roleTarget.id, r)}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    roleTarget.roles[0] === r
+                      ? "bg-orange-500/20 text-orange-400 cursor-default"
+                      : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                  }`}
+                >
+                  {savingRole ? "Sparar…" : roleLabel[r]}
+                  {roleTarget.roles[0] === r && " ✓"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
       {/* Player notes modal */}
       {notesTarget && user && (
@@ -483,24 +536,38 @@ export default function RegistretPage() {
                         </div>
                       </td>
                       <td className="py-2 pl-2">
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 flex-wrap">
                           <button
-                            onClick={() =>
-                              setAssigningMember({ member, teamIds })
-                            }
+                            onClick={() => setAssigningMember({ member, teamIds })}
                             className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-orange-500/20 text-slate-400 hover:text-orange-400 rounded-lg transition-colors font-medium"
                             title="Lägg till i lag"
                           >
                             + Lag
                           </button>
+                          <button
+                            onClick={() => setRoleTarget(member)}
+                            className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 rounded-lg transition-colors font-medium"
+                            title="Ändra roll"
+                          >
+                            🔑
+                          </button>
                           {teamIds.length > 0 && (
-                            <button
-                              onClick={() => setNotesTarget({ member, teamId: teamIds[0] })}
-                              className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 rounded-lg transition-colors font-medium"
-                              title="Anteckningar"
-                            >
-                              📝
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setNotesTarget({ member, teamId: teamIds[0] })}
+                                className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-400 rounded-lg transition-colors font-medium"
+                                title="Anteckningar"
+                              >
+                                📝
+                              </button>
+                              <button
+                                onClick={() => removeMemberFromTeam(member.id, teamIds[0])}
+                                className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors font-medium"
+                                title="Ta bort från lag"
+                              >
+                                ✕
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>

@@ -145,8 +145,6 @@ function getPlanSession(planYear: number, sessionNumber: number): PlanSession | 
   return plan.sessions.find((s) => s.number === sessionNumber) ?? null;
 }
 
-/* ─── Local storage key (players stay local) ── */
-const PLAYERS_KEY = "basketball_players";
 
 /* ─── Main page ──────────────────────────────────────────────── */
 export default function KalenderPage() {
@@ -252,11 +250,20 @@ export default function KalenderPage() {
   // Ref for the selected date panel – used to scroll into view when date is selected
   const dateListRef = useRef<HTMLDivElement>(null);
 
-  // Load players from localStorage (players stay local; attendance moves to Firestore)
+  const loadPlayers = useCallback(async () => {
+    if (!team) { setPlayers([]); return; }
+    const { data } = await supabase.from("players").select("id, name, number").eq("team_id", team.id).order("number");
+    setPlayers((data ?? []).map((d) => ({ id: d.id, name: d.name, number: d.number ?? 0 })));
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
-    const p = localStorage.getItem(PLAYERS_KEY);
-    if (p) setPlayers(JSON.parse(p));
-  }, []);
+    loadPlayers();
+    if (!team) return;
+    const ch = supabase.channel(`players:${team.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `team_id=eq.${team.id}` }, loadPlayers)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [team?.id, loadPlayers]);
 
   // For admins: load all teams so they can switch between teams in the calendar
   const loadAllTeams = useCallback(async () => {
@@ -447,10 +454,6 @@ export default function KalenderPage() {
       });
   }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const savePlayers = (updated: Player[]) => {
-    setPlayers(updated);
-    localStorage.setItem(PLAYERS_KEY, JSON.stringify(updated));
-  };
 
   /* ── Navigation ── */
   const prevMonth = () => {
@@ -716,20 +719,21 @@ export default function KalenderPage() {
   };
 
   /* ── Player management ── */
-  const addPlayer = () => {
-    if (!newPlayerName.trim()) return;
-    const p: Player = {
-      id: crypto.randomUUID(),
+  const addPlayer = async () => {
+    if (!newPlayerName.trim() || !team) return;
+    await supabase.from("players").insert({
+      team_id: team.id,
       name: newPlayerName.trim(),
       number: parseInt(newPlayerNumber) || 0,
-    };
-    savePlayers([...players, p]);
+    });
     setNewPlayerName("");
     setNewPlayerNumber("");
+    loadPlayers();
   };
 
-  const deletePlayer = (id: string) => {
-    savePlayers(players.filter((p) => p.id !== id));
+  const deletePlayer = async (id: string) => {
+    await supabase.from("players").delete().eq("id", id);
+    loadPlayers();
   };
 
   /* ── Attendance summary for a session ── */

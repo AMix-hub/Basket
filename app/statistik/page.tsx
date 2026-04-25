@@ -64,9 +64,7 @@ function getZone(xPct: number, yPct: number): string {
   return "Höger 3p";
 }
 
-const PLAYERS_KEY   = "basketball_players";
-const SHOTS_KEY     = "basketball_shots";
-const ATTENDANCE_KEY = "basketball_attendance";
+const SHOTS_KEY = "basketball_shots";
 const HIT_RADIUS    = 14; // px in SVG units to detect click on existing shot
 
 export default function StatistikPage() {
@@ -84,11 +82,7 @@ export default function StatistikPage() {
   const [selectedShotId, setSelectedShotId] = useState<string | null>(null);
 
   const [calSessions, setCalSessions] = useState<{ id: string; date: string; title: string; type: string }[]>([]);
-  const [calAttendance] = useState<{ sessionId: string; playerId: string; status: string }[]>(() => {
-    if (typeof window === "undefined") return [];
-    const ca = localStorage.getItem(ATTENDANCE_KEY);
-    return ca ? JSON.parse(ca) : [];
-  });
+  const [calAttendance, setCalAttendance] = useState<{ sessionId: string; playerId: string; status: string }[]>([]);
 
   useEffect(() => {
     if (!team) { setCalSessions([]); return; }
@@ -96,19 +90,28 @@ export default function StatistikPage() {
       .then(({ data }) => setCalSessions((data ?? []).map((d) => ({ id: d.id, date: d.date, title: d.title, type: d.type }))));
   }, [team?.id]);
 
+  useEffect(() => {
+    if (!team) { setCalAttendance([]); return; }
+    supabase.from("attendance").select("session_id, player_id, status").eq("team_id", team.id)
+      .then(({ data }) => setCalAttendance((data ?? []).map((d) => ({ sessionId: d.session_id, playerId: d.player_id, status: d.status }))));
+  }, [team?.id]);
+
+  const loadPlayers = useCallback(async () => {
+    if (!team) { setPlayers([]); return; }
+    const { data } = await supabase.from("players").select("id, name, number").eq("team_id", team.id).order("number");
+    setPlayers((data ?? []).map((d) => ({ id: d.id, name: d.name, number: d.number ?? 0 })));
+  }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    const p = localStorage.getItem(PLAYERS_KEY);
-    if (p) setPlayers(JSON.parse(p));
+    loadPlayers();
+  }, [loadPlayers]);
+
+  useEffect(() => {
     const s = localStorage.getItem(SHOTS_KEY);
     if (s) setShots(JSON.parse(s));
   }, []);
-
-  const savePlayers = (updated: Player[]) => {
-    setPlayers(updated);
-    localStorage.setItem(PLAYERS_KEY, JSON.stringify(updated));
-  };
 
   const saveShots = (updated: Shot[]) => {
     setShots(updated);
@@ -164,15 +167,18 @@ export default function StatistikPage() {
     if (selectedShotId === id) setSelectedShotId(null);
   };
 
-  const addPlayer = () => {
-    if (!newPlayerName.trim()) return;
-    const p: Player = { id: crypto.randomUUID(), name: newPlayerName.trim(), number: parseInt(newPlayerNumber) || 0 };
-    savePlayers([...players, p]);
+  const addPlayer = async () => {
+    if (!newPlayerName.trim() || !team) return;
+    await supabase.from("players").insert({ team_id: team.id, name: newPlayerName.trim(), number: parseInt(newPlayerNumber) || 0 });
     setNewPlayerName("");
     setNewPlayerNumber("");
+    loadPlayers();
   };
 
-  const deletePlayer = (id: string) => savePlayers(players.filter((p) => p.id !== id));
+  const deletePlayer = async (id: string) => {
+    await supabase.from("players").delete().eq("id", id);
+    loadPlayers();
+  };
 
   const getPlayerStats = (playerId: string | null) => {
     const ps = playerId ? shots.filter((s) => s.playerId === playerId) : shots;

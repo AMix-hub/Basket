@@ -68,6 +68,7 @@ interface AuthContextType {
   updateClubLogoUrl:    (url: string) => Promise<string | null>;
   updateClubWebsiteUrl: (url: string) => Promise<string | null>;
   updateAvatar:         (file: File) => Promise<string | null>;
+  updateProfile:        (fields: { name?: string; childName?: string }) => Promise<string | null>;
   requestPushPermission: () => Promise<void>;
 }
 
@@ -299,8 +300,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser((prev) =>
             prev ? {
               ...prev,
+              name:           p.name ?? prev.name,
               roles,
               adminId:        p.admin_id,
+              childName:      p.child_name ?? prev.childName,
               clubName:       p.club_name    ?? prev.clubName,
               clubLogoUrl:    p.club_logo_url ?? prev.clubLogoUrl,
               clubWebsiteUrl: p.club_website_url ?? prev.clubWebsiteUrl,
@@ -571,6 +574,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   };
 
+  /* ── updateProfile ── */
+  const updateProfile = async (fields: { name?: string; childName?: string }): Promise<string | null> => {
+    if (!user) return "Inte inloggad.";
+    const patch: Record<string, string> = {};
+    if (fields.name !== undefined) patch.name = fields.name;
+    if (fields.childName !== undefined) patch.child_name = fields.childName;
+    const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
+    if (error) return translateError(error.message);
+    setUser((prev) => prev ? { ...prev, ...fields } : prev);
+    return null;
+  };
+
   /* ── requestPushPermission (no-op: FCM removed, can add Web Push later) ── */
   const requestPushPermission = async (): Promise<void> => {};
 
@@ -590,7 +605,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login, logout, register,
       joinTeam, getMyTeam, getMyTeams, getAllTeams,
       createTeam, updateClubLogo, updateClubLogoUrl,
-      updateClubWebsiteUrl, updateAvatar, requestPushPermission,
+      updateClubWebsiteUrl, updateAvatar, updateProfile, requestPushPermission,
     }}>
       {children}
     </AuthContext.Provider>
