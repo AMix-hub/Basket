@@ -106,6 +106,11 @@ export default function SessionDetailPage() {
   const [resultDraft, setResultDraft] = useState("");
   const [savingResult, setSavingResult] = useState(false);
 
+  // My RSVP (for non-coach users)
+  const [myRsvp, setMyRsvp] = useState<"coming" | "not_coming" | "maybe" | null>(null);
+  const [myRsvpComment, setMyRsvpComment] = useState("");
+  const [rsvpBusy, setRsvpBusy] = useState(false);
+
   /* ── Load session ── */
   const loadSession = useCallback(async () => {
     const { data } = await supabase.from("sessions")
@@ -141,11 +146,18 @@ export default function SessionDetailPage() {
     const { data } = await supabase.from("rsvps")
       .select("user_id, user_name, status, comment")
       .eq("session_id", id);
-    setRsvps((data ?? []).map((d) => ({
+    const rows = (data ?? []).map((d) => ({
       userId: d.user_id, userName: d.user_name ?? "Okänd",
       status: d.status as RsvpRow["status"], comment: d.comment ?? "",
-    })));
-  }, [id]);
+    }));
+    setRsvps(rows);
+    // Sync own RSVP
+    if (user) {
+      const mine = rows.find((r) => r.userId === user.id);
+      setMyRsvp(mine?.status ?? null);
+      setMyRsvpComment(mine?.comment ?? "");
+    }
+  }, [id, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Load attendance + players ── */
   const loadAttendanceAndPlayers = useCallback(async () => {
@@ -225,6 +237,23 @@ export default function SessionDetailPage() {
       if (existing) return prev.map((a) => a.playerId === playerId ? { ...a, status } : a);
       return [...prev, { playerId, status }];
     });
+  };
+
+  /* ── Submit own RSVP ── */
+  const submitRsvp = async (status: "coming" | "not_coming" | "maybe") => {
+    if (!user || !session || rsvpBusy) return;
+    setRsvpBusy(true);
+    const comment = myRsvpComment.trim() || null;
+    if (myRsvp === status) {
+      await supabase.from("rsvps").delete().eq("session_id", id).eq("user_id", user.id);
+    } else {
+      await supabase.from("rsvps").upsert(
+        { session_id: id, user_id: user.id, user_name: user.name, team_id: session.teamId, status, comment },
+        { onConflict: "session_id,user_id" }
+      );
+    }
+    setRsvpBusy(false);
+    loadRsvps();
   };
 
   /* ── Computed ── */
@@ -536,6 +565,38 @@ export default function SessionDetailPage() {
       {/* ── RSVP overview ── */}
       <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
         <h2 className="font-bold text-slate-100 mb-3">Kallelse</h2>
+
+        {/* My RSVP (non-coach users) */}
+        {!canEdit && user && session.date >= today && (
+          <div className="bg-slate-900/50 rounded-xl p-3 mb-4">
+            <p className="text-xs font-semibold text-slate-400 mb-2">Kommer du?</p>
+            <div className="flex gap-2 mb-2">
+              {([["coming", "✓ Ja", "emerald"], ["maybe", "? Kanske", "amber"], ["not_coming", "✗ Nej", "red"]] as const).map(([st, lbl, color]) => (
+                <button key={st} disabled={rsvpBusy} onClick={() => submitRsvp(st)}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
+                    myRsvp === st
+                      ? color === "emerald" ? "bg-emerald-600 text-white" : color === "amber" ? "bg-amber-500 text-white" : "bg-red-600 text-white"
+                      : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                  }`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            {myRsvp && (
+              <div className="flex gap-2">
+                <input type="text" value={myRsvpComment}
+                  onChange={(e) => setMyRsvpComment(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && myRsvp) submitRsvp(myRsvp); }}
+                  placeholder="Kommentar (valfri)..."
+                  className="flex-1 bg-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 border border-slate-600 placeholder-slate-500 focus:outline-none focus:border-orange-500" />
+                <button onClick={() => myRsvp && submitRsvp(myRsvp)} disabled={rsvpBusy}
+                  className="text-xs px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors">
+                  Spara
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Summary chips */}
         <div className="flex gap-2 flex-wrap mb-4">
