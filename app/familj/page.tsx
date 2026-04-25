@@ -14,6 +14,7 @@ interface TrainingSession {
   time: string;
   opponent?: string;
   homeOrAway?: "home" | "away";
+  result?: string;
 }
 
 type AttendanceStatus = "present" | "absent" | "sick";
@@ -62,13 +63,14 @@ export default function FamiljPage() {
     if (!team) { setSessions([]); return; }
     let mounted = true;
     const load = () =>
-      supabase.from("sessions").select("id, date, title, type, time, opponent, home_or_away").eq("team_id", team.id)
+      supabase.from("sessions").select("id, date, title, type, time, opponent, home_or_away, result").eq("team_id", team.id)
         .then(({ data }) => {
           if (!mounted) return;
           setSessions((data ?? []).map((d) => ({
             id: d.id, date: d.date, title: d.title,
             type: d.type as "träning" | "match", time: d.time ?? "",
             opponent: d.opponent ?? undefined, homeOrAway: d.home_or_away ?? undefined,
+            result: d.result ?? undefined,
           })));
         });
     load();
@@ -476,7 +478,12 @@ export default function FamiljPage() {
                       <p className="text-sm font-medium text-slate-200 truncate">
                         {s.title}
                       </p>
-                      <p className="text-xs text-slate-400">{label}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-slate-400">{label}</p>
+                        {s.type === "match" && s.result && (
+                          <span className="text-xs font-bold text-emerald-300">{s.result}</span>
+                        )}
+                      </div>
                     </div>
                     {cfg ? (
                       <span
@@ -485,8 +492,8 @@ export default function FamiljPage() {
                         {cfg.icon} {cfg.label}
                       </span>
                     ) : (
-                      <span className="text-xs text-slate-300 shrink-0">
-                        Ej registrerat
+                      <span className="text-xs text-slate-500 shrink-0">
+                        {s.type === "match" ? "Match" : "Ej registrerat"}
                       </span>
                     )}
                   </div>
