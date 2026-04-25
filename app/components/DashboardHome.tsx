@@ -30,9 +30,16 @@ export default function DashboardHome() {
   const team = myTeams.find((t) => t.id === selectedTeamId) ?? myTeams[0] ?? null;
 
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
+  const [myRsvps, setMyRsvps] = useState<Set<string>>(new Set());
 
   const today = new Date();
   const todayYMD = today.toISOString().slice(0, 10);
+
+  useEffect(() => {
+    if (!team || !user) { setMyRsvps(new Set()); return; }
+    supabase.from("rsvps").select("session_id").eq("team_id", team.id).eq("user_id", user.id)
+      .then(({ data }) => setMyRsvps(new Set((data ?? []).map((r: { session_id: string }) => r.session_id))));
+  }, [team?.id, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!team) return;
@@ -96,6 +103,12 @@ export default function DashboardHome() {
       .map((s) => parseInt(s.date.slice(8), 10))
   );
 
+  /* ── Unanswered RSVPs (non-coach users) ── */
+  const isCoachOrAdmin = user?.roles.some((r) => ["coach", "admin", "assistant"].includes(r)) ?? false;
+  const unansweredCount = isCoachOrAdmin ? 0 : sessions
+    .filter((s) => s.date >= todayYMD && !myRsvps.has(s.id))
+    .length;
+
   /* ── Today's sessions ── */
   const todaySessions = sessions
     .filter((s) => s.date === todayYMD)
@@ -147,6 +160,22 @@ export default function DashboardHome() {
           </select>
         )}
       </div>
+
+      {/* Unanswered RSVP nudge */}
+      {!isCoachOrAdmin && unansweredCount > 0 && (
+        <Link
+          href="/familj"
+          className="flex items-center gap-3 bg-amber-900/30 border border-amber-700/50 rounded-2xl px-4 py-3 hover:border-amber-600/70 transition-colors"
+        >
+          <span className="text-xl">📬</span>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-amber-300">
+              Du har {unansweredCount} obesvarad{unansweredCount !== 1 ? "e" : ""} kallelse{unansweredCount !== 1 ? "r" : ""}
+            </p>
+            <p className="text-xs text-amber-500">Svara nu →</p>
+          </div>
+        </Link>
+      )}
 
       {/* Today's session banner */}
       {todaySessions.length > 0 && (
