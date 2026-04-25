@@ -12,7 +12,8 @@ interface TrainingSession {
   title: string;
   type: "träning" | "match";
   time: string;
-  planSessionNumber?: number;
+  opponent?: string;
+  homeOrAway?: "home" | "away";
 }
 
 const MONTHS_SV = [
@@ -46,7 +47,7 @@ export default function DashboardHome() {
     let mounted = true;
 
     const load = () =>
-      supabase.from("sessions").select("id, date, title, type, time").eq("team_id", team.id)
+      supabase.from("sessions").select("id, date, title, type, time, opponent, home_or_away").eq("team_id", team.id)
         .then(({ data }) => {
           if (!mounted) return;
           setSessions(
@@ -54,6 +55,8 @@ export default function DashboardHome() {
               id: d.id, date: d.date, title: d.title,
               type: (d.type as "träning" | "match") ?? "träning",
               time: d.time ?? "",
+              opponent: d.opponent ?? undefined,
+              homeOrAway: d.home_or_away ?? undefined,
             }))
           );
         });
@@ -245,18 +248,6 @@ export default function DashboardHome() {
               </svg>
             ),
           },
-          {
-            label: "Nästa match",
-            value: matchDayLabel(),
-            accent: "text-amber-400",
-            bg: "bg-amber-500/10 border-amber-500/15",
-            icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                  d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-              </svg>
-            ),
-          },
         ].map((stat) => (
           <div key={stat.label} className={`${stat.bg} border rounded-2xl p-4`}>
             <div className="flex items-center justify-between mb-2">
@@ -266,6 +257,32 @@ export default function DashboardHome() {
             <div className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</div>
           </div>
         ))}
+        {/* Next match card */}
+        {nextMatch ? (
+          <Link
+            href={`/session/${nextMatch.id}`}
+            className="bg-amber-500/10 border border-amber-500/15 hover:border-amber-500/40 rounded-2xl p-4 transition-colors"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-slate-400">Nästa match</span>
+              <span className="text-lg">🏆</span>
+            </div>
+            <div className="text-2xl font-bold text-amber-400">{matchDayLabel()}</div>
+            {nextMatch.opponent && (
+              <p className="text-xs text-amber-500 mt-1 truncate">
+                {nextMatch.homeOrAway === "home" ? "🏠" : "✈️"} vs {nextMatch.opponent}
+              </p>
+            )}
+          </Link>
+        ) : (
+          <div className="bg-amber-500/10 border border-amber-500/15 rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-slate-400">Nästa match</span>
+              <span className="text-lg">🏆</span>
+            </div>
+            <div className="text-2xl font-bold text-amber-400">—</div>
+          </div>
+        )}
       </div>
 
       {/* Middle row: upcoming sessions + calendar */}
