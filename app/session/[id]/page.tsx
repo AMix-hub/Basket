@@ -88,6 +88,7 @@ export default function SessionDetailPage() {
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
+  const [teamExercises, setTeamExercises] = useState<{ id: string; name: string; description: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Edit states
@@ -100,6 +101,8 @@ export default function SessionDetailPage() {
   const [newItemDuration, setNewItemDuration] = useState("15");
   const [newItemDesc, setNewItemDesc] = useState("");
   const [addingItem, setAddingItem] = useState(false);
+  const [showExercisePicker, setShowExercisePicker] = useState(false);
+  const [exerciseSearch, setExerciseSearch] = useState("");
 
   // Match result
   const [editingResult, setEditingResult] = useState(false);
@@ -159,13 +162,14 @@ export default function SessionDetailPage() {
     }
   }, [id, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* ── Load attendance + players ── */
+  /* ── Load attendance + players + exercises ── */
   const loadAttendanceAndPlayers = useCallback(async () => {
     if (!session?.teamId) return;
-    const [{ data: att }, { data: pl }, { data: members }] = await Promise.all([
+    const [{ data: att }, { data: pl }, { data: members }, { data: exs }] = await Promise.all([
       supabase.from("attendance").select("player_id, status").eq("session_id", id),
       supabase.from("players").select("id, name, number").eq("team_id", session.teamId).order("number"),
       supabase.from("team_members").select("user_id, profiles(name)").eq("team_id", session.teamId),
+      supabase.from("team_exercises").select("id, title, description").eq("team_id", session.teamId).order("title"),
     ]);
     setAttendance((att ?? []).map((d) => ({ playerId: d.player_id, status: d.status as AttendanceRow["status"] })));
     setPlayers((pl ?? []).map((d) => ({ id: d.id, name: d.name, number: d.number ?? 0 })));
@@ -173,6 +177,7 @@ export default function SessionDetailPage() {
       id: d.user_id,
       name: (Array.isArray(d.profiles) ? (d.profiles[0] as { name: string } | undefined)?.name : (d.profiles as { name: string } | null)?.name) ?? "Okänd",
     })));
+    setTeamExercises((exs ?? []).map((d) => ({ id: d.id, name: d.title, description: d.description ?? "" })));
   }, [id, session?.teamId]);
 
   useEffect(() => { loadSession(); }, [loadSession]);
@@ -506,12 +511,55 @@ export default function SessionDetailPage() {
                 placeholder="Beskrivning (valfritt)"
                 className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
               />
+              {/* Exercise picker */}
+              {teamExercises.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowExercisePicker((v) => !v)}
+                    className="text-xs text-orange-400 hover:text-orange-300 font-semibold"
+                  >
+                    📚 {showExercisePicker ? "Dölj övningsbank" : "Välj från övningsbank"}
+                  </button>
+                  {showExercisePicker && (
+                    <div className="mt-2 bg-slate-800 rounded-xl border border-slate-600 overflow-hidden">
+                      <input
+                        type="text"
+                        value={exerciseSearch}
+                        onChange={(e) => setExerciseSearch(e.target.value)}
+                        placeholder="Sök övning…"
+                        className="w-full bg-slate-700 text-slate-200 text-xs px-3 py-2 border-b border-slate-600 focus:outline-none placeholder-slate-500"
+                      />
+                      <div className="max-h-36 overflow-y-auto">
+                        {teamExercises
+                          .filter((e) => !exerciseSearch || e.name.toLowerCase().includes(exerciseSearch.toLowerCase()))
+                          .map((ex) => (
+                            <button
+                              key={ex.id}
+                              onClick={() => {
+                                setNewItemTitle(ex.name);
+                                if (ex.description) setNewItemDesc(ex.description);
+                                setShowExercisePicker(false);
+                                setExerciseSearch("");
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                            >
+                              <span className="font-medium">{ex.name}</span>
+                              {ex.description && (
+                                <span className="ml-2 text-slate-500 truncate">{ex.description.slice(0, 50)}</span>
+                              )}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex gap-2">
                 <button onClick={addPlanItem} disabled={!newItemTitle.trim()}
                   className="flex-1 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors">
                   Lägg till
                 </button>
-                <button onClick={() => setAddingItem(false)}
+                <button onClick={() => { setAddingItem(false); setShowExercisePicker(false); setExerciseSearch(""); }}
                   className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-semibold rounded-lg transition-colors">
                   Avbryt
                 </button>
