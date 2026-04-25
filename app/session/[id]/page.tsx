@@ -138,6 +138,14 @@ export default function SessionDetailPage() {
   const [carpools, setCarpools] = useState<{ id: string; userId: string; userName: string; type: "needs_ride" | "offers_ride" }[]>([]);
   const [savingCarpool, setSavingCarpool] = useState(false);
 
+  // AI plan generation
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiPlayers, setAiPlayers] = useState("");
+  const [aiDuration, setAiDuration] = useState("90");
+  const [aiFocus, setAiFocus] = useState("");
+  const [aiEquipment, setAiEquipment] = useState("");
+  const [generatingAi, setGeneratingAi] = useState(false);
+
   // My RSVP (for non-coach users)
   const [myRsvp, setMyRsvp] = useState<"coming" | "not_coming" | "maybe" | null>(null);
   const [myRsvpComment, setMyRsvpComment] = useState("");
@@ -427,6 +435,48 @@ export default function SessionDetailPage() {
     loadCarpools();
   };
 
+  /* ── Generate AI plan ── */
+  const generateAiPlan = async () => {
+    if (!aiFocus.trim() || !session) return;
+    setGeneratingAi(true);
+    try {
+      const res = await fetch("/api/generate-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          players: aiPlayers.trim() || undefined,
+          duration: parseInt(aiDuration) || 90,
+          focus: aiFocus.trim(),
+          equipment: aiEquipment.trim() || undefined,
+          sport: "basket",
+        }),
+      });
+      const data = await res.json();
+      if (data.error || !data.items) { toast("Kunde inte generera plan. Försök igen.", "error"); return; }
+      // Save theme if present
+      if (data.theme) {
+        await supabase.from("sessions").update({ theme: data.theme }).eq("id", session.id);
+        setSession((prev) => prev ? { ...prev, theme: data.theme } : prev);
+      }
+      // Insert items
+      const startOrder = planItems.length;
+      const inserts = data.items.map((item: { title: string; duration_minutes: number; description?: string }, i: number) => ({
+        session_id: id, team_id: session.teamId, title: item.title,
+        duration_minutes: item.duration_minutes, description: item.description ?? null,
+        sort_order: startOrder + i,
+      }));
+      await supabase.from("session_plan_items").insert(inserts);
+      setShowAiModal(false);
+      setAiFocus(""); setAiPlayers(""); setAiEquipment("");
+      loadPlanItems();
+      toast(`AI genererade ${inserts.length} moment!`, "success");
+    } catch {
+      toast("Något gick fel. Kontrollera API-nyckeln.", "error");
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
+
   /* ── Submit own RSVP ── */
   const submitRsvp = async (status: "coming" | "not_coming" | "maybe") => {
     if (!user || !session || rsvpBusy) return;
@@ -665,6 +715,10 @@ export default function SessionDetailPage() {
             </div>
             {canEdit && (
               <div className="flex gap-1.5 flex-wrap justify-end">
+                <button onClick={() => setShowAiModal(true)}
+                  className="text-xs px-2.5 py-1 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-semibold transition-colors">
+                  ✨ AI
+                </button>
                 {planItems.length > 0 && (
                   <button onClick={() => { setNewTemplateName(""); setShowSaveTemplateModal(true); }}
                     className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
@@ -1096,6 +1150,61 @@ export default function SessionDetailPage() {
           ) : (
             <p className="text-sm text-slate-500 italic">Ingen har anmält sig för samåkning ännu.</p>
           )}
+        </div>
+      )}
+
+      {/* ── AI plan generation modal ── */}
+      {showAiModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-lg">✨</span>
+              <h3 className="font-bold text-slate-100">AI-genererad träningsplan</h3>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Beskriv vad du vill träna på, så skapar AI ett förslag.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">Fokusområde <span className="text-red-400">*</span></label>
+                <input autoFocus value={aiFocus} onChange={(e) => setAiFocus(e.target.value)}
+                  placeholder="T.ex. Passningsspel och rörelser utan boll"
+                  onKeyDown={(e) => { if (e.key === "Enter") generateAiPlan(); }}
+                  className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">Passlängd (min)</label>
+                  <input type="number" value={aiDuration} onChange={(e) => setAiDuration(e.target.value)} min="30" max="180"
+                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-400 block mb-1">Antal spelare</label>
+                  <input value={aiPlayers} onChange={(e) => setAiPlayers(e.target.value)}
+                    placeholder="T.ex. 12"
+                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">Tillgänglig utrustning</label>
+                <input value={aiEquipment} onChange={(e) => setAiEquipment(e.target.value)}
+                  placeholder="T.ex. 8 bollar, 12 koner, västar"
+                  className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={generateAiPlan} disabled={generatingAi || !aiFocus.trim()}
+                className="flex-1 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2">
+                {generatingAi ? (
+                  <><span className="animate-spin text-base">⟳</span> Genererar…</>
+                ) : (
+                  <>✨ Generera</>
+                )}
+              </button>
+              <button onClick={() => setShowAiModal(false)}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                Avbryt
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
