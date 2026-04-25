@@ -53,7 +53,9 @@ export default function FamiljPage() {
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [myRsvps, setMyRsvps] = useState<Record<string, RsvpStatus>>({});
+  const [myRsvpComments, setMyRsvpComments] = useState<Record<string, string>>({});
   const [rsvpBusy, setRsvpBusy] = useState<string | null>(null);
+  const [rsvpComment, setRsvpComment] = useState<Record<string, string>>({});
   const [playerNotes, setPlayerNotes] = useState<Array<{ id: string; note: string; coachName: string; date: string }>>([]);
 
   useEffect(() => {
@@ -99,15 +101,20 @@ export default function FamiljPage() {
   }, [team?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!user || !team) { setMyRsvps({}); return; }
+    if (!user || !team) { setMyRsvps({}); setMyRsvpComments({}); return; }
     let mounted = true;
     const load = () =>
-      supabase.from("rsvps").select("session_id, status").eq("team_id", team.id).eq("user_id", user.id)
+      supabase.from("rsvps").select("session_id, status, comment").eq("team_id", team.id).eq("user_id", user.id)
         .then(({ data }) => {
           if (!mounted) return;
           const loaded: Record<string, RsvpStatus> = {};
-          (data ?? []).forEach((d) => { loaded[d.session_id] = d.status as RsvpStatus; });
+          const comments: Record<string, string> = {};
+          (data ?? []).forEach((d) => {
+            loaded[d.session_id] = d.status as RsvpStatus;
+            if (d.comment) comments[d.session_id] = d.comment;
+          });
           setMyRsvps(loaded);
+          setMyRsvpComments(comments);
         });
     load();
     const ch = supabase.channel(`familj-rsvps:${team.id}:${user.id}`)
@@ -133,12 +140,13 @@ export default function FamiljPage() {
   const submitRsvp = async (sessionId: string, status: RsvpStatus) => {
     if (!user || !team || rsvpBusy) return;
     setRsvpBusy(sessionId);
+    const comment = rsvpComment[sessionId]?.trim() || myRsvpComments[sessionId] || null;
     try {
       if (myRsvps[sessionId] === status) {
         await supabase.from("rsvps").delete().eq("session_id", sessionId).eq("user_id", user.id);
       } else {
         await supabase.from("rsvps").upsert(
-          { session_id: sessionId, user_id: user.id, user_name: user.name, team_id: team.id, status },
+          { session_id: sessionId, user_id: user.id, user_name: user.name, team_id: team.id, status, comment },
           { onConflict: "session_id,user_id" }
         );
       }
@@ -400,6 +408,25 @@ export default function FamiljPage() {
                         </button>
                       ))}
                     </div>
+                    {myRsvp && (
+                      <div className="mt-2 flex gap-2 items-center">
+                        <input
+                          type="text"
+                          value={rsvpComment[s.id] ?? myRsvpComments[s.id] ?? ""}
+                          onChange={(e) => setRsvpComment((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") submitRsvp(s.id, myRsvp); }}
+                          placeholder="Kommentar (valfri)..."
+                          className="flex-1 bg-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 border border-slate-600 placeholder-slate-500 focus:outline-none focus:border-orange-500"
+                        />
+                        <button
+                          onClick={() => submitRsvp(s.id, myRsvp)}
+                          disabled={rsvpBusy === s.id}
+                          className="text-xs px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors"
+                        >
+                          Spara
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}

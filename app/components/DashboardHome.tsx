@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
@@ -22,6 +23,7 @@ const DAYS_SV_SHORT = ["M", "T", "O", "T", "F", "L", "S"];
 
 export default function DashboardHome() {
   const { user, getMyTeams } = useAuth();
+  const router = useRouter();
   const myTeams = getMyTeams();
 
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
@@ -237,7 +239,8 @@ export default function DashboardHome() {
                 const dateLabel = `${d.getDate()}/${d.getMonth() + 1}`;
                 const isToday = s.date === todayYMD;
                 return (
-                  <div key={s.id} className="flex items-center gap-3">
+                  <button key={s.id} onClick={() => router.push(`/session/${s.id}`)}
+                    className="flex items-center gap-3 w-full text-left hover:bg-slate-700/30 rounded-xl px-2 py-1 -mx-2 transition-colors">
                     <div
                       className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${
                         isToday ? "bg-sky-500" : "bg-sky-500/10"
@@ -254,12 +257,8 @@ export default function DashboardHome() {
                       <div className="text-sm text-slate-200 font-medium truncate">{s.title}</div>
                       <div className="text-xs text-slate-500">{dateLabel} · {s.time}</div>
                     </div>
-                    {s.planSessionNumber != null && (
-                      <span className="text-xs bg-slate-700/70 text-slate-400 px-2 py-0.5 rounded-full flex-shrink-0">
-                        Pass {s.planSessionNumber}
-                      </span>
-                    )}
-                  </div>
+                    <span className="text-slate-600 text-xs shrink-0">→</span>
+                  </button>
                 );
               })}
             </div>
@@ -383,6 +382,27 @@ export default function DashboardHome() {
           </Link>
         ))}
       </div>
+
+      {/* ── Quick actions for coaches/admins ── */}
+      {user?.roles.some((r) => ["coach", "admin", "assistant"].includes(r)) && (
+        <div className="bg-[#1e293b] border border-white/5 rounded-2xl p-5">
+          <p className="font-semibold text-slate-200 mb-3">Snabbåtgärder</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { href: "/kalender", label: "Skapa träning", icon: "📅", color: "bg-sky-500/10 hover:bg-sky-500/20 text-sky-300" },
+              { href: "/taktik",   label: "Taktiktavla",  icon: "🎯", color: "bg-violet-500/10 hover:bg-violet-500/20 text-violet-300" },
+              { href: "/traningsdatabas", label: "Övningsbank", icon: "🏋️", color: "bg-orange-500/10 hover:bg-orange-500/20 text-orange-300" },
+              { href: "/meddelanden", label: "Skicka meddelande", icon: "💬", color: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300" },
+            ].map((a) => (
+              <Link key={a.href} href={a.href}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors ${a.color}`}>
+                <span className="text-xl">{a.icon}</span>
+                <span className="text-xs font-semibold leading-tight">{a.label}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
