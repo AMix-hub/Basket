@@ -9,6 +9,7 @@ import type { Team } from "../context/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { SPORTS } from "../../lib/sports";
 import { autoTag, TAG_LABELS, TAG_COLORS } from "../../lib/exerciseTags";
+import { toast } from "../../lib/toast";
 
 interface Props {
   plan: SeasonPlan;
@@ -300,32 +301,43 @@ export default function SeasonPage({ plan }: Props) {
     setSchedBusy(true);
     try {
       const dates = generateSeasonDates(schedStartDate, schedWeekday, plan.sessions.length, freePeriods);
+      if (dates.length === 0) {
+        toast("Inga datum genererades. Kontrollera startdatum och träningsfria perioder.", "error");
+        return;
+      }
       const selectedHall = halls.find((h) => h.id === schedHallId);
       const groupId = crypto.randomUUID();
-      const rows = dates.map((date, idx) => {
-        const session = plan.sessions[idx];
-        if (!session) return null;
-        return {
-          team_id: targetTeamId,
-          date,
-          title: session.title,
-          type: "träning",
-          time: schedTime,
-          end_time: schedEndTime || null,
-          hall_id: selectedHall?.id ?? null,
-          hall_name: selectedHall?.name ?? null,
-          created_by: user.id,
-          plan_year: plan.year,
-          plan_session_number: session.number,
-          recurring_group_id: groupId,
-        };
-      }).filter(Boolean);
-      const { error } = await supabase.from("sessions").insert(rows as Record<string, unknown>[]);
-      if (error) throw error;
+      const rows = dates
+        .map((date, idx) => {
+          const session = plan.sessions[idx];
+          if (!session) return null;
+          return {
+            team_id: targetTeamId,
+            date,
+            title: session.title,
+            type: "träning",
+            time: schedTime || null,
+            end_time: schedEndTime || null,
+            hall_id: selectedHall?.id ?? null,
+            hall_name: selectedHall?.name ?? null,
+            created_by: user.id,
+            plan_year: plan.year,
+            plan_session_number: session.number,
+            recurring_group_id: groupId,
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+
+      const { error } = await supabase.from("sessions").insert(rows);
+      if (error) {
+        console.error("Supabase insert error:", error);
+        toast(`Kunde inte skapa schema: ${error.message}`, "error");
+        return;
+      }
       setSchedDone(true);
     } catch (err) {
       console.error("Failed to generate season schedule:", err);
-      alert("Kunde inte skapa säsongsschemat. Försök igen.");
+      toast("Något gick fel. Kontrollera konsolen för detaljer.", "error");
     } finally {
       setSchedBusy(false);
     }
