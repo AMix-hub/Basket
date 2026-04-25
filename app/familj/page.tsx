@@ -382,15 +382,23 @@ export default function FamiljPage() {
                           </p>
                         )}
                       </div>
-                      <span
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                          s.type === "match"
-                            ? "bg-red-900/30 text-red-400"
-                            : "bg-emerald-900/30 text-emerald-400"
-                        }`}
-                      >
-                        {s.type === "match" ? "Match" : "Träning"}
-                      </span>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span
+                          className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                            s.type === "match"
+                              ? "bg-red-900/30 text-red-400"
+                              : "bg-emerald-900/30 text-emerald-400"
+                          }`}
+                        >
+                          {s.type === "match" ? "Match" : "Träning"}
+                        </span>
+                        <Link
+                          href={`/session/${s.id}`}
+                          className="text-xs text-slate-500 hover:text-orange-400 transition-colors"
+                        >
+                          Detaljer ↗
+                        </Link>
+                      </div>
                     </div>
                     <div className="mt-3 flex gap-1.5">
                       {([["coming", "✓ Ja", "emerald"], ["maybe", "? Kanske", "amber"], ["not_coming", "✗ Nej", "red"]] as const).map(([st, lbl, color]) => (
