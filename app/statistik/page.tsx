@@ -528,7 +528,35 @@ export default function StatistikPage() {
               ) : (
                 <>
                   <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
-                    <h3 className="font-bold text-slate-100 mb-3">Närvaro per spelare</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-bold text-slate-100">Närvaro per spelare</h3>
+                      <button
+                        onClick={() => {
+                          const trainingSessions = calSessions.filter((s) => s.type === "träning").sort((a, b) => a.date.localeCompare(b.date));
+                          const header = ["Spelare", "Nummer", "Närvarande", "Totalt registrerade", "Närvaro%", ...trainingSessions.map((s) => `${s.date} ${s.title}`)];
+                          const rows = players.map((p) => {
+                            const att = calAttendance.filter((a) => a.playerId === p.id);
+                            const present = att.filter((a) => a.status === "present").length;
+                            const total = att.length;
+                            const pct = total > 0 ? Math.round((present / total) * 100) : "";
+                            const perSession = trainingSessions.map((s) => {
+                              const a = calAttendance.find((x) => x.sessionId === s.id && x.playerId === p.id);
+                              return a ? (a.status === "present" ? "Ja" : a.status === "sick" ? "Sjuk" : "Nej") : "-";
+                            });
+                            return [p.name, p.number, present, total, pct, ...perSession];
+                          });
+                          const csv = [header, ...rows].map((row) => row.map((v) => `"${v}"`).join(",")).join("\n");
+                          const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url; a.download = "narvaro.csv"; a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors"
+                      >
+                        ⬇ Exportera CSV
+                      </button>
+                    </div>
                     <div className="space-y-3">
                       {[...players].sort((a, b) => {
                         const attA = calAttendance.filter((x) => x.playerId === a.id);
