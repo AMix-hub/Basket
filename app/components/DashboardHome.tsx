@@ -96,6 +96,11 @@ export default function DashboardHome() {
       .map((s) => parseInt(s.date.slice(8), 10))
   );
 
+  /* ── Today's sessions ── */
+  const todaySessions = sessions
+    .filter((s) => s.date === todayYMD)
+    .sort((a, b) => a.time.localeCompare(b.time));
+
   /* ── Upcoming training sessions ── */
   const upcoming = sessions
     .filter((s) => s.type === "träning" && s.date >= todayYMD)
@@ -142,6 +147,35 @@ export default function DashboardHome() {
           </select>
         )}
       </div>
+
+      {/* Today's session banner */}
+      {todaySessions.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {todaySessions.map((s) => (
+            <Link
+              key={s.id}
+              href={`/session/${s.id}`}
+              className={`flex items-center gap-4 rounded-2xl p-4 border transition-all hover:opacity-90 ${
+                s.type === "match"
+                  ? "bg-red-900/30 border-red-700/50"
+                  : "bg-orange-500/15 border-orange-500/30"
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xl ${
+                s.type === "match" ? "bg-red-800/60" : "bg-orange-500/30"
+              }`}>
+                {s.type === "match" ? "🏆" : "🏀"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-orange-400 mb-0.5">IDAG</p>
+                <p className="font-bold text-white truncate">{s.title}</p>
+                {s.time && <p className="text-xs text-slate-400">{s.time}</p>}
+              </div>
+              <span className="text-orange-400 font-bold text-sm shrink-0">→</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
