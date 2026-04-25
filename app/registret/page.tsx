@@ -235,6 +235,7 @@ export default function RegistretPage() {
   const [notesTarget, setNotesTarget] = useState<{ member: ProfileRow; teamId: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleTarget, setRoleTarget] = useState<ProfileRow | null>(null);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [savingRole, setSavingRole] = useState(false);
 
   const isAdmin = user?.roles.includes("admin") ?? false;
@@ -298,15 +299,15 @@ export default function RegistretPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, effectiveAdminId, teams.map((t: Team) => t.id).join(",")]);
 
-  const changeRole = async (memberId: string, newRole: string) => {
+  const changeRole = async (memberId: string, newRoles: string[]) => {
+    if (newRoles.length === 0) return;
     setSavingRole(true);
-    await supabase.from("profiles").update({ roles: [newRole], role: newRole }).eq("id", memberId);
+    await supabase.from("profiles").update({ roles: newRoles, role: newRoles[0] }).eq("id", memberId);
     setSavingRole(false);
     setRoleTarget(null);
-    // Refresh data
     setTeamData((prev) => prev ? prev.map((t) => ({
       ...t,
-      members: t.members.map((m) => m.id === memberId ? { ...m, roles: [newRole] } : m),
+      members: t.members.map((m) => m.id === memberId ? { ...m, roles: newRoles } : m),
     })) : prev);
   };
 
@@ -411,28 +412,39 @@ export default function RegistretPage() {
           <div className="bg-[#1e293b] border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="font-bold text-slate-100">Ändra roll</h3>
+                <h3 className="font-bold text-slate-100">Roller</h3>
                 <p className="text-sm text-slate-400 mt-0.5">{roleTarget.name}</p>
               </div>
               <button onClick={() => setRoleTarget(null)} className="text-slate-500 hover:text-slate-300 text-xl">✕</button>
             </div>
-            <div className="space-y-2">
-              {(["player", "parent", "assistant", "coach", "co_admin", "admin"] as const).map((r) => (
-                <button
-                  key={r}
-                  disabled={savingRole || roleTarget.roles[0] === r}
-                  onClick={() => changeRole(roleTarget.id, r)}
-                  className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                    roleTarget.roles[0] === r
-                      ? "bg-orange-500/20 text-orange-400 cursor-default"
-                      : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                  }`}
-                >
-                  {savingRole ? "Sparar…" : roleLabel[r]}
-                  {roleTarget.roles[0] === r && " ✓"}
-                </button>
-              ))}
+            <div className="space-y-2 mb-4">
+              {(["player", "parent", "assistant", "coach", "co_admin", "admin"] as const).map((r) => {
+                const checked = selectedRoles.includes(r);
+                return (
+                  <label key={r} className="flex items-center gap-3 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => setSelectedRoles((prev) =>
+                        prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]
+                      )}
+                      className="w-4 h-4 accent-orange-500"
+                    />
+                    <span className="text-sm font-medium text-slate-200">{roleLabel[r]}</span>
+                  </label>
+                );
+              })}
             </div>
+            {selectedRoles.length === 0 && (
+              <p className="text-xs text-amber-400 mb-3">Välj minst en roll.</p>
+            )}
+            <button
+              disabled={savingRole || selectedRoles.length === 0}
+              onClick={() => changeRole(roleTarget.id, selectedRoles)}
+              className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              {savingRole ? "Sparar…" : "Spara roller"}
+            </button>
           </div>
         </div>
       )}
@@ -545,9 +557,9 @@ export default function RegistretPage() {
                             + Lag
                           </button>
                           <button
-                            onClick={() => setRoleTarget(member)}
+                            onClick={() => { setRoleTarget(member); setSelectedRoles(member.roles); }}
                             className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 rounded-lg transition-colors font-medium"
-                            title="Ändra roll"
+                            title="Ändra roller"
                           >
                             🔑
                           </button>
