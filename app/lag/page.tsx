@@ -42,6 +42,9 @@ export default function LagPage() {
   const [addingGroup, setAddingGroup] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  // Next session per team
+  const [nextSessionByTeam, setNextSessionByTeam] = useState<Record<string, { id: string; date: string; title: string; time: string; type: string } | null>>({});
+
   /* Load team members for each team */
   useEffect(() => {
     if (teams.length === 0) return;
@@ -92,6 +95,26 @@ export default function LagPage() {
         .subscribe()
     );
     return () => { mounted = false; channels.forEach((c) => supabase.removeChannel(c)); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teams.map((t: Team) => t.id).join(",")]);
+
+  /* Load next session per team */
+  useEffect(() => {
+    if (teams.length === 0) return;
+    const todayYMD = new Date().toISOString().slice(0, 10);
+    Promise.all(
+      teams.map(async (t: Team) => {
+        const { data } = await supabase.from("sessions")
+          .select("id, date, title, time, type")
+          .eq("team_id", t.id).gte("date", todayYMD)
+          .order("date").order("time").limit(1);
+        return { teamId: t.id, session: data?.[0] ?? null };
+      })
+    ).then((results) => {
+      const byTeam: Record<string, { id: string; date: string; title: string; time: string; type: string } | null> = {};
+      results.forEach(({ teamId, session }) => { byTeam[teamId] = session; });
+      setNextSessionByTeam(byTeam);
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams.map((t: Team) => t.id).join(",")]);
 
@@ -262,6 +285,29 @@ export default function LagPage() {
 
             {isExpanded && (
               <div className="mt-1 space-y-3">
+                {/* Next session quick link */}
+                {(() => {
+                  const next = nextSessionByTeam[team.id];
+                  if (!next) return null;
+                  const d = new Date(next.date + "T12:00:00");
+                  const label = d.toLocaleDateString("sv-SE", { weekday: "short", month: "short", day: "numeric" });
+                  const isMatch = next.type === "match";
+                  return (
+                    <Link href={`/session/${next.id}`}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-colors hover:opacity-90 ${
+                        isMatch ? "bg-red-900/20 border-red-800/40" : "bg-orange-500/10 border-orange-500/20"
+                      }`}>
+                      <span className="text-xl">{isMatch ? "🏆" : "🏀"}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-orange-400 mb-0.5">Nästa pass</p>
+                        <p className="font-semibold text-slate-200 text-sm truncate">{next.title}</p>
+                        <p className="text-xs text-slate-400">{label}{next.time ? ` · ${next.time}` : ""}</p>
+                      </div>
+                      <span className="text-orange-400 text-sm">→</span>
+                    </Link>
+                  );
+                })()}
+
                 {/* Invite codes (coach / admin only) */}
                 {canSeeInvites && (
                   <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
