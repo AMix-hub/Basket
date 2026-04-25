@@ -43,7 +43,11 @@ Regler:
       messages: [{ role: "user", content: prompt }],
     });
 
-    const raw = (message.content[0] as { type: string; text: string }).text.trim();
+    const raw = (message.content[0] as { type: string; text: string }).text
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
     const parsed = JSON.parse(raw);
     return NextResponse.json(parsed);
   } catch (err) {
