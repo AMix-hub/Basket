@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../context/AuthContext";
 
@@ -529,7 +530,13 @@ export default function StatistikPage() {
                   <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
                     <h3 className="font-bold text-slate-100 mb-3">Närvaro per spelare</h3>
                     <div className="space-y-3">
-                      {players.map((p) => {
+                      {[...players].sort((a, b) => {
+                        const attA = calAttendance.filter((x) => x.playerId === a.id);
+                        const attB = calAttendance.filter((x) => x.playerId === b.id);
+                        const pctA = attA.length > 0 ? attA.filter((x) => x.status === "present").length / attA.length : -1;
+                        const pctB = attB.length > 0 ? attB.filter((x) => x.status === "present").length / attB.length : -1;
+                        return pctB - pctA;
+                      }).map((p) => {
                         const playerAtt = calAttendance.filter((a) => a.playerId === p.id);
                         const present = playerAtt.filter((a) => a.status === "present").length;
                         const total = playerAtt.length;
@@ -559,12 +566,13 @@ export default function StatistikPage() {
                   <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
                     <h3 className="font-bold text-slate-100 mb-3">Sessionshistorik</h3>
                     <div className="space-y-2">
-                      {calSessions.filter((s) => s.type === "träning").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((s) => {
+                      {calSessions.filter((s) => s.type === "träning").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15).map((s) => {
                         const sessAtt = calAttendance.filter((a) => a.sessionId === s.id);
                         const presentCount = sessAtt.filter((a) => a.status === "present").length;
                         const d = new Date(s.date + "T12:00:00");
                         return (
-                          <div key={s.id} className="flex items-center gap-3 bg-slate-900/40 rounded-xl px-3 py-2">
+                          <Link key={s.id} href={`/session/${s.id}`}
+                            className="flex items-center gap-3 bg-slate-900/40 hover:bg-slate-700/40 rounded-xl px-3 py-2 transition-colors">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-slate-200 truncate">{s.title}</p>
                               <p className="text-xs text-slate-400">{d.toLocaleDateString("sv-SE", { weekday: "short", month: "short", day: "numeric" })}</p>
@@ -576,7 +584,7 @@ export default function StatistikPage() {
                             ) : (
                               <span className="text-xs text-slate-500 shrink-0">Ej registrerat</span>
                             )}
-                          </div>
+                          </Link>
                         );
                       })}
                     </div>
