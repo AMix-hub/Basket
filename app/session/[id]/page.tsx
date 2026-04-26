@@ -138,6 +138,12 @@ export default function SessionDetailPage() {
   const [carpools, setCarpools] = useState<{ id: string; userId: string; userName: string; type: "needs_ride" | "offers_ride" }[]>([]);
   const [savingCarpool, setSavingCarpool] = useState(false);
 
+  // Checklist
+  interface ChecklistItem { id: string; label: string; checked: boolean; sortOrder: number; }
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [newCheckItem, setNewCheckItem] = useState("");
+  const [addingCheckItem, setAddingCheckItem] = useState(false);
+
   // AI plan generation
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiPlayers, setAiPlayers] = useState("");
@@ -230,8 +236,17 @@ export default function SessionDetailPage() {
     })));
   }, [id]);
 
+  /* ── Load checklist ── */
+  const loadChecklist = useCallback(async () => {
+    const { data } = await supabase.from("session_checklist")
+      .select("id, label, checked, sort_order").eq("session_id", id).order("sort_order");
+    setChecklist((data ?? []).map((d) => ({
+      id: d.id, label: d.label, checked: d.checked ?? false, sortOrder: d.sort_order ?? 0,
+    })));
+  }, [id]);
+
   useEffect(() => { loadSession(); }, [loadSession]);
-  useEffect(() => { if (session) { loadPlanItems(); loadRsvps(); loadAttendanceAndPlayers(); loadCarpools(); } }, [session?.id, loadPlanItems, loadRsvps, loadAttendanceAndPlayers, loadCarpools]);
+  useEffect(() => { if (session) { loadPlanItems(); loadRsvps(); loadAttendanceAndPlayers(); loadCarpools(); loadChecklist(); } }, [session?.id, loadPlanItems, loadRsvps, loadAttendanceAndPlayers, loadCarpools, loadChecklist]);
 
   /* ── Save meta ── */
   const saveMeta = async () => {
@@ -433,6 +448,27 @@ export default function SessionDetailPage() {
     }
     setSavingCarpool(false);
     loadCarpools();
+  };
+
+  /* ── Checklist ── */
+  const addChecklistItem = async (label: string) => {
+    if (!label.trim() || !session) return;
+    setAddingCheckItem(true);
+    const sortOrder = checklist.length;
+    await supabase.from("session_checklist").insert({ session_id: id, label: label.trim(), sort_order: sortOrder });
+    setNewCheckItem("");
+    setAddingCheckItem(false);
+    loadChecklist();
+  };
+
+  const toggleChecklistItem = async (item: ChecklistItem) => {
+    setChecklist((prev) => prev.map((c) => c.id === item.id ? { ...c, checked: !c.checked } : c));
+    await supabase.from("session_checklist").update({ checked: !item.checked }).eq("id", item.id);
+  };
+
+  const deleteChecklistItem = async (itemId: string) => {
+    setChecklist((prev) => prev.filter((c) => c.id !== itemId));
+    await supabase.from("session_checklist").delete().eq("id", itemId);
   };
 
   /* ── Generate AI plan ── */
@@ -1204,6 +1240,98 @@ export default function SessionDetailPage() {
           )}
         </div>
       )}
+
+      {/* ── Packlista ── */}
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="font-bold text-slate-100">📦 Packlista</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {checklist.length === 0 ? "Lägg till utrustning att packa" : `${checklist.filter((c) => c.checked).length} / ${checklist.length} packade`}
+            </p>
+          </div>
+          {checklist.length > 0 && checklist.every((c) => c.checked) && (
+            <span className="text-xs font-bold text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded-lg">✓ Allt packat!</span>
+          )}
+        </div>
+
+        {/* Progress bar */}
+        {checklist.length > 0 && (
+          <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden mb-4">
+            <div
+              className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+              style={{ width: `${(checklist.filter((c) => c.checked).length / checklist.length) * 100}%` }}
+            />
+          </div>
+        )}
+
+        {/* Items */}
+        <div className="space-y-1.5 mb-4">
+          {checklist.map((item) => (
+            <div key={item.id} className="flex items-center gap-2 group">
+              <button
+                onClick={() => toggleChecklistItem(item)}
+                className={`w-5 h-5 rounded shrink-0 border-2 flex items-center justify-center transition-all ${
+                  item.checked
+                    ? "bg-emerald-500 border-emerald-500 text-white"
+                    : "border-slate-500 hover:border-emerald-500"
+                }`}
+              >
+                {item.checked && <span className="text-xs leading-none">✓</span>}
+              </button>
+              <span className={`flex-1 text-sm transition-colors ${item.checked ? "line-through text-slate-500" : "text-slate-200"}`}>
+                {item.label}
+              </span>
+              {canEdit && (
+                <button
+                  onClick={() => deleteChecklistItem(item.id)}
+                  className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all text-xs px-1"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          ))}
+          {checklist.length === 0 && (
+            <p className="text-sm text-slate-500 italic">Ingen utrustning tillagd ännu.</p>
+          )}
+        </div>
+
+        {/* Quick-add presets */}
+        {canEdit && checklist.length === 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {["🏀 Bollar", "🧢 Tröjor/Matchkläder", "🔶 Koner", "🥤 Vatten", "🩹 Första hjälpen", "📋 Namnlista"].map((preset) => (
+              <button
+                key={preset}
+                onClick={() => addChecklistItem(preset)}
+                className="text-xs px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors border border-slate-600 border-dashed"
+              >
+                + {preset}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Add item input */}
+        {canEdit && (
+          <div className="flex gap-2">
+            <input
+              value={newCheckItem}
+              onChange={(e) => setNewCheckItem(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addChecklistItem(newCheckItem); }}
+              placeholder="Lägg till utrustning…"
+              className="flex-1 px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-1 focus:ring-orange-400"
+            />
+            <button
+              onClick={() => addChecklistItem(newCheckItem)}
+              disabled={!newCheckItem.trim() || addingCheckItem}
+              className="px-3 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white text-sm font-semibold rounded-xl transition-colors"
+            >
+              +
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── AI plan generation modal ── */}
       {showAiModal && (
