@@ -458,38 +458,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const joinTeam = async (inviteCode: string, childName?: string): Promise<boolean> => {
     if (!user) return false;
     const code = inviteCode.toUpperCase();
+    try {
+      const { data: rows } = await supabase
+        .from("teams")
+        .select("id, invite_code, parent_invite_code, player_invite_code")
+        .or(`invite_code.eq.${code},parent_invite_code.eq.${code},player_invite_code.eq.${code}`)
+        .limit(1);
 
-    const { data: rows } = await supabase
-      .from("teams")
-      .select("*")
-      .or(`invite_code.eq.${code},parent_invite_code.eq.${code},player_invite_code.eq.${code}`)
-      .limit(1);
+      if (!rows || rows.length === 0) return false;
+      const team = rows[0] as DbTeam;
 
-    if (!rows || rows.length === 0) return false;
-    const team = rows[0] as DbTeam;
+      let newRole: UserRole = "assistant";
+      if (team.parent_invite_code === code) newRole = "parent";
+      if (team.player_invite_code === code) newRole = "player";
 
-    // Determine role from which code matched
-    let newRole: UserRole = "assistant";
-    if (team.parent_invite_code === code) newRole = "parent";
-    if (team.player_invite_code === code) newRole = "player";
+      await supabase.from("team_members")
+        .upsert({ team_id: team.id, user_id: user.id }, { onConflict: "team_id,user_id" });
 
-    const newMemberIds = [...new Set([...(team.member_ids ?? []), user.id])];
-    await supabase.from("teams").update({ member_ids: newMemberIds }).eq("id", team.id);
-    await supabase.from("team_members")
-      .upsert({ team_id: team.id, user_id: user.id }, { onConflict: "team_id,user_id" });
+      const currentRoles = user.roles;
+      if (!currentRoles.includes(newRole)) {
+        const updatedRoles = [...currentRoles, newRole];
+        await supabase.from("profiles").update({ role: newRole, roles: updatedRoles }).eq("id", user.id);
+      }
+      if (childName) {
+        await supabase.from("profiles").update({ child_name: childName }).eq("id", user.id);
+      }
 
-    // Update profile role if necessary (e.g., player joining)
-    const currentRoles = user.roles;
-    if (!currentRoles.includes(newRole)) {
-      const updatedRoles = [...currentRoles, newRole];
-      await supabase.from("profiles").update({ role: newRole, roles: updatedRoles }).eq("id", user.id);
+      await loadProfile(user.id);
+      return true;
+    } catch {
+      return false;
     }
-    if (childName) {
-      await supabase.from("profiles").update({ child_name: childName }).eq("id", user.id);
-    }
-
-    await loadProfile(user.id);
-    return true;
   };
 
   /* ── createTeam ── */

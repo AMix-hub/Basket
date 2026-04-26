@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server not configured (SUPABASE_SERVICE_ROLE_KEY missing)" }, { status: 500 });
   }
 
-  // Verify the caller is a logged-in user via the Authorization header
+  // Verify the caller is authenticated
   const authHeader = req.headers.get("authorization");
   if (!authHeader?.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,6 +42,17 @@ export async function POST(req: NextRequest) {
   const { data: { user: callerUser }, error: authErr } = await supabaseAdmin.auth.getUser(authHeader.slice(7));
   if (authErr || !callerUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Verify the caller has admin or co_admin role
+  const { data: callerProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("roles")
+    .eq("id", callerUser.id)
+    .single();
+  const callerRoles: string[] = callerProfile?.roles ?? [];
+  if (!callerRoles.some((r) => ["admin", "co_admin"].includes(r))) {
+    return NextResponse.json({ error: "Forbidden: only admins can invite users" }, { status: 403 });
   }
 
   try {

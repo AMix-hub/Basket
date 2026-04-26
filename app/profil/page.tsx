@@ -116,6 +116,14 @@ export default function ProfilPage() {
   const [notifMessage, setNotifMessage] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
 
+  // Account deletion
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  // Data export
+  const [exporting, setExporting] = useState(false);
+
   const currentPermission: NotificationPermission | "unsupported" | null =
     typeof window !== "undefined" && "Notification" in window
       ? Notification.permission
@@ -246,6 +254,50 @@ export default function ProfilPage() {
     : null;
 
   const teams = getMyTeams();
+
+  const handleExportData = async () => {
+    if (!user) return;
+    setExporting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/export-data", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { toast("Kunde inte exportera data.", "error"); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `min-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Data exporterad!", "success");
+    } catch {
+      toast("Något gick fel.", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user || deleteConfirmText !== "RADERA") return;
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/delete-account", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { toast("Kunde inte ta bort kontot.", "error"); setDeleting(false); return; }
+      toast("Kontot har tagits bort.", "success");
+      router.push("/");
+    } catch {
+      toast("Något gick fel.", "error");
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="max-w-lg mx-auto px-4 pt-6 pb-12 space-y-4">
@@ -546,6 +598,61 @@ export default function ProfilPage() {
         <p className="text-xs text-slate-600 mt-3">
           iOS: installera appen på hemskärmen via Safari → Dela → Lägg till på hemskärmen.
         </p>
+      </Card>
+
+      {/* ── Data & Privacy ── */}
+      <Card>
+        <SectionHeading>Data & Integritet</SectionHeading>
+        <p className="text-sm text-slate-400 mb-4">
+          Enligt GDPR har du rätt att ladda ner all din data eller ta bort ditt konto.{" "}
+          <a href="/integritetspolicy" className="text-orange-400 hover:underline">Integritetspolicy →</a>
+        </p>
+
+        <button
+          onClick={handleExportData}
+          disabled={exporting}
+          className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-colors mb-3"
+        >
+          {exporting ? "Exporterar…" : "⬇️ Ladda ner min data (JSON)"}
+        </button>
+
+        {!showDeleteConfirm ? (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="w-full py-2.5 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-sm font-semibold rounded-xl border border-red-800/40 transition-colors"
+          >
+            🗑 Ta bort mitt konto
+          </button>
+        ) : (
+          <div className="bg-red-900/20 border border-red-800/40 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-red-300">Ta bort konto permanent?</p>
+            <p className="text-xs text-slate-400">
+              All din data raderas — profil, närvaro, meddelanden och mer. Detta går inte att ångra.
+              Skriv <strong className="text-white">RADERA</strong> för att bekräfta.
+            </p>
+            <input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value.toUpperCase())}
+              placeholder="RADERA"
+              className="w-full px-3 py-2 text-sm bg-slate-800 border border-red-700/50 text-slate-100 placeholder-slate-600 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-500 font-mono uppercase tracking-widest"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
+                className="flex-1 py-2 text-sm font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== "RADERA" || deleting}
+                className="flex-1 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white rounded-xl transition-colors"
+              >
+                {deleting ? "Raderar…" : "Radera permanent"}
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );
