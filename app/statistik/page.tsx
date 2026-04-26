@@ -23,6 +23,57 @@ interface Shot {
 
 type ViewMode = "log" | "stats" | "närvaro";
 
+/* ─── Streak helpers ───────────────────────────────────────── */
+function isoWeekKey(dateStr: string): string {
+  // Returns "YYYY-WNN" for a given date string (YYYY-MM-DD)
+  const d = new Date(dateStr + "T12:00:00");
+  const day = d.getDay() || 7;
+  d.setDate(d.getDate() + 4 - day);
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNum = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+}
+
+function calcStreak(
+  playerId: string,
+  sessions: { id: string; date: string; type: string }[],
+  attendance: { sessionId: string; playerId: string; status: string }[],
+): { current: number; best: number } {
+  const trainingSessions = sessions.filter((s) => s.type === "träning");
+  if (trainingSessions.length === 0) return { current: 0, best: 0 };
+
+  const presentIds = new Set(
+    attendance
+      .filter((a) => a.playerId === playerId && a.status === "present")
+      .map((a) => a.sessionId),
+  );
+
+  // Unique weeks that had at least one training, sorted ascending
+  const allWeeks = [...new Set(trainingSessions.map((s) => isoWeekKey(s.date)))].sort();
+
+  // Weeks where the player was present
+  const attendedWeeks = new Set<string>();
+  for (const s of trainingSessions) {
+    if (presentIds.has(s.id)) attendedWeeks.add(isoWeekKey(s.date));
+  }
+
+  // Best streak (full scan)
+  let best = 0, run = 0;
+  for (const w of allWeeks) {
+    if (attendedWeeks.has(w)) { run++; best = Math.max(best, run); }
+    else run = 0;
+  }
+
+  // Current streak (scan backwards from most recent training week)
+  let current = 0;
+  for (let i = allWeeks.length - 1; i >= 0; i--) {
+    if (attendedWeeks.has(allWeeks[i])) current++;
+    else break;
+  }
+
+  return { current, best };
+}
+
 /* ─── Court dimensions ─────────────────────────────────────── */
 const CW = 400;
 const CH = 300;
@@ -569,12 +620,19 @@ export default function StatistikPage() {
                         const present = playerAtt.filter((a) => a.status === "present").length;
                         const total = playerAtt.length;
                         const pct = total > 0 ? Math.round((present / total) * 100) : null;
+                        const streak = calcStreak(p.id, calSessions, calAttendance);
                         return (
                           <div key={p.id} className="flex items-center gap-3">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">#{p.number} {p.name}</p>
                               <p className="text-xs text-slate-400">{present} av {total} pass</p>
                             </div>
+                            {streak.current > 0 && (
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-lg shrink-0 ${streak.current >= 4 ? "bg-orange-500/20 text-orange-400" : "bg-slate-700 text-slate-400"}`}
+                                title={`Bästa: ${streak.best} v`}>
+                                🔥{streak.current}v
+                              </span>
+                            )}
                             {pct !== null ? (
                               <div className="flex items-center gap-2 shrink-0">
                                 <div className="w-20 h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -590,6 +648,49 @@ export default function StatistikPage() {
                       })}
                     </div>
                   </div>
+
+                  {/* Streak leaderboard */}
+                  {(() => {
+                    const streaks = players
+                      .map((p) => ({ player: p, ...calcStreak(p.id, calSessions, calAttendance) }))
+                      .filter((r) => r.current > 0 || r.best > 0)
+                      .sort((a, b) => b.current - a.current || b.best - a.best);
+                    if (streaks.length === 0) return null;
+                    return (
+                      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
+                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-1">🔥 Träningssvit</h3>
+                        <p className="text-xs text-slate-400 mb-3">Antal veckor i rad med minst en närvaro</p>
+                        <div className="space-y-2">
+                          {streaks.map((r, i) => (
+                            <div key={r.player.id} className="flex items-center gap-3">
+                              <span className={`text-sm font-extrabold w-5 shrink-0 text-center ${i === 0 ? "text-orange-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-amber-600" : "text-slate-500"}`}>
+                                {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
+                                  #{r.player.number} {r.player.name}
+                                </p>
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  <div
+                                    className="h-1.5 rounded-full bg-orange-400 transition-all"
+                                    style={{ width: `${Math.min((r.current / Math.max(streaks[0].current, 1)) * 100, 100)}%`, minWidth: r.current > 0 ? "8px" : "0" }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className={`text-base font-extrabold ${r.current >= 4 ? "text-orange-400" : "text-slate-300"}`}>
+                                  {r.current}v
+                                </span>
+                                {r.best > r.current && (
+                                  <p className="text-xs text-slate-500">bäst: {r.best}v</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
                     <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Sessionshistorik</h3>
