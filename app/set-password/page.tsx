@@ -1,26 +1,52 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 
-function SetPasswordForm() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  // Supabase puts the recovery token in the URL hash, which Next.js
-  // exposes as a query param after the redirect from the email link.
-  const oobCode = searchParams.get("oobCode") ?? searchParams.get("token") ?? "";
+type Status = "loading" | "ready" | "invalid";
 
+function SetPasswordForm() {
+  const router = useRouter();
+
+  const [status, setStatus] = useState<Status>("loading");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    // Supabase automatically processes the #access_token hash on page load
+    // and fires onAuthStateChange with event PASSWORD_RECOVERY.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+        setStatus("ready");
+      }
+    });
+
+    // Also handle the case where the session was already set (e.g. page refresh).
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setStatus("ready");
+      } else {
+        // Give the hash a moment to be processed before declaring invalid.
+        const timer = setTimeout(() => {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (!session) setStatus("invalid");
+          });
+        }, 2500);
+        return () => clearTimeout(timer);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const passwordsMatch = confirm.length > 0 && password === confirm;
   const passwordsMismatch = confirm.length > 0 && password !== confirm;
-  const canSubmit = password.length >= 6 && passwordsMatch && !!oobCode;
+  const canSubmit = password.length >= 6 && passwordsMatch && status === "ready";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +65,7 @@ function SetPasswordForm() {
         }
       } else {
         setSuccess(true);
-        setTimeout(() => router.push("/login"), 3000);
+        setTimeout(() => router.push("/"), 2500);
       }
     } catch {
       setError("Något gick fel. Försök igen eller kontakta administratören.");
@@ -48,12 +74,22 @@ function SetPasswordForm() {
     }
   };
 
-  if (!oobCode) {
+  if (status === "loading") {
+    return (
+      <div className="text-center py-4">
+        <div className="inline-block w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-slate-400 text-sm">Verifierar länk…</p>
+      </div>
+    );
+  }
+
+  if (status === "invalid") {
     return (
       <div className="text-center">
         <p className="text-4xl mb-3">🔗</p>
-        <p className="text-slate-600 mb-4">
-          Ogiltig länk. Öppna länken från välkomstmailet.
+        <p className="text-slate-300 font-semibold mb-1">Ogiltig eller utgången länk</p>
+        <p className="text-slate-500 text-sm mb-4">
+          Öppna länken direkt från välkomstmailet. Be administratören skicka en ny inbjudan om länken har gått ut.
         </p>
         <Link
           href="/login"
@@ -71,13 +107,13 @@ function SetPasswordForm() {
         <p className="text-4xl mb-3">✅</p>
         <p className="text-slate-200 font-semibold mb-1">Lösenordet är satt!</p>
         <p className="text-slate-500 text-sm mb-4">
-          Du skickas vidare till inloggningssidan om ett ögonblick…
+          Du skickas vidare om ett ögonblick…
         </p>
         <Link
-          href="/login"
+          href="/"
           className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600"
         >
-          Logga in nu
+          Gå till appen
         </Link>
       </div>
     );
@@ -86,7 +122,7 @@ function SetPasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="text-xs font-semibold text-slate-600 block mb-1">
+        <label className="text-xs font-semibold text-slate-400 block mb-1">
           Nytt lösenord
         </label>
         <input
@@ -96,12 +132,15 @@ function SetPasswordForm() {
           placeholder="Minst 6 tecken"
           required
           minLength={6}
-          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
+          className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-orange-400"
         />
+        {password.length > 0 && password.length < 6 && (
+          <p className="mt-1 text-xs text-amber-400">Minst 6 tecken krävs.</p>
+        )}
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-600 block mb-1">
+        <label className="text-xs font-semibold text-slate-400 block mb-1">
           Bekräfta lösenord
         </label>
         <input
@@ -110,34 +149,23 @@ function SetPasswordForm() {
           onChange={(e) => setConfirm(e.target.value)}
           placeholder="Skriv lösenordet igen"
           required
-          className={`w-full px-3 py-2 text-sm border rounded-xl focus:outline-none focus:ring-2 transition-colors ${
+          className={`w-full px-3 py-2 text-sm bg-slate-700 border text-slate-100 placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 transition-colors ${
             passwordsMatch
-              ? "border-emerald-400 focus:ring-emerald-300"
+              ? "border-emerald-500 focus:ring-emerald-400"
               : passwordsMismatch
-              ? "border-red-400 focus:ring-red-300"
-              : "border-slate-200 focus:ring-orange-300 focus:border-orange-400"
+              ? "border-red-500 focus:ring-red-400"
+              : "border-slate-600 focus:ring-orange-400"
           }`}
         />
-        {/* Real-time match indicator */}
         {confirm.length > 0 && (
-          <p
-            className={`mt-1 text-xs font-semibold ${
-              passwordsMatch ? "text-emerald-600" : "text-red-500"
-            }`}
-          >
+          <p className={`mt-1 text-xs font-semibold ${passwordsMatch ? "text-emerald-400" : "text-red-400"}`}>
             {passwordsMatch ? "✓ Matchar" : "✗ Matchar inte"}
           </p>
         )}
       </div>
 
-      {password.length > 0 && password.length < 6 && (
-        <p className="text-xs text-amber-600">
-          Lösenordet måste vara minst 6 tecken.
-        </p>
-      )}
-
       {error && (
-        <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
+        <p className="text-red-400 text-sm bg-red-900/30 border border-red-700/40 px-3 py-2 rounded-xl">
           {error}
         </p>
       )}
@@ -145,7 +173,7 @@ function SetPasswordForm() {
       <button
         type="submit"
         disabled={busy || !canSubmit}
-        className="w-full px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors"
+        className="w-full px-4 py-2.5 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors"
       >
         {busy ? "Sparar…" : "Sätt lösenord"}
       </button>
