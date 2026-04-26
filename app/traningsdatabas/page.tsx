@@ -242,7 +242,7 @@ export default function TraningsdatabasPage() {
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight">
             Träningsdatabas<br className="hidden sm:block" /> – {sport.name}
           </h1>
-          <p className="text-slate-300 text-lg max-w-xl mx-auto leading-relaxed">
+          <p className="text-slate-600 dark:text-slate-300 text-lg max-w-xl mx-auto leading-relaxed">
             Välj säsongsår, filtrera med Smart-Tagging, skapa egna övningar eller
             bygg din egna årsplanering.
           </p>
@@ -251,12 +251,12 @@ export default function TraningsdatabasPage() {
               <span className="text-2xl font-bold text-white">3</span>
               <span>årsplaner</span>
             </div>
-            <div className="w-px bg-slate-700" />
+            <div className="w-px bg-gray-300 dark:bg-slate-700" />
             <div className="flex flex-col items-center gap-1">
               <span className="text-2xl font-bold text-white">36</span>
               <span>pass / år</span>
             </div>
-            <div className="w-px bg-slate-700" />
+            <div className="w-px bg-gray-300 dark:bg-slate-700" />
             <div className="flex flex-col items-center gap-1">
               <span className="text-2xl font-bold text-white">{allExercises.length}</span>
               <span>övningar totalt</span>
@@ -272,7 +272,7 @@ export default function TraningsdatabasPage() {
             {canEdit && (
               <button
                 onClick={() => setShowAddExercise(true)}
-                className="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors border border-slate-600"
+                className="inline-flex items-center gap-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors border border-gray-200 dark:border-slate-600"
               >
                 ➕ Skapa egen övning
               </button>
@@ -282,11 +282,11 @@ export default function TraningsdatabasPage() {
       </div>
 
       {/* ── Smart-Tagging övningsbank ── */}
-      <div className="mb-10 bg-slate-800 rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div className="mb-10 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl">🏷️</span>
           <div>
-            <h2 className="text-lg font-bold text-slate-100">Övningsbank – Smart-Tagging</h2>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Övningsbank – Smart-Tagging</h2>
             <p className="text-sm text-slate-500">
               Filtrera {allExercises.length} övningar efter kategori eller sök på nyckelord.
             </p>
@@ -300,7 +300,7 @@ export default function TraningsdatabasPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Sök övning, t.ex. dribbling, skott eller kull…"
-            className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full px-4 py-2.5 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
         </div>
 
@@ -310,8 +310,8 @@ export default function TraningsdatabasPage() {
             onClick={() => setActiveTag(null)}
             className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all ${
               activeTag === null
-                ? "bg-slate-800 text-white"
-                : "bg-slate-700 text-slate-300 hover:bg-slate-200"
+                ? "bg-slate-800 dark:bg-slate-800 text-white"
+                : "bg-gray-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600"
             }`}
           >
             Alla ({allExercises.length})
@@ -350,15 +350,15 @@ export default function TraningsdatabasPage() {
                   return (
                     <div
                       key={key}
-                      className="border border-slate-200 rounded-xl overflow-hidden"
+                      className="border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden"
                     >
                       <button
-                        className="w-full text-left px-4 py-3 hover:bg-slate-700/30 transition-colors"
+                        className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors"
                         onClick={() => setExpandedActivity(isExpanded ? null : key)}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-slate-200 text-sm">{ex.name}</p>
+                            <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm">{ex.name}</p>
                             <p className="text-xs text-slate-400 mt-0.5">
                               {ex.source === "year"
                                 ? `År ${ex.planYear} · ${ex.sessionTitle}`
@@ -447,7 +447,7 @@ export default function TraningsdatabasPage() {
           <Link
             key={s.year}
             href={yearHref(s.year)}
-            className={`group block bg-slate-800 rounded-2xl border border-t-4 ${s.accentColor} border-slate-100 p-6 shadow-sm hover:shadow-md transition-shadow`}
+            className={`group block bg-white dark:bg-slate-800 rounded-2xl border border-t-4 ${s.accentColor} border-gray-200 dark:border-slate-700 p-6 shadow-sm hover:shadow-md transition-shadow`}
           >
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">{s.icon}</span>
@@ -457,7 +457,7 @@ export default function TraningsdatabasPage() {
                 >
                   År {s.year}
                 </span>
-                <p className="text-sm font-semibold text-slate-300 mt-0.5">
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-300 mt-0.5">
                   {s.ageGroup}
                 </p>
               </div>
@@ -473,7 +473,7 @@ export default function TraningsdatabasPage() {
                   key={h}
                   className="flex items-center gap-2 text-sm text-slate-600"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-300 shrink-0" />
                   {h}
                 </li>
               ))}
@@ -492,8 +492,8 @@ export default function TraningsdatabasPage() {
       </div>
 
       {/* ── Info section ────────────────────────────────────── */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8">
-        <h2 className="text-xl font-bold text-slate-100 mb-6">
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8">
+        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-6">
           Schemalägg träningar direkt från planen
         </h2>
         <div className="grid sm:grid-cols-4 gap-6 text-sm text-slate-600">
@@ -502,7 +502,7 @@ export default function TraningsdatabasPage() {
               📚
             </div>
             <div>
-              <p className="font-semibold text-slate-200 mb-1">Välj årsplan</p>
+              <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">Välj årsplan</p>
               <p>Välj rätt år baserat på spelarnas åldersgrupp.</p>
             </div>
           </div>
@@ -511,7 +511,7 @@ export default function TraningsdatabasPage() {
               📅
             </div>
             <div>
-              <p className="font-semibold text-slate-200 mb-1">
+              <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">
                 Schemalägg säsongen
               </p>
               <p>
@@ -525,7 +525,7 @@ export default function TraningsdatabasPage() {
               🏷️
             </div>
             <div>
-              <p className="font-semibold text-slate-200 mb-1">Smart-Tagging</p>
+              <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">Smart-Tagging</p>
               <p>
                 Filtrera övningar efter kategori – försvar, skytte, kondition och
                 mer. Hitta rätt övning snabbt.
@@ -537,7 +537,7 @@ export default function TraningsdatabasPage() {
               📋
             </div>
             <div>
-              <p className="font-semibold text-slate-200 mb-1">Egna årsplaneringar</p>
+              <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">Egna årsplaneringar</p>
               <p>
                 Bygg en skräddarsydd plan med övningar du väljer ur databasen.
               </p>
@@ -549,7 +549,7 @@ export default function TraningsdatabasPage() {
       {/* ── Create Custom Exercise Modal ─────────────────────── */}
       {showAddExercise && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h2 className="text-lg font-bold text-white mb-5">Skapa egen övning</h2>
             <div className="space-y-4">
               <div>
@@ -561,7 +561,7 @@ export default function TraningsdatabasPage() {
                   value={newExName}
                   onChange={(e) => setNewExName(e.target.value)}
                   placeholder="T.ex. Rörelselekar med boll"
-                  className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
               <div>
@@ -573,7 +573,7 @@ export default function TraningsdatabasPage() {
                   onChange={(e) => setNewExDesc(e.target.value)}
                   placeholder="Beskriv hur övningen genomförs…"
                   rows={3}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
                 />
               </div>
               <div>
@@ -585,7 +585,7 @@ export default function TraningsdatabasPage() {
                   onChange={(e) => setNewExTips(e.target.value)}
                   placeholder="Valfria tips till tränaren…"
                   rows={2}
-                  className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -600,7 +600,7 @@ export default function TraningsdatabasPage() {
                     placeholder="T.ex. 10"
                     min={1}
                     max={120}
-                    className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                   />
                 </div>
                 <div>
@@ -614,7 +614,7 @@ export default function TraningsdatabasPage() {
                         e.target.value === "" ? "" : (Number(e.target.value) as 1 | 2 | 3)
                       )
                     }
-                    className="w-full px-3 py-2.5 text-sm bg-slate-700 text-white border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-3 py-2.5 text-sm bg-white dark:bg-slate-700 text-slate-800 dark:text-white border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
                   >
                     <option value="">Välj…</option>
                     <option value={1}>🔥 Låg (1)</option>
@@ -627,7 +627,7 @@ export default function TraningsdatabasPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={resetExerciseForm}
-                className="flex-1 py-2.5 text-sm font-semibold text-slate-400 border border-slate-600 rounded-xl hover:bg-slate-700 transition-colors"
+                className="flex-1 py-2.5 text-sm font-semibold text-slate-500 dark:text-slate-400 border border-gray-300 dark:border-slate-600 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
               >
                 Avbryt
               </button>

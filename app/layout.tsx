@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { ClientLayoutWrapper } from "./ClientLayoutWrapper";
 
 export const metadata: Metadata = {
@@ -26,9 +27,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="sv">
-      <body className="antialiased bg-[#0f172a] text-slate-100">
+      <head>
+        {/* Set theme class before React hydrates to prevent flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.classList.toggle('dark',t==='dark');})();`,
+          }}
+        />
+      </head>
+      <body className="antialiased">
         <AuthProvider>
-          <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+          <ThemeProvider>
+            <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+          </ThemeProvider>
         </AuthProvider>
 
         {/*

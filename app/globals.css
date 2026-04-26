@@ -1,10 +1,18 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #0f172a;
-  --foreground: #f1f5f9;
+  --background: #f8fafc;
+  --foreground: #0f172a;
   --accent: #38bdf8;
   --accent-glow: rgba(56, 189, 248, 0.15);
+}
+
+:root.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
 }
 
 @theme inline {
@@ -23,12 +31,20 @@ body {
   min-width: 320px;
 }
 
-/* Ensure form controls always have readable text on white/light backgrounds */
+/* Light mode: readable inputs */
 input,
 select,
 textarea {
   background-color: #ffffff;
   color: #0f172a;
+}
+
+/* Dark mode: dark inputs */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #334155;
+  color: #f1f5f9;
 }
 
 input::placeholder,

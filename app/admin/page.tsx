@@ -474,7 +474,7 @@ export default function AdminPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <span className="text-3xl">🏛</span>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
             {user.clubName ?? "Föreningsadmin"}
           </h1>
         </div>
@@ -487,8 +487,8 @@ export default function AdminPage() {
 
       {/* Club logo – only the root admin can manage club-level settings */}
       {isRootAdmin && (
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
-        <h2 className="font-bold text-slate-100 mb-1">Klubblogga</h2>
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">Klubblogga</h2>
         <p className="text-slate-500 text-sm mb-4">
           Ladda upp din förenings logga. Den visas i navigeringsmenyn för alla
           coacher, spelare och föräldrar i {user.clubName ?? "din förening"}.
@@ -548,7 +548,7 @@ export default function AdminPage() {
               />
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-200 truncate">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">
                 {selectedLogoFile.name}
               </p>
               <p className="text-xs text-slate-500">
@@ -629,12 +629,12 @@ export default function AdminPage() {
 
       {/* Club website URL – only root admin */}
       {isRootAdmin && (
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
-        <h2 className="font-bold text-slate-100 mb-1">Föreningens webbplats</h2>
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">Föreningens webbplats</h2>
         <p className="text-slate-500 text-sm mb-4">
           Ange din förenings webbplats så att alla i{" "}
-          <strong className="text-slate-300">{user.clubName ?? "föreningen"}</strong> kan se
-          nyheter direkt i appen via menyn <strong className="text-slate-300">Nyheter</strong>.
+          <strong className="text-slate-600 dark:text-slate-300">{user.clubName ?? "föreningen"}</strong> kan se
+          nyheter direkt i appen via menyn <strong className="text-slate-600 dark:text-slate-300">Nyheter</strong>.
         </p>
         {user.clubWebsiteUrl && (
           <p className="text-sm text-slate-400 mb-3">
@@ -656,7 +656,7 @@ export default function AdminPage() {
             placeholder="https://www.dinförening.se"
             value={websiteUrlInput}
             onChange={(e) => setWebsiteUrlInput(e.target.value)}
-            className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-slate-600 bg-slate-700 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-slate-400"
+            className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 placeholder:text-slate-400"
             disabled={websiteUrlSaving}
           />
           <button
@@ -664,7 +664,7 @@ export default function AdminPage() {
             disabled={websiteUrlSaving || !websiteUrlInput.trim()}
             className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
               websiteUrlSaving || !websiteUrlInput.trim()
-                ? "bg-slate-600 text-slate-400 cursor-not-allowed"
+                ? "bg-gray-200 dark:bg-slate-600 text-slate-400 cursor-not-allowed"
                 : "bg-orange-500 hover:bg-orange-600 text-white"
             }`}
           >
@@ -686,8 +686,8 @@ export default function AdminPage() {
 
       {/* Coach invite code – only root admin */}
       {isRootAdmin && (
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
-        <h2 className="font-bold text-slate-100 mb-1">
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">
           Inbjudningskod för coacher
         </h2>
         <p className="text-slate-500 text-sm mb-4">
@@ -730,8 +730,8 @@ export default function AdminPage() {
       )} {/* end isRootAdmin – coach invite code */}
 
       {/* Create new team */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mb-6">
-        <h2 className="font-bold text-slate-100 mb-1">Skapa nytt lag</h2>
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mb-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">Skapa nytt lag</h2>
         <p className="text-slate-500 text-sm mb-4">
           {isRootAdmin
             ? "Som admin kan du skapa lag direkt. Bjud sedan in en coach med coach-inbjudningskoden ovan, eller dela lagkoderna nedan med spelare och föräldrar."
@@ -744,7 +744,7 @@ export default function AdminPage() {
             onChange={(e) => setNewTeamName(e.target.value)}
             placeholder="Lagets namn, t.ex. Röda Laget U9"
             required
-            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
           {createTeamError && (
             <p className="text-red-600 text-sm bg-red-900/30 px-3 py-2 rounded-xl">
@@ -762,8 +762,8 @@ export default function AdminPage() {
       </div>
 
       {/* All teams in this club */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6">
-        <h2 className="font-bold text-slate-100 mb-4">
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-4">
           Lag i {user.clubName ?? "föreningen"} ({teams?.length ?? 0})
         </h2>
 
@@ -779,12 +779,12 @@ export default function AdminPage() {
               return (
                 <li
                   key={team.id}
-                  className="border border-slate-100 rounded-xl p-4"
+                  className="border border-gray-200 dark:border-slate-700 rounded-xl p-4"
                 >
                   {/* Team header */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
-                      <p className="font-bold text-slate-100">{team.name}</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-100">{team.name}</p>
                       {team.age_group && (
                         <span className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full">
                           {team.age_group}
@@ -802,7 +802,7 @@ export default function AdminPage() {
                       {team.members.map((m) => (
                         <li key={m.id} className="text-sm">
                           <div className="flex items-center gap-2 mb-1.5">
-                            <span className="font-medium text-slate-200 flex-1 min-w-0">
+                            <span className="font-medium text-slate-700 dark:text-slate-200 flex-1 min-w-0">
                               {m.name}
                               {m.roles.includes("parent") && m.child_name && (
                                 <span className="text-xs text-slate-400 ml-1">
@@ -906,8 +906,8 @@ export default function AdminPage() {
       </div>
 
       {/* Hall management */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
-        <h2 className="font-bold text-slate-100 mb-1">🏟 Hallar</h2>
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">🏟 Hallar</h2>
         <p className="text-slate-500 text-sm mb-4">
           Lägg till träningshallar som coacher kan välja när de schemalägger träningar.
         </p>
@@ -966,8 +966,8 @@ export default function AdminPage() {
       </div>
 
       {/* Training-free periods */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
-        <h2 className="font-bold text-slate-100 mb-1">🚫 Träningsfria perioder</h2>
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">🚫 Träningsfria perioder</h2>
         <p className="text-slate-500 text-sm mb-4">
           Lägg till perioder då det inte är träning (t.ex. höstlov, jullov). Träningar skapas inte
           automatiskt på dessa datum när du schemalägger återkommande pass.
@@ -980,7 +980,7 @@ export default function AdminPage() {
             onChange={(e) => setNewPeriodName(e.target.value)}
             placeholder="Periodens namn, t.ex. Jullov"
             required
-            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
           <div className="flex gap-2">
             <div className="flex-1">
@@ -990,7 +990,7 @@ export default function AdminPage() {
                 value={newPeriodStart}
                 onChange={(e) => setNewPeriodStart(e.target.value)}
                 required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
             <div className="flex-1">
@@ -1001,7 +1001,7 @@ export default function AdminPage() {
                 min={newPeriodStart}
                 onChange={(e) => setNewPeriodEnd(e.target.value)}
                 required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
           </div>
@@ -1044,8 +1044,8 @@ export default function AdminPage() {
       </div>
 
       {/* Invite user by email */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
-        <h2 className="font-bold text-slate-100 mb-1">✉️ Bjud in användare via e-post</h2>
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">✉️ Bjud in användare via e-post</h2>
         <p className="text-slate-500 text-sm mb-4">
           Skapa ett konto för en ny användare direkt. Personen får ett mail med en länk för att
           sätta sitt eget lösenord.
@@ -1060,7 +1060,7 @@ export default function AdminPage() {
                 onChange={(e) => setInviteName(e.target.value)}
                 placeholder="Personens namn"
                 required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
             <div className="flex-1">
@@ -1071,7 +1071,7 @@ export default function AdminPage() {
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="epost@exempel.se"
                 required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
           </div>
@@ -1121,8 +1121,8 @@ export default function AdminPage() {
       </div>
 
       {/* User register – all members across all teams */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-6">
-        <h2 className="font-bold text-slate-100 mb-1">👥 Användarregister</h2>
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mt-6">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">👥 Användarregister</h2>
         <p className="text-slate-500 text-sm mb-4">
           Alla medlemmar i {user.clubName ?? "föreningen"} – du kan redigera deras grupptillhörighet och roller direkt här.
         </p>

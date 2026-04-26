@@ -153,7 +153,7 @@ export default function BetalningarPage() {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <span className="text-3xl">💰</span>
-            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">Betalningar</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Betalningar</h1>
           </div>
           <p className="text-slate-500 text-sm">Spåra avgifter och betalningsstatus per spelare.</p>
         </div>
@@ -167,20 +167,20 @@ export default function BetalningarPage() {
 
       {/* ── Add category form ── */}
       {showAddCategory && canEdit && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 mb-5">
-          <h2 className="font-bold text-slate-100 mb-3">Lägg till avgiftstyp</h2>
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 mb-5">
+          <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Lägg till avgiftstyp</h2>
           <div className="grid grid-cols-2 gap-2 mb-2">
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Namn <span className="text-red-400">*</span></label>
               <input autoFocus value={catName} onChange={(e) => setCatName(e.target.value)}
                 placeholder="T.ex. Träningsavgift 2025"
-                className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Belopp (kr)</label>
               <input type="number" value={catAmount} onChange={(e) => setCatAmount(e.target.value)}
                 placeholder="T.ex. 1500" min="0"
-                className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 mb-3">
@@ -188,13 +188,13 @@ export default function BetalningarPage() {
               <label className="text-xs font-semibold text-slate-400 block mb-1">Säsong</label>
               <input value={catSeason} onChange={(e) => setCatSeason(e.target.value)}
                 placeholder="2025"
-                className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Info (valfri)</label>
               <input value={catNote} onChange={(e) => setCatNote(e.target.value)}
                 placeholder="T.ex. Betalas senast 1 feb"
-                className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
           </div>
           <div className="flex gap-2">
@@ -203,7 +203,7 @@ export default function BetalningarPage() {
               {addingCat ? "Skapar…" : "Skapa avgift"}
             </button>
             <button onClick={() => setShowAddCategory(false)}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+              className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
               Avbryt
             </button>
           </div>
@@ -211,7 +211,7 @@ export default function BetalningarPage() {
       )}
 
       {categories.length === 0 ? (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-12 text-center">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-12 text-center">
           <p className="text-4xl mb-3">💰</p>
           <p className="text-slate-500 text-sm">
             {canEdit ? "Inga avgifter skapade ännu. Klicka \"+ Ny avgift\" för att börja." : "Inga avgifter registrerade."}
@@ -230,7 +230,7 @@ export default function BetalningarPage() {
                   className={`w-full text-left px-3 py-3 rounded-xl transition-all ${
                     activeCategoryId === cat.id
                       ? "bg-orange-500/20 border border-orange-500/40 text-orange-300"
-                      : "bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700"
+                      : "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700"
                   }`}>
                   <p className="text-sm font-semibold truncate">{cat.name}</p>
                   <p className="text-xs opacity-70 mt-0.5">{cat.season} · {paid}/{players.length} betalda</p>
@@ -246,10 +246,10 @@ export default function BetalningarPage() {
           {activeCategory && (
             <div className="flex-1 min-w-0">
               {/* Category header */}
-              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 mb-4">
+              <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 mb-4">
                 <div className="flex items-start justify-between flex-wrap gap-2">
                   <div>
-                    <h2 className="font-bold text-slate-100 text-lg">{activeCategory.name}</h2>
+                    <h2 className="font-bold text-slate-800 dark:text-slate-100 text-lg">{activeCategory.name}</h2>
                     {activeCategory.note && <p className="text-xs text-slate-400 mt-0.5">{activeCategory.note}</p>}
                   </div>
                   {canEdit && (
@@ -269,7 +269,7 @@ export default function BetalningarPage() {
                       </span>
                     )}
                   </div>
-                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-emerald-500 rounded-full transition-all"
                       style={{ width: players.length > 0 ? `${(paidCount / players.length) * 100}%` : "0%" }}
@@ -295,12 +295,12 @@ export default function BetalningarPage() {
                     return (
                       <div key={player.id}
                         className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
-                          isPaid ? "bg-emerald-900/20 border-emerald-700/30" : "bg-slate-800 border-slate-700"
+                          isPaid ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-700/30" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"
                         }`}>
-                        <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-700 flex items-center justify-center shrink-0">
                           <span className="text-xs font-bold text-slate-400">#{player.number}</span>
                         </div>
-                        <span className={`flex-1 text-sm font-medium ${isPaid ? "text-slate-200" : "text-slate-300"}`}>
+                        <span className={`flex-1 text-sm font-medium ${isPaid ? "text-slate-600 dark:text-slate-200" : "text-slate-600 dark:text-slate-300"}`}>
                           {player.name}
                         </span>
                         {isPaid && payment?.paidAt && (
@@ -314,14 +314,14 @@ export default function BetalningarPage() {
                             className={`shrink-0 px-3 py-1 text-xs font-bold rounded-lg transition-all ${
                               isPaid
                                 ? "bg-emerald-900/50 text-emerald-400 hover:bg-red-900/40 hover:text-red-400"
-                                : "bg-slate-700 text-slate-400 hover:bg-emerald-900/40 hover:text-emerald-400"
+                                : "bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/40 hover:text-emerald-600 dark:hover:text-emerald-400"
                             }`}
                           >
                             {isPaid ? "✓ Betald" : "Ej betald"}
                           </button>
                         ) : (
                           <span className={`shrink-0 px-3 py-1 text-xs font-bold rounded-lg ${
-                            isPaid ? "bg-emerald-900/40 text-emerald-400" : "bg-slate-700 text-slate-500"
+                            isPaid ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400" : "bg-gray-100 dark:bg-slate-700 text-slate-500"
                           }`}>
                             {isPaid ? "✓ Betald" : "Ej betald"}
                           </span>

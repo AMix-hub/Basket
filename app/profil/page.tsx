@@ -67,7 +67,7 @@ function InfoRow({ label, value }: { label: string; value?: string }) {
   return (
     <div className="flex items-start gap-3 py-2 border-b border-white/5 last:border-0">
       <span className="text-xs font-semibold text-slate-500 w-28 shrink-0 pt-0.5">{label}</span>
-      <span className="text-sm text-slate-200 flex-1 break-words">{value}</span>
+      <span className="text-sm text-slate-700 dark:text-slate-200 flex-1 break-words">{value}</span>
     </div>
   );
 }
@@ -78,7 +78,7 @@ function CopyButton({ value }: { value: string }) {
   return (
     <button
       onClick={() => { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      className="text-xs px-2 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded-lg transition-colors ml-2"
+      className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 rounded-lg transition-colors ml-2"
     >
       {copied ? "✓" : "Kopiera"}
     </button>
@@ -304,7 +304,7 @@ export default function ProfilPage() {
             </span>
           ))}
           {teams.length > 0 && (
-            <span className="px-3 py-0.5 text-xs font-medium rounded-full bg-slate-700 text-slate-400">
+            <span className="px-3 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
               {teams.map((t) => t.name).join(", ")}
             </span>
           )}
@@ -312,7 +312,7 @@ export default function ProfilPage() {
 
         {/* Bio (read view) */}
         {!editing && user.bio && (
-          <p className="text-sm text-slate-300 italic border-t border-white/10 pt-3">&ldquo;{user.bio}&rdquo;</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300 italic border-t border-black/10 dark:border-white/10 pt-3">&ldquo;{user.bio}&rdquo;</p>
         )}
 
         {/* Quick stats row */}
@@ -323,7 +323,7 @@ export default function ProfilPage() {
               <p className="text-xs text-slate-500">Närvaro</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-extrabold text-slate-200">{attendance?.present ?? 0}</p>
+              <p className="text-2xl font-extrabold text-slate-700 dark:text-slate-200">{attendance?.present ?? 0}</p>
               <p className="text-xs text-slate-500">Pass</p>
             </div>
             <div className="text-center">
@@ -339,7 +339,7 @@ export default function ProfilPage() {
         <div className="flex items-center justify-between mb-4">
           <SectionHeading>Personuppgifter</SectionHeading>
           {!editing && (
-            <button onClick={openEdit} className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+            <button onClick={openEdit} className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors">
               ✏️ Redigera
             </button>
           )}
@@ -350,19 +350,19 @@ export default function ProfilPage() {
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Namn <span className="text-red-400">*</span></label>
               <input autoFocus value={draft.name} onChange={(e) => setDraft((p) => ({ ...p, name: e.target.value }))}
-                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Telefon</label>
               <input type="tel" value={draft.phone} onChange={(e) => setDraft((p) => ({ ...p, phone: e.target.value }))}
                 placeholder="T.ex. 070-123 45 67"
-                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             {(isPlayer || isCoach) && (
               <div>
                 <label className="text-xs font-semibold text-slate-400 block mb-1">Position</label>
                 <select value={draft.position} onChange={(e) => setDraft((p) => ({ ...p, position: e.target.value }))}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-orange-400">
+                  className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-orange-400">
                   <option value="">Välj position</option>
                   {BASKETBALL_POSITIONS.map((pos) => (
                     <option key={pos} value={pos}>{pos}</option>
@@ -375,7 +375,7 @@ export default function ProfilPage() {
                 <label className="text-xs font-semibold text-slate-400 block mb-1">Barnets namn</label>
                 <input value={draft.childName} onChange={(e) => setDraft((p) => ({ ...p, childName: e.target.value }))}
                   placeholder="T.ex. Erik Svensson"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                  className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
                 <p className="text-xs text-slate-500 mt-1">Måste matcha spelarnamnet som coachen lagt in.</p>
               </div>
             )}
@@ -383,7 +383,7 @@ export default function ProfilPage() {
               <label className="text-xs font-semibold text-slate-400 block mb-1">Bio / Om mig</label>
               <textarea value={draft.bio} onChange={(e) => setDraft((p) => ({ ...p, bio: e.target.value }))}
                 rows={3} placeholder="Berätta lite om dig själv…"
-                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none" />
+                className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none" />
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={savePersonalInfo} disabled={saving || !draft.name.trim()}
@@ -391,7 +391,7 @@ export default function ProfilPage() {
                 {saving ? "Sparar…" : "Spara"}
               </button>
               <button onClick={() => setEditing(false)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
                 Avbryt
               </button>
             </div>
@@ -420,13 +420,13 @@ export default function ProfilPage() {
               <label className="text-xs font-semibold text-slate-400 block mb-1">Nytt lösenord</label>
               <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Minst 6 tecken"
-                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Bekräfta lösenord</label>
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Upprepa lösenordet"
-                className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
                 onKeyDown={(e) => e.key === "Enter" && savePassword()} />
             </div>
             {passwordError && <p className="text-xs text-red-400 bg-red-900/20 rounded-lg px-3 py-2">{passwordError}</p>}
@@ -436,14 +436,14 @@ export default function ProfilPage() {
                 {savingPassword ? "Sparar…" : "Byt lösenord"}
               </button>
               <button onClick={() => { setShowPasswordForm(false); setNewPassword(""); setConfirmPassword(""); setPasswordError(""); }}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
                 Avbryt
               </button>
             </div>
           </div>
         ) : (
           <button onClick={() => setShowPasswordForm(true)}
-            className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+            className="w-full py-2.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
             🔑 Byt lösenord
           </button>
         )}
@@ -455,7 +455,7 @@ export default function ProfilPage() {
           <SectionHeading>Inbjudningskoder</SectionHeading>
           <div className="space-y-3">
             {teams.map((team) => (
-              <div key={team.id} className="rounded-xl bg-slate-700/40 p-3">
+              <div key={team.id} className="rounded-xl bg-gray-50 dark:bg-slate-700/40 p-3">
                 <p className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wide">{team.name}</p>
                 <div className="space-y-1.5">
                   {[
@@ -484,7 +484,7 @@ export default function ProfilPage() {
           <SectionHeading>Föreningsinställningar</SectionHeading>
           <p className="text-xs text-slate-500 mb-3">Hantera logotyp, webbplats och lag i adminpanelen.</p>
           <Link href="/admin"
-            className="block w-full py-2.5 text-center bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+            className="block w-full py-2.5 text-center bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
             🏛 Öppna adminpanel
           </Link>
         </Card>
@@ -499,12 +499,12 @@ export default function ProfilPage() {
               const isMatch = s.type === "match";
               return (
                 <Link key={s.id} href={`/session/${s.id}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-700/40 hover:bg-slate-700 transition-colors">
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-slate-700/40 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
                   <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 ${isMatch ? "bg-red-900/50 text-red-300" : "bg-emerald-900/50 text-emerald-300"}`}>
                     {isMatch ? "🏀" : "🏋"}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-200 truncate">{s.title}</p>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{s.title}</p>
                     <p className="text-xs text-slate-500">{formatDate(s.date)}{s.time ? ` · ${s.time}` : ""}</p>
                   </div>
                   <span className="text-slate-500 text-xs shrink-0">↗</span>
@@ -541,7 +541,7 @@ export default function ProfilPage() {
           </button>
         )}
         {notifMessage && (
-          <p className="text-sm text-slate-400 bg-slate-700/40 rounded-xl px-4 py-2.5 mt-2">{notifMessage}</p>
+          <p className="text-sm text-slate-400 bg-gray-50 dark:bg-slate-700/40 rounded-xl px-4 py-2.5 mt-2">{notifMessage}</p>
         )}
         <p className="text-xs text-slate-600 mt-3">
           iOS: installera appen på hemskärmen via Safari → Dela → Lägg till på hemskärmen.

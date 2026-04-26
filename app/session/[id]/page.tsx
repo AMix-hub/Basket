@@ -69,15 +69,15 @@ function formatDate(dateStr: string) {
 }
 
 const RSVP_CONFIG = {
-  coming:     { label: "Kommer",       color: "bg-emerald-900/40 text-emerald-300", dot: "bg-emerald-400" },
-  not_coming: { label: "Kommer inte",  color: "bg-red-900/40 text-red-300",         dot: "bg-red-400" },
-  maybe:      { label: "Kanske",       color: "bg-amber-900/40 text-amber-300",     dot: "bg-amber-400" },
+  coming:     { label: "Kommer",       color: "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500 dark:bg-emerald-400" },
+  not_coming: { label: "Kommer inte",  color: "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",               dot: "bg-red-500 dark:bg-red-400" },
+  maybe:      { label: "Kanske",       color: "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",       dot: "bg-amber-500 dark:bg-amber-400" },
 };
 
 const ATTENDANCE_CONFIG = {
-  present: { label: "Närvarande", icon: "✓", active: "bg-emerald-900/50 text-emerald-300 ring-1 ring-emerald-500/50" },
-  absent:  { label: "Frånvar.",   icon: "✗", active: "bg-red-900/50 text-red-300 ring-1 ring-red-500/50" },
-  sick:    { label: "Sjuk",       icon: "🤒", active: "bg-amber-900/50 text-amber-300 ring-1 ring-amber-500/50" },
+  present: { label: "Närvarande", icon: "✓", active: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-500/50" },
+  absent:  { label: "Frånvar.",   icon: "✗", active: "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 ring-1 ring-red-500/50" },
+  sick:    { label: "Sjuk",       icon: "🤒", active: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 ring-1 ring-amber-500/50" },
 };
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -538,26 +538,26 @@ export default function SessionDetailPage() {
 
       {/* ── Back ── */}
       <div>
-        <button onClick={() => router.back()} className="text-sm text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1">
+        <button onClick={() => router.back()} className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors flex items-center gap-1">
           ← Tillbaka
         </button>
       </div>
 
       {/* ── Header ── */}
-      <div className={`rounded-2xl p-5 border ${isMatch ? "bg-red-900/20 border-red-800/40" : "bg-slate-800 border-slate-700"}`}>
+      <div className={`rounded-2xl p-5 border ${isMatch ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40" : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700"}`}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${isMatch ? "bg-red-800/60 text-red-300" : "bg-emerald-900/50 text-emerald-300"}`}>
+              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${isMatch ? "bg-red-100 dark:bg-red-800/60 text-red-700 dark:text-red-300" : "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"}`}>
                 {isMatch ? "Match" : "Träning"}
               </span>
               {session.hallName && (
-                <span className="text-xs text-slate-500">📍 {session.hallName}</span>
+                <span className="text-xs text-slate-400 dark:text-slate-500">📍 {session.hallName}</span>
               )}
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">{session.title}</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">{session.title}</h1>
             {isMatch && session.opponent && (
-              <p className="text-sm text-red-300 mt-1">
+              <p className="text-sm text-red-600 dark:text-red-300 mt-1">
                 {session.homeOrAway === "home" ? "🏠 Hemma" : "✈️ Borta"} mot {session.opponent}
               </p>
             )}
@@ -570,7 +570,7 @@ export default function SessionDetailPage() {
                       value={resultDraft}
                       onChange={(e) => setResultDraft(e.target.value)}
                       placeholder="T.ex. 78-65"
-                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-1 text-sm text-slate-100 w-28 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1 text-sm text-slate-800 dark:text-slate-100 w-28 focus:outline-none focus:ring-1 focus:ring-orange-400"
                       onKeyDown={(e) => { if (e.key === "Enter") saveResult(); if (e.key === "Escape") setEditingResult(false); }}
                     />
                     <button onClick={saveResult} disabled={savingResult} className="text-xs px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors">
@@ -588,14 +588,14 @@ export default function SessionDetailPage() {
                 ) : canEdit ? (
                   <button
                     onClick={() => { setResultDraft(""); setEditingResult(true); }}
-                    className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded-lg transition-colors"
+                    className="text-xs px-3 py-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 rounded-lg transition-colors"
                   >
                     + Lägg till resultat
                   </button>
                 ) : null}
               </div>
             )}
-            <div className="flex flex-wrap gap-3 mt-2 text-sm text-slate-400">
+            <div className="flex flex-wrap gap-3 mt-2 text-sm text-slate-500 dark:text-slate-400">
               <span>📅 {formatDate(session.date)}</span>
               {session.time && <span>🕐 {session.time}{session.endTime ? `–${session.endTime}` : ""}</span>}
               {session.coachName && <span>👤 {session.coachName}</span>}
@@ -605,13 +605,13 @@ export default function SessionDetailPage() {
           <div className="flex flex-col gap-2 shrink-0">
             <Link
               href={`/taktik`}
-              className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors"
+              className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors"
             >
               🎯 Taktiktavla
             </Link>
             <Link
               href="/kalender"
-              className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors"
+              className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors"
             >
               📅 Kalender
             </Link>
@@ -620,13 +620,13 @@ export default function SessionDetailPage() {
       </div>
 
       {/* ── Theme / Focus / Material / Notes ── */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold text-slate-100">Träningsinformation</h2>
+          <h2 className="font-bold text-slate-800 dark:text-slate-100">Träningsinformation</h2>
           {canEdit && !editingMeta && (
             <button
               onClick={() => { setMetaDraft({ theme: session.theme, focusArea: session.focusArea, material: session.material, reflection: session.reflection }); setEditingMeta(true); }}
-              className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded-lg transition-colors"
+              className="text-xs px-3 py-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 rounded-lg transition-colors"
             >
               ✏️ Redigera
             </button>
@@ -636,34 +636,34 @@ export default function SessionDetailPage() {
         {editingMeta ? (
           <div className="flex flex-col gap-3">
             <div>
-              <label className="text-xs font-semibold text-slate-400 block mb-1">Tema</label>
+              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Tema</label>
               <input value={metaDraft.theme} onChange={(e) => setMetaDraft((p) => ({ ...p, theme: e.target.value }))}
                 placeholder="T.ex. Passningsspel och rörelse"
-                className="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 block mb-1">Fokusområde</label>
+              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Fokusområde</label>
               <input value={metaDraft.focusArea} onChange={(e) => setMetaDraft((p) => ({ ...p, focusArea: e.target.value }))}
                 placeholder="T.ex. Kommunikation och timing"
-                className="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 block mb-1">Material som behövs</label>
+              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Material som behövs</label>
               <input value={metaDraft.material} onChange={(e) => setMetaDraft((p) => ({ ...p, material: e.target.value }))}
                 placeholder="T.ex. 12 bollar, 8 koner, västar"
-                className="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-400 block mb-1">{isPast ? "Reflektion efter passet" : "Anteckningar"}</label>
+              <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">{isPast ? "Reflektion efter passet" : "Anteckningar"}</label>
               <textarea value={metaDraft.reflection} onChange={(e) => setMetaDraft((p) => ({ ...p, reflection: e.target.value }))}
                 rows={3} placeholder={isPast ? "Vad gick bra? Vad kan bli bättre?" : "Förberedelseanteckningar…"}
-                className="w-full bg-slate-900 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none" />
+                className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none" />
             </div>
             <div className="flex gap-2">
               <button onClick={saveMeta} disabled={savingMeta} className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors">
                 {savingMeta ? "Sparar…" : "Spara"}
               </button>
-              <button onClick={() => setEditingMeta(false)} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+              <button onClick={() => setEditingMeta(false)} className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
                 Avbryt
               </button>
             </div>
@@ -672,30 +672,30 @@ export default function SessionDetailPage() {
           <div className="space-y-3">
             {session.theme && (
               <div>
-                <p className="text-xs font-semibold text-slate-500 mb-0.5">TEMA</p>
-                <p className="text-sm text-slate-200">{session.theme}</p>
+                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-0.5">TEMA</p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">{session.theme}</p>
               </div>
             )}
             {session.focusArea && (
               <div>
-                <p className="text-xs font-semibold text-slate-500 mb-0.5">FOKUS</p>
-                <p className="text-sm text-slate-200">{session.focusArea}</p>
+                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-0.5">FOKUS</p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">{session.focusArea}</p>
               </div>
             )}
             {session.material && (
               <div>
-                <p className="text-xs font-semibold text-slate-500 mb-0.5">MATERIAL</p>
-                <p className="text-sm text-slate-200">{session.material}</p>
+                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-0.5">MATERIAL</p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">{session.material}</p>
               </div>
             )}
             {session.reflection && (
               <div>
-                <p className="text-xs font-semibold text-slate-500 mb-0.5">{isPast ? "REFLEKTION" : "ANTECKNINGAR"}</p>
+                <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-0.5">{isPast ? "REFLEKTION" : "ANTECKNINGAR"}</p>
                 <p className="text-sm text-slate-200 whitespace-pre-wrap">{session.reflection}</p>
               </div>
             )}
             {!session.theme && !session.focusArea && !session.material && !session.reflection && (
-              <p className="text-sm text-slate-500 italic">
+              <p className="text-sm text-slate-400 dark:text-slate-500 italic">
                 {canEdit ? "Klicka Redigera för att lägga till tema, material och anteckningar." : "Ingen information tillagd ännu."}
               </p>
             )}
@@ -705,12 +705,12 @@ export default function SessionDetailPage() {
 
       {/* ── Training plan ── */}
       {!isMatch && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-bold text-slate-100">Träningsplan</h2>
+              <h2 className="font-bold text-slate-800 dark:text-slate-100">Träningsplan</h2>
               {totalDuration > 0 && (
-                <p className="text-xs text-slate-500 mt-0.5">Totalt {totalDuration} min</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Totalt {totalDuration} min</p>
               )}
             </div>
             {canEdit && (
@@ -721,16 +721,16 @@ export default function SessionDetailPage() {
                 </button>
                 {planItems.length > 0 && (
                   <button onClick={() => { setNewTemplateName(""); setShowSaveTemplateModal(true); }}
-                    className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+                    className="text-xs px-2.5 py-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors">
                     💾 Mall
                   </button>
                 )}
                 <button onClick={openTemplateModal}
-                  className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+                  className="text-xs px-2.5 py-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors">
                   📁 Från mall
                 </button>
                 <button onClick={openCopyModal}
-                  className="text-xs px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+                  className="text-xs px-2.5 py-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors">
                   📋 Kopiera
                 </button>
                 <button onClick={() => setAddingItem(!addingItem)}
@@ -743,14 +743,14 @@ export default function SessionDetailPage() {
 
           {/* Add item form */}
           {addingItem && (
-            <div className="bg-slate-900/60 rounded-xl p-3 mb-3 flex flex-col gap-2">
+            <div className="bg-gray-50 dark:bg-slate-900/60 rounded-xl p-3 mb-3 flex flex-col gap-2">
               <div className="flex gap-2">
                 <input
                   autoFocus
                   value={newItemTitle}
                   onChange={(e) => setNewItemTitle(e.target.value)}
                   placeholder="T.ex. Uppvärmning, Rondo, Matchspel…"
-                  className="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                  className="flex-1 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
                 />
                 <div className="flex items-center gap-1 shrink-0">
                   <input
@@ -758,16 +758,16 @@ export default function SessionDetailPage() {
                     value={newItemDuration}
                     onChange={(e) => setNewItemDuration(e.target.value)}
                     min="1" max="120"
-                    className="w-14 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-100 text-center focus:outline-none focus:ring-1 focus:ring-orange-400"
+                    className="w-14 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm text-slate-800 dark:text-slate-100 text-center focus:outline-none focus:ring-1 focus:ring-orange-400"
                   />
-                  <span className="text-xs text-slate-500">min</span>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">min</span>
                 </div>
               </div>
               <input
                 value={newItemDesc}
                 onChange={(e) => setNewItemDesc(e.target.value)}
                 placeholder="Beskrivning (valfritt)"
-                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                className="bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400"
               />
               {/* Exercise picker */}
               {teamExercises.length > 0 && (
@@ -779,13 +779,13 @@ export default function SessionDetailPage() {
                     📚 {showExercisePicker ? "Dölj övningsbank" : "Välj från övningsbank"}
                   </button>
                   {showExercisePicker && (
-                    <div className="mt-2 bg-slate-800 rounded-xl border border-slate-600 overflow-hidden">
+                    <div className="mt-2 bg-white dark:bg-slate-800 rounded-xl border border-gray-300 dark:border-slate-600 overflow-hidden">
                       <input
                         type="text"
                         value={exerciseSearch}
                         onChange={(e) => setExerciseSearch(e.target.value)}
                         placeholder="Sök övning…"
-                        className="w-full bg-slate-700 text-slate-200 text-xs px-3 py-2 border-b border-slate-600 focus:outline-none placeholder-slate-500"
+                        className="w-full bg-gray-50 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs px-3 py-2 border-b border-gray-200 dark:border-slate-600 focus:outline-none placeholder-slate-400 dark:placeholder-slate-500"
                       />
                       <div className="max-h-36 overflow-y-auto">
                         {teamExercises
@@ -799,7 +799,7 @@ export default function SessionDetailPage() {
                                 setShowExercisePicker(false);
                                 setExerciseSearch("");
                               }}
-                              className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                              className="w-full text-left px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors border-b border-gray-100 dark:border-slate-700/50 last:border-0"
                             >
                               <span className="font-medium">{ex.name}</span>
                               {ex.description && (
@@ -818,7 +818,7 @@ export default function SessionDetailPage() {
                   Lägg till
                 </button>
                 <button onClick={() => { setAddingItem(false); setShowExercisePicker(false); setExerciseSearch(""); }}
-                  className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-semibold rounded-lg transition-colors">
+                  className="px-4 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-lg transition-colors">
                   Avbryt
                 </button>
               </div>
@@ -826,23 +826,23 @@ export default function SessionDetailPage() {
           )}
 
           {planItems.length === 0 ? (
-            <p className="text-sm text-slate-500 italic">
+            <p className="text-sm text-slate-400 dark:text-slate-500 italic">
               {canEdit ? "Lägg till delmoment för att bygga träningsplanen." : "Ingen plan skapad ännu."}
             </p>
           ) : (
             <div className="space-y-2">
               {planItems.map((item, i) => (
-                <div key={item.id} className="flex items-start gap-3 bg-slate-900/40 rounded-xl px-3 py-2.5">
+                <div key={item.id} className="flex items-start gap-3 bg-gray-50 dark:bg-slate-900/40 rounded-xl px-3 py-2.5">
                   <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center shrink-0">
                     <span className="text-xs font-bold text-orange-400">{i + 1}</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-slate-200">{item.title}</span>
+                      <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{item.title}</span>
                       <span className="text-xs text-slate-500 shrink-0">{item.durationMinutes} min</span>
                     </div>
                     {item.description && (
-                      <p className="text-xs text-slate-400 mt-0.5">{item.description}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.description}</p>
                     )}
                   </div>
                   {canEdit && (
@@ -870,26 +870,26 @@ export default function SessionDetailPage() {
 
       {/* ── Linked yearly plan ── */}
       {linkedPlanSession && !isMatch && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-bold text-slate-100">Årsplan – pass {session.planSessionNumber}</h2>
-              <p className="text-xs text-slate-500 mt-0.5">År {session.planYear} · {linkedPlanSession.title}</p>
+              <h2 className="font-bold text-slate-800 dark:text-slate-100">Årsplan – pass {session.planSessionNumber}</h2>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">År {session.planYear} · {linkedPlanSession.title}</p>
             </div>
             <Link href={`/ar${session.planYear}`}
-              className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors">
+              className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors">
               Se hela årsplanen ↗
             </Link>
           </div>
           <div className="space-y-2">
             {linkedPlanSession.activities.map((act, i) => (
-              <div key={i} className="flex items-start gap-3 bg-slate-900/40 rounded-xl px-3 py-2.5">
+              <div key={i} className="flex items-start gap-3 bg-gray-50 dark:bg-slate-900/40 rounded-xl px-3 py-2.5">
                 <div className="w-6 h-6 rounded-md bg-violet-500/20 flex items-center justify-center shrink-0 mt-0.5">
                   <span className="text-[10px] font-bold text-violet-400">{i + 1}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-200">{act.name}</span>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{act.name}</span>
                     {act.durationMinutes && (
                       <span className="text-xs text-slate-500 shrink-0">{act.durationMinutes} min</span>
                     )}
@@ -906,11 +906,11 @@ export default function SessionDetailPage() {
 
       {/* ── Match lineup ── */}
       {isMatch && players.length > 0 && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-bold text-slate-100">Laguttagning</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h2 className="font-bold text-slate-800 dark:text-slate-100">Laguttagning</h2>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                 {lineup.size > 0 ? `${lineup.size} spelare uttagna` : "Inga uttagna ännu"}
               </p>
             </div>
@@ -942,16 +942,16 @@ export default function SessionDetailPage() {
                   }}
                   className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all text-left ${
                     inLineup
-                      ? "bg-emerald-900/40 border border-emerald-700/50"
-                      : "bg-slate-700/40 border border-slate-700/40 hover:bg-slate-700"
+                      ? "bg-emerald-50 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-700/50"
+                      : "bg-gray-50 dark:bg-slate-700/40 border border-gray-200 dark:border-slate-700/40 hover:bg-gray-100 dark:hover:bg-slate-700"
                   } ${!canEdit ? "cursor-default" : "cursor-pointer"}`}
                 >
                   <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
-                    inLineup ? "bg-emerald-500 text-white" : "bg-slate-600 text-slate-400"
+                    inLineup ? "bg-emerald-500 text-white" : "bg-gray-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
                   }`}>
                     {inLineup ? "✓" : ""}
                   </span>
-                  <span className={`text-sm flex-1 ${inLineup ? "text-slate-100 font-semibold" : "text-slate-400"}`}>
+                  <span className={`text-sm flex-1 ${inLineup ? "text-slate-800 dark:text-slate-100 font-semibold" : "text-slate-500 dark:text-slate-400"}`}>
                     #{p.number} {p.name}
                   </span>
                   {inLineup && (
@@ -965,20 +965,20 @@ export default function SessionDetailPage() {
       )}
 
       {/* ── RSVP overview ── */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
         <h2 className="font-bold text-slate-100 mb-3">Kallelse</h2>
 
         {/* My RSVP (non-coach users) */}
         {!canEdit && user && session.date >= today && (
-          <div className="bg-slate-900/50 rounded-xl p-3 mb-4">
-            <p className="text-xs font-semibold text-slate-400 mb-2">Kommer du?</p>
+          <div className="bg-gray-50 dark:bg-slate-900/50 rounded-xl p-3 mb-4">
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Kommer du?</p>
             <div className="flex gap-2 mb-2">
               {([["coming", "✓ Ja", "emerald"], ["maybe", "? Kanske", "amber"], ["not_coming", "✗ Nej", "red"]] as const).map(([st, lbl, color]) => (
                 <button key={st} disabled={rsvpBusy} onClick={() => submitRsvp(st)}
                   className={`flex-1 py-1.5 text-xs font-semibold rounded-xl transition-all ${
                     myRsvp === st
                       ? color === "emerald" ? "bg-emerald-600 text-white" : color === "amber" ? "bg-amber-500 text-white" : "bg-red-600 text-white"
-                      : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                      : "bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600"
                   }`}>
                   {lbl}
                 </button>
@@ -990,7 +990,7 @@ export default function SessionDetailPage() {
                   onChange={(e) => setMyRsvpComment(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && myRsvp) submitRsvp(myRsvp); }}
                   placeholder="Kommentar (valfri)..."
-                  className="flex-1 bg-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 border border-slate-600 placeholder-slate-500 focus:outline-none focus:border-orange-500" />
+                  className="flex-1 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs rounded-lg px-3 py-1.5 border border-gray-300 dark:border-slate-600 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-orange-500" />
                 <button onClick={() => myRsvp && submitRsvp(myRsvp)} disabled={rsvpBusy}
                   className="text-xs px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors">
                   Spara
@@ -1002,17 +1002,17 @@ export default function SessionDetailPage() {
 
         {/* Summary chips */}
         <div className="flex gap-2 flex-wrap mb-4">
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-900/40 text-emerald-300">
+          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
             ✓ {rsvpComing.length} kommer
           </span>
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-900/40 text-red-300">
+          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
             ✗ {rsvpNotComing.length} kommer inte
           </span>
-          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-900/40 text-amber-300">
+          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
             ? {rsvpMaybe.length} kanske
           </span>
           {unanswered.length > 0 && (
-            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-700 text-slate-400">
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
               — {unanswered.length} ej svarat
             </span>
           )}
@@ -1020,7 +1020,7 @@ export default function SessionDetailPage() {
 
         {/* RSVP list */}
         {rsvps.length === 0 && unanswered.length === 0 ? (
-          <p className="text-sm text-slate-500 italic">Inga svar ännu.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 italic">Inga svar ännu.</p>
         ) : (
           <div className="space-y-1.5">
             {rsvps.map((r) => {
@@ -1028,10 +1028,10 @@ export default function SessionDetailPage() {
               return (
                 <div key={r.userId} className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
-                  <span className="text-sm text-slate-300 flex-1">{r.userName}</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">{r.userName}</span>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>{cfg.label}</span>
                   {r.comment && (
-                    <span className="text-xs text-slate-500 italic truncate max-w-[120px]" title={r.comment}>
+                    <span className="text-xs text-slate-400 dark:text-slate-500 italic truncate max-w-[120px]" title={r.comment}>
                       &ldquo;{r.comment}&rdquo;
                     </span>
                   )}
@@ -1041,8 +1041,8 @@ export default function SessionDetailPage() {
             {unanswered.map((m) => (
               <div key={m.id} className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full shrink-0 bg-slate-600" />
-                <span className="text-sm text-slate-500 flex-1">{m.name}</span>
-                <span className="text-xs text-slate-600 px-2 py-0.5 rounded-full bg-slate-700">Ej svarat</span>
+                <span className="text-sm text-slate-400 dark:text-slate-500 flex-1">{m.name}</span>
+                <span className="text-xs text-slate-400 dark:text-slate-600 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700">Ej svarat</span>
               </div>
             ))}
           </div>
@@ -1051,9 +1051,9 @@ export default function SessionDetailPage() {
 
       {/* ── Attendance (today or past) ── */}
       {players.length > 0 && (isPast || session.date === today) && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-1">
-            <h2 className="font-bold text-slate-100">Närvaro</h2>
+            <h2 className="font-bold text-slate-800 dark:text-slate-100">Närvaro</h2>
             {canEdit && (
               <button
                 onClick={async () => {
@@ -1071,7 +1071,7 @@ export default function SessionDetailPage() {
             const absent  = attendance.filter((a) => a.status === "absent").length;
             const sick    = attendance.filter((a) => a.status === "sick").length;
             return (
-              <p className="text-xs text-slate-500 mb-3">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">
                 {present} ✓ · {absent} ✗ · {sick} 🤒
               </p>
             );
@@ -1081,7 +1081,7 @@ export default function SessionDetailPage() {
               const att = attendance.find((a) => a.playerId === p.id);
               return (
                 <div key={p.id} className="flex items-center gap-2">
-                  <span className="text-sm text-slate-300 flex-1">#{p.number} {p.name}</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">#{p.number} {p.name}</span>
                   <div className="flex gap-1">
                     {(["present", "absent", "sick"] as const).map((s) => {
                       const cfg = ATTENDANCE_CONFIG[s];
@@ -1089,7 +1089,7 @@ export default function SessionDetailPage() {
                         <button key={s} onClick={() => canEdit && markAttendance(p.id, s)}
                           disabled={!canEdit}
                           title={cfg.label}
-                          className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${att?.status === s ? cfg.active : "bg-slate-700 text-slate-400 hover:bg-slate-600"}`}>
+                          className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${att?.status === s ? cfg.active : "bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600"}`}>
                           {cfg.icon}
                         </button>
                       );
@@ -1104,11 +1104,11 @@ export default function SessionDetailPage() {
 
       {/* ── Samåkning ── */}
       {session.date >= today && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
           <h2 className="font-bold text-slate-100 mb-3">Samåkning</h2>
           {user && (
             <div className="mb-4">
-              <p className="text-xs text-slate-500 mb-2">Hur tar du dig dit?</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">Hur tar du dig dit?</p>
               <div className="flex gap-2">
                 {([
                   ["needs_ride", "🙋 Behöver skjuts", "amber"],
@@ -1121,7 +1121,7 @@ export default function SessionDetailPage() {
                       className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${
                         active
                           ? color === "amber" ? "bg-amber-500 text-white" : "bg-emerald-600 text-white"
-                          : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                          : "bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600"
                       }`}>
                       {label}
                     </button>
@@ -1135,20 +1135,20 @@ export default function SessionDetailPage() {
               {carpools.filter((c) => c.type === "offers_ride").map((c) => (
                 <div key={c.id} className="flex items-center gap-2 text-sm">
                   <span>🚗</span>
-                  <span className="text-slate-200 flex-1">{c.userName}</span>
+                  <span className="text-slate-700 dark:text-slate-200 flex-1">{c.userName}</span>
                   <span className="text-xs text-emerald-400">erbjuder skjuts</span>
                 </div>
               ))}
               {carpools.filter((c) => c.type === "needs_ride").map((c) => (
                 <div key={c.id} className="flex items-center gap-2 text-sm">
                   <span>🙋</span>
-                  <span className="text-slate-200 flex-1">{c.userName}</span>
+                  <span className="text-slate-700 dark:text-slate-200 flex-1">{c.userName}</span>
                   <span className="text-xs text-amber-400">behöver skjuts</span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-slate-500 italic">Ingen har anmält sig för samåkning ännu.</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 italic">Ingen har anmält sig för samåkning ännu.</p>
           )}
         </div>
       )}
@@ -1156,38 +1156,38 @@ export default function SessionDetailPage() {
       {/* ── AI plan generation modal ── */}
       {showAiModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-5">
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-5">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-lg">✨</span>
-              <h3 className="font-bold text-slate-100">AI-genererad träningsplan</h3>
+              <h3 className="font-bold text-slate-800 dark:text-slate-100">AI-genererad träningsplan</h3>
             </div>
             <p className="text-xs text-slate-500 mb-4">Beskriv vad du vill träna på, så skapar AI ett förslag.</p>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Fokusområde <span className="text-red-400">*</span></label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Fokusområde <span className="text-red-400">*</span></label>
                 <input autoFocus value={aiFocus} onChange={(e) => setAiFocus(e.target.value)}
                   placeholder="T.ex. Passningsspel och rörelser utan boll"
                   onKeyDown={(e) => { if (e.key === "Enter") generateAiPlan(); }}
-                  className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Passlängd (min)</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Passlängd (min)</label>
                   <input type="number" value={aiDuration} onChange={(e) => setAiDuration(e.target.value)} min="30" max="180"
-                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-violet-500" />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Antal spelare</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Antal spelare</label>
                   <input value={aiPlayers} onChange={(e) => setAiPlayers(e.target.value)}
                     placeholder="T.ex. 12"
-                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Tillgänglig utrustning</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Tillgänglig utrustning</label>
                 <input value={aiEquipment} onChange={(e) => setAiEquipment(e.target.value)}
                   placeholder="T.ex. 8 bollar, 12 koner, västar"
-                  className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
@@ -1200,7 +1200,7 @@ export default function SessionDetailPage() {
                 )}
               </button>
               <button onClick={() => setShowAiModal(false)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
                 Avbryt
               </button>
             </div>
@@ -1211,16 +1211,16 @@ export default function SessionDetailPage() {
       {/* ── Save as template modal ── */}
       {showSaveTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-5">
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-5">
             <h3 className="font-bold text-slate-100 mb-3">Spara som mall</h3>
-            <p className="text-xs text-slate-500 mb-3">Sparar {planItems.length} moment som en återanvändbar mall för ditt lag.</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">Sparar {planItems.length} moment som en återanvändbar mall för ditt lag.</p>
             <input
               autoFocus
               value={newTemplateName}
               onChange={(e) => setNewTemplateName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") saveAsTemplate(); if (e.key === "Escape") setShowSaveTemplateModal(false); }}
               placeholder="T.ex. Passningsfokus 60 min"
-              className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 mb-3"
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 mb-3"
             />
             <div className="flex gap-2">
               <button onClick={saveAsTemplate} disabled={savingTemplate || !newTemplateName.trim()}
@@ -1228,7 +1228,7 @@ export default function SessionDetailPage() {
                 {savingTemplate ? "Sparar…" : "Spara mall"}
               </button>
               <button onClick={() => setShowSaveTemplateModal(false)}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
                 Avbryt
               </button>
             </div>
@@ -1239,23 +1239,23 @@ export default function SessionDetailPage() {
       {/* ── Pick template modal ── */}
       {showTemplateModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-slate-700">
-              <h3 className="font-bold text-slate-100">Välj mall</h3>
-              <button onClick={() => setShowTemplateModal(false)} className="text-slate-400 hover:text-slate-200 text-xl leading-none">✕</button>
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100">Välj mall</h3>
+              <button onClick={() => setShowTemplateModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xl leading-none">✕</button>
             </div>
             <div className="overflow-y-auto flex-1 p-3">
               {loadingTemplates ? (
-                <p className="text-slate-500 text-sm text-center py-8">Laddar mallar…</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-8">Laddar mallar…</p>
               ) : templates.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-8">Inga mallar sparade ännu. Skapa en mall från ett träningspass med moment.</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-8">Inga mallar sparade ännu. Skapa en mall från ett träningspass med moment.</p>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-slate-500 mb-3">Momenteten läggs till efter eventuella befintliga.</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">Momenteten läggs till efter eventuella befintliga.</p>
                   {templates.map((t) => (
                     <button key={t.id} onClick={() => applyTemplate(t.id)} disabled={!!applyingTemplate}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-700/60 hover:bg-slate-700 disabled:opacity-50 rounded-xl transition-colors text-left">
-                      <p className="text-sm font-semibold text-slate-200">{t.name}</p>
+                      className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700/60 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 rounded-xl transition-colors text-left">
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t.name}</p>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs text-slate-400">{t.itemCount} moment</span>
                         {applyingTemplate === t.id
@@ -1274,19 +1274,19 @@ export default function SessionDetailPage() {
       {/* ── Copy plan modal ── */}
       {showCopyModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-slate-700">
-              <h3 className="font-bold text-slate-100">Kopiera träningsplan</h3>
-              <button onClick={() => setShowCopyModal(false)} className="text-slate-400 hover:text-slate-200 text-xl leading-none">✕</button>
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl w-full max-w-md max-h-[70vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100">Kopiera träningsplan</h3>
+              <button onClick={() => setShowCopyModal(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xl leading-none">✕</button>
             </div>
             <div className="overflow-y-auto flex-1 p-3">
               {loadingCopy ? (
-                <p className="text-slate-500 text-sm text-center py-8">Laddar pass…</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-8">Laddar pass…</p>
               ) : copyableSessions.length === 0 ? (
-                <p className="text-slate-500 text-sm text-center py-8">Inga tidigare träningspass med plan hittades.</p>
+                <p className="text-slate-400 dark:text-slate-500 text-sm text-center py-8">Inga tidigare träningspass med plan hittades.</p>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-xs text-slate-500 mb-3">
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">
                     Välj ett pass att kopiera momenteten ifrån. De läggs till efter eventuella befintliga moment.
                   </p>
                   {copyableSessions.map((s) => (
@@ -1294,11 +1294,11 @@ export default function SessionDetailPage() {
                       key={s.id}
                       onClick={() => copyPlanFrom(s.id)}
                       disabled={!!copyingFrom}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-700/60 hover:bg-slate-700 disabled:opacity-50 rounded-xl transition-colors text-left"
+                      className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700/60 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 rounded-xl transition-colors text-left"
                     >
                       <div>
-                        <p className="text-sm font-semibold text-slate-200">{s.title}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{formatDate(s.date)}</p>
+                        <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{s.title}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{formatDate(s.date)}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-xs text-slate-400">{s.planCount} moment</span>

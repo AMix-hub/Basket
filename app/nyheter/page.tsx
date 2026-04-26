@@ -73,7 +73,7 @@ export default function NyheterPage() {
     <div className="max-w-3xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-slate-100 tracking-tight mb-1">
+        <h1 className="text-3xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight mb-1">
           📰 Nyheter
         </h1>
         {websiteUrl ? (
@@ -97,9 +97,9 @@ export default function NyheterPage() {
 
       {/* No website configured */}
       {!websiteUrl && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 text-center">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-8 text-center">
           <div className="text-5xl mb-4">🌐</div>
-          <h2 className="text-lg font-bold text-slate-100 mb-2">
+          <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">
             Ingen webbplats inställd
           </h2>
           <p className="text-slate-400 text-sm mb-4">
@@ -146,7 +146,7 @@ export default function NyheterPage() {
           {items.map((item, i) => (
             <article
               key={item.link ? `${item.link}-${item.pubDate}` : i}
-              className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden hover:border-slate-500 transition-colors"
+              className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl overflow-hidden hover:border-gray-400 dark:hover:border-slate-500 transition-colors"
             >
               {item.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -160,7 +160,7 @@ export default function NyheterPage() {
                 />
               )}
               <div className="p-5">
-                <h2 className="text-lg font-bold text-slate-100 mb-1 leading-snug">
+                <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1 leading-snug">
                   {item.link ? (
                     <a
                       href={item.link}
@@ -205,7 +205,7 @@ export default function NyheterPage() {
         <div className="mt-6 text-center">
           <button
             onClick={() => fetchNews(websiteUrl)}
-            className="px-4 py-2 text-sm font-semibold bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl transition-colors"
+            className="px-4 py-2 text-sm font-semibold bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-200 rounded-xl transition-colors"
           >
             🔄 Uppdatera
           </button>

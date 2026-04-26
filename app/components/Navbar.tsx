@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../context/AuthContext";
 import type { UserRole } from "../context/AuthContext";
 import { useUnreadCount } from "../hooks/useUnreadCount";
+import { useTheme } from "../context/ThemeContext";
 import { roleEmoji } from "../../lib/roleLabels";
 import { getSport } from "../../lib/sports";
 
@@ -40,6 +41,7 @@ export default function Navbar() {
   const { user, loading, logout, getMyTeam } = useAuth();
   const unread = useUnreadCount();
 
+  const { theme, toggle: toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
   const [merDropdownOpen, setMerDropdownOpen] = useState(false);
@@ -310,6 +312,16 @@ export default function Navbar() {
                   })}
                 </div>
 
+                {/* Theme toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className="flex items-center justify-center w-8 h-8 rounded-full text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+                  aria-label={theme === "dark" ? "Byt till ljust läge" : "Byt till mörkt läge"}
+                  title={theme === "dark" ? "Ljust läge" : "Mörkt läge"}
+                >
+                  {theme === "dark" ? "☀️" : "🌙"}
+                </button>
+
                 {/* Messages icon */}
                 <Link
                   href="/meddelanden"
@@ -498,7 +510,7 @@ export default function Navbar() {
 
             <div className="h-px bg-gray-700 my-2" />
 
-            {/* Profile + logout (mobile) */}
+            {/* Profile + logout + theme toggle (mobile) */}
             <div className="flex items-center justify-between px-3 py-2">
               <Link
                 href="/profil"
@@ -506,12 +518,20 @@ export default function Navbar() {
               >
                 {roleEmoji(user.roles)} {user.name}
               </Link>
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1 text-xs font-semibold bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 hover:text-white transition-colors"
-              >
-                Logga ut
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleTheme}
+                  className="px-2 py-1 text-xs font-semibold bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 hover:text-white transition-colors"
+                >
+                  {theme === "dark" ? "☀️ Ljust" : "🌙 Mörkt"}
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1 text-xs font-semibold bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 hover:text-white transition-colors"
+                >
+                  Logga ut
+                </button>
+              </div>
             </div>
           </div>
         </div>

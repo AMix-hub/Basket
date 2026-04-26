@@ -363,10 +363,10 @@ export default function MeddelandenPage() {
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <p className="text-4xl mb-3">💬</p>
-          <h1 className="text-xl font-bold text-slate-200 mb-2">Logga in för att använda chatten</h1>
+          <h1 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Logga in för att använda chatten</h1>
           <div className="flex gap-3 justify-center mt-5">
             <Link href="/login" className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600">Logga in</Link>
-            <Link href="/registrera" className="px-4 py-2 bg-slate-800 text-slate-300 text-sm font-semibold rounded-xl hover:bg-slate-700/50">Registrera</Link>
+            <Link href="/registrera" className="px-4 py-2 bg-gray-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-slate-700/50">Registrera</Link>
           </div>
         </div>
       </div>
@@ -379,7 +379,7 @@ export default function MeddelandenPage() {
       <div className="min-h-[50vh] flex items-center justify-center">
         <div className="text-center">
           <p className="text-4xl mb-3">💬</p>
-          <h1 className="text-xl font-bold text-slate-200 mb-2">Du är inte med i något lag ännu</h1>
+          <h1 className="text-xl font-bold text-slate-700 dark:text-slate-200 mb-2">Du är inte med i något lag ännu</h1>
           <Link href="/lag" className="px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 mt-5 inline-block">Gå till Laget</Link>
         </div>
       </div>
@@ -392,7 +392,7 @@ export default function MeddelandenPage() {
         <div className="flex items-start justify-between flex-wrap gap-3 mb-1">
           <div className="flex items-center gap-3">
             <span className="text-3xl">💬</span>
-            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">Meddelanden</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Meddelanden</h1>
           </div>
           {isCoachOrAbove && (
             <button
@@ -408,13 +408,13 @@ export default function MeddelandenPage() {
 
       {/* ── Broadcast compose ── */}
       {showBroadcast && isCoachOrAbove && (
-        <div className="bg-slate-800 border border-orange-500/30 rounded-2xl p-4 mb-5">
+        <div className="bg-white dark:bg-slate-800 border border-orange-300 dark:border-orange-500/30 rounded-2xl p-4 mb-5">
           <p className="text-sm font-bold text-orange-300 mb-3">📢 Nytt utskick</p>
           <div className="flex gap-2 mb-3">
             {(["alla", "föräldrar", "spelare"] as const).map((t) => (
               <button key={t} onClick={() => setBroadcastTarget(t)}
                 className={`px-3 py-1 text-xs font-semibold rounded-full capitalize transition-colors ${
-                  broadcastTarget === t ? "bg-orange-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                  broadcastTarget === t ? "bg-orange-500 text-white" : "bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600"
                 }`}>
                 {t === "alla" ? "Alla" : t === "föräldrar" ? "Föräldrar" : "Spelare"}
               </button>
@@ -425,7 +425,7 @@ export default function MeddelandenPage() {
             onChange={(e) => setBroadcastText(e.target.value)}
             rows={3}
             placeholder={`Skriv ett meddelande till ${broadcastTarget === "alla" ? "hela laget" : broadcastTarget}…`}
-            className="w-full bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none mb-2"
+            className="w-full bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none mb-2"
           />
           <div className="flex gap-2">
             <button onClick={sendBroadcast} disabled={sendingBroadcast || !broadcastText.trim() || !activeTeam}
@@ -433,7 +433,7 @@ export default function MeddelandenPage() {
               {sendingBroadcast ? "Skickar…" : "Skicka utskick"}
             </button>
             <button onClick={() => { setShowBroadcast(false); setBroadcastText(""); }}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+              className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
               Avbryt
             </button>
           </div>
@@ -465,7 +465,7 @@ export default function MeddelandenPage() {
                 key={t.id}
                 onClick={() => openThread(t.id, "team")}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left w-full ${
-                  isActiveTeamChat ? "bg-orange-500 text-white" : "bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30"
+                  isActiveTeamChat ? "bg-orange-500 text-white" : "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700/30"
                 }`}
               >
                 <span className="flex items-center gap-2 truncate">
@@ -501,7 +501,7 @@ export default function MeddelandenPage() {
                 key={m.id}
                 onClick={() => openThread(activeTeam.id, m.id)}
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left w-full ${
-                  isActive ? "bg-orange-500 text-white" : "bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30"
+                  isActive ? "bg-orange-500 text-white" : "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700/30"
                 }`}
               >
                 <span className="flex items-center gap-1.5 min-w-0">
@@ -539,7 +539,7 @@ export default function MeddelandenPage() {
                 className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all text-left w-full ${
                   selected === "coaches" && threadOpen
                     ? "bg-orange-500 text-white"
-                    : "bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30"
+                    : "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700/30"
                 }`}
               >
                 <span className="flex items-center gap-2 truncate">
@@ -558,23 +558,23 @@ export default function MeddelandenPage() {
 
         {/* Thread panel – shown when threadOpen is true */}
         {threadOpen ? (
-          <div className="flex-1 min-w-0 flex flex-col bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden"
+          <div className="flex-1 min-w-0 flex flex-col bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden"
             style={{ minHeight: "calc(100vh - 310px)", maxHeight: "calc(100vh - 200px)" }}
           >
-            <div className="px-4 py-3 border-b border-slate-700 shrink-0 flex items-center gap-2">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-700 shrink-0 flex items-center gap-2">
               {/* Back button on mobile */}
               <button
                 onClick={() => {
                   setThreadOpen(false);
                   setFirstUnreadId(null);
                 }}
-                className="md:hidden p-1.5 rounded-lg hover:bg-slate-700/30 transition-colors text-slate-400"
+                className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700/30 transition-colors text-slate-400"
                 aria-label="Tillbaka"
               >
                 ‹
               </button>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-slate-100 text-sm truncate">{threadTitle}</p>
+                <p className="font-bold text-slate-800 dark:text-slate-100 text-sm truncate">{threadTitle}</p>
                 {selected === "team" && (
                   <p className="text-xs text-slate-400 mt-0.5">Alla i {activeTeam?.name ?? "laget"} ser dessa meddelanden</p>
                 )}
@@ -620,7 +620,7 @@ export default function MeddelandenPage() {
                         <div className={`max-w-[75%] ${isOwn ? "items-end" : "items-start"} flex flex-col gap-1`}>
                           {!isOwn && <span className="text-xs text-slate-500 font-medium px-1">{m.senderName}</span>}
                           <div className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words ${
-                            isOwn ? "bg-orange-500 text-white rounded-br-sm" : "bg-slate-700 text-slate-200 rounded-bl-sm"
+                            isOwn ? "bg-orange-500 text-white rounded-br-sm" : "bg-gray-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-bl-sm"
                           }`}>
                             {m.text}
                           </div>
@@ -639,7 +639,7 @@ export default function MeddelandenPage() {
               <div ref={bottomRef} />
             </div>
 
-            <div className="px-4 py-3 border-t border-slate-100 shrink-0">
+            <div className="px-4 py-3 border-t border-gray-200 dark:border-slate-700 shrink-0">
               {sendError && (
                 <div className="mb-2 px-3 py-2 bg-red-900/30 border border-red-700/50 rounded-xl text-xs text-red-400">
                   {sendError}
@@ -663,7 +663,7 @@ export default function MeddelandenPage() {
                       : `Skriv till ${selectedMember?.name ?? ""}… (Enter för att skicka)`
                   }
                   rows={1}
-                  className="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 overflow-auto"
+                  className="flex-1 px-3 py-2.5 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-gray-300 dark:border-slate-600 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-orange-400 overflow-auto"
                 />
                 <button
                   onClick={sendMessage}
@@ -681,7 +681,7 @@ export default function MeddelandenPage() {
           </div>
         ) : (
           /* Overview prompt when no thread is selected */
-          <div className="hidden md:flex flex-1 items-center justify-center bg-slate-800 rounded-2xl border border-slate-700 text-slate-400 text-sm flex-col gap-2">
+          <div className="hidden md:flex flex-1 items-center justify-center bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 text-slate-400 text-sm flex-col gap-2">
             <span className="text-4xl">💬</span>
             <p>Välj en grupp eller konversation för att öppna chatten</p>
           </div>

@@ -914,7 +914,7 @@ export default function KalenderPage() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <span className="text-slate-400">Laddar…</span>
+        <span className="text-slate-500 dark:text-slate-400">Laddar…</span>
       </div>
     );
   }
@@ -938,19 +938,19 @@ export default function KalenderPage() {
       {/* Cancellation modal */}
       {cancellingSession && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-slate-100 mb-1">Ställ in pass</h3>
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-1">Ställ in pass</h3>
             <p className="text-sm text-slate-400 mb-1">
               Vill du ställa in{" "}
-              <strong className="text-slate-200">{cancellingSession.title}</strong>?
+              <strong className="text-slate-700 dark:text-slate-200">{cancellingSession.title}</strong>?
             </p>
 
             {/* Recurring scope selector */}
             {cancellingSession.recurringGroupId && (
               <div className="mb-3 space-y-1.5">
-                <p className="text-xs font-semibold text-slate-400">Vilka pass ska ställas in?</p>
+                <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Vilka pass ska ställas in?</p>
                 {(["single", "all", "specific"] as const).map((scope) => (
-                  <label key={scope} className="flex items-center gap-2 cursor-pointer text-sm text-slate-200">
+                  <label key={scope} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 dark:text-slate-200">
                     <input
                       type="radio"
                       name="deleteScope"
@@ -977,7 +977,7 @@ export default function KalenderPage() {
                       .slice()
                       .sort((a, b) => a.date.localeCompare(b.date))
                       .map((s) => (
-                        <label key={s.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-700 text-xs text-slate-200">
+                        <label key={s.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 text-xs text-slate-600 dark:text-slate-200">
                           <input
                             type="checkbox"
                             checked={selectedDeleteIds.has(s.id)}
@@ -1008,7 +1008,7 @@ export default function KalenderPage() {
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="Ange anledning till inställningen..."
               rows={3}
-              className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none mb-4"
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none mb-4"
             />
             <div className="flex gap-2">
               <button
@@ -1018,7 +1018,7 @@ export default function KalenderPage() {
                   setDeleteScope("single");
                   setSelectedDeleteIds(new Set());
                 }}
-                className="flex-1 py-2 rounded-xl border border-slate-600 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
+                className="flex-1 py-2 rounded-xl border border-gray-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
               >
                 Avbryt
               </button>
@@ -1037,25 +1037,25 @@ export default function KalenderPage() {
       {/* Edit session modal */}
       {editingSession && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-slate-100 mb-3">Redigera pass</h3>
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Redigera pass</h3>
 
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Titel</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Titel</label>
                 <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-400 block mb-1">Typ</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Typ</label>
                 <select
                   value={editType}
                   onChange={(e) => setEditType(e.target.value as "träning" | "match")}
-                  className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                 >
                   <option value="träning">Träning</option>
                   <option value="match">Match</option>
@@ -1063,31 +1063,31 @@ export default function KalenderPage() {
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Starttid</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Starttid</label>
                   <input
                     type="time"
                     value={editTime}
                     onChange={(e) => setEditTime(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Sluttid</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Sluttid</label>
                   <input
                     type="time"
                     value={editEndTime}
                     onChange={(e) => setEditEndTime(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
               </div>
               {halls.length > 0 && (
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Hall</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Hall</label>
                   <select
                     value={editHallId}
                     onChange={(e) => setEditHallId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                   >
                     <option value="">🏟 Ingen hall</option>
                     {halls.map((h) => (
@@ -1101,39 +1101,39 @@ export default function KalenderPage() {
                 <div className="space-y-2 bg-red-950/40 rounded-xl p-3 border border-red-800/50">
                   <p className="text-xs font-semibold text-red-400">Matchinfo</p>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-0.5">Motståndare</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Motståndare</label>
                     <input type="text" value={editOpponent} onChange={(e) => setEditOpponent(e.target.value)}
                       placeholder="Motståndarlaget..."
-                      className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-0.5">Plats / Arena</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Plats / Arena</label>
                     <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)}
                       placeholder="Arena eller adress..."
-                      className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-0.5">Hemma / Borta</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Hemma / Borta</label>
                     <select value={editHomeOrAway} onChange={(e) => setEditHomeOrAway(e.target.value as "home" | "away")}
-                      className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400">
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400">
                       <option value="home">🏠 Hemma</option>
                       <option value="away">✈️ Borta</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-0.5">Resultat (om matchen spelats)</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Resultat (om matchen spelats)</label>
                     <input type="text" value={editResult} onChange={(e) => setEditResult(e.target.value)}
                       placeholder="t.ex. 68–54"
-                      className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400" />
                   </div>
                 </div>
               )}
               {/* Coach assignment */}
               {teamCoaches.length > 0 && (
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 block mb-1">Ansvarig tränare</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Ansvarig tränare</label>
                   <select value={editCoachId} onChange={(e) => setEditCoachId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400">
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400">
                     <option value="">Ingen specifik tränare</option>
                     {teamCoaches.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -1145,9 +1145,9 @@ export default function KalenderPage() {
               {/* Recurring scope */}
               {editingSession.recurringGroupId && (
                 <div className="space-y-1.5">
-                  <p className="text-xs font-semibold text-slate-400">Vilka pass ska uppdateras?</p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Vilka pass ska uppdateras?</p>
                   {(["single", "all", "specific"] as const).map((scope) => (
-                    <label key={scope} className="flex items-center gap-2 cursor-pointer text-sm text-slate-200">
+                    <label key={scope} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700 dark:text-slate-200">
                       <input
                         type="radio"
                         name="editScope"
@@ -1172,7 +1172,7 @@ export default function KalenderPage() {
                         .slice()
                         .sort((a, b) => a.date.localeCompare(b.date))
                         .map((s) => (
-                          <label key={s.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-slate-700 text-xs text-slate-200">
+                          <label key={s.id} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700 text-xs text-slate-600 dark:text-slate-200">
                             <input
                               type="checkbox"
                               checked={selectedEditIds.has(s.id)}
@@ -1199,7 +1199,7 @@ export default function KalenderPage() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => setEditingSession(null)}
-                className="flex-1 py-2 rounded-xl border border-slate-600 text-sm font-semibold text-slate-300 hover:bg-slate-700 transition-colors"
+                className="flex-1 py-2 rounded-xl border border-gray-300 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
               >
                 Avbryt
               </button>
@@ -1220,7 +1220,7 @@ export default function KalenderPage() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">📅</span>
-            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
+            <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
               Kalender & Närvaro
             </h1>
           </div>
@@ -1240,7 +1240,7 @@ export default function KalenderPage() {
                   setSelectedSession(null);
                   setSelectedDate(null);
                 }}
-                className="px-3 py-1.5 text-sm border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-slate-700 text-slate-100"
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100"
               >
                 <option value="__all__">🏢 Alla lag</option>
                 {allTeams.map((t) => (
@@ -1263,7 +1263,7 @@ export default function KalenderPage() {
                   setSelectedSession(null);
                   setSelectedDate(null);
                 }}
-                className="px-3 py-1.5 text-sm border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-slate-700 text-slate-100"
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100"
               >
                 {myTeams.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -1300,7 +1300,7 @@ export default function KalenderPage() {
           )}
           <button
             onClick={() => setShowPlayerPanel((s) => !s)}
-            className="px-4 py-2 rounded-xl text-sm font-semibold bg-slate-800 text-white hover:bg-slate-700 transition-colors shrink-0"
+            className="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-100 dark:bg-slate-800 text-slate-700 dark:text-white hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors shrink-0"
           >
             👥 Spelare ({players.length})
           </button>
@@ -1527,7 +1527,7 @@ export default function KalenderPage() {
             <div className="flex gap-2 mt-4">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="flex-1 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                className="flex-1 py-2 rounded-xl border border-gray-200 dark:border-slate-600 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
               >
                 Avbryt
               </button>
@@ -1564,16 +1564,16 @@ export default function KalenderPage() {
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={prevMonth}
-              className="p-2 rounded-xl hover:bg-slate-700/60 transition-colors text-slate-300 font-bold"
+              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700/60 transition-colors text-slate-500 dark:text-slate-300 font-bold"
             >
               ‹
             </button>
-            <h2 className="text-lg font-bold text-slate-100">
+            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">
               {MONTHS_SV[month]} {year}
             </h2>
             <button
               onClick={nextMonth}
-              className="p-2 rounded-xl hover:bg-slate-700/60 transition-colors text-slate-300 font-bold"
+              className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700/60 transition-colors text-slate-500 dark:text-slate-300 font-bold"
             >
               ›
             </button>
@@ -1637,10 +1637,10 @@ export default function KalenderPage() {
                     isSelected
                       ? "bg-orange-500 text-white shadow-md"
                       : isFreePeriod
-                      ? "bg-slate-800 text-purple-400 border border-purple-700/40 hover:bg-slate-700/80"
+                      ? "bg-purple-50 dark:bg-slate-800 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/40 hover:bg-purple-100 dark:hover:bg-slate-700/80"
                       : isToday
-                      ? "bg-orange-500/20 text-orange-300 font-bold border border-orange-500/40"
-                      : "bg-slate-800 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50"
+                      ? "bg-orange-500/20 text-orange-500 dark:text-orange-300 font-bold border border-orange-500/40"
+                      : "bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/80 text-slate-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700/50"
                   }`}
                 >
                   <span className="font-semibold">{date.getDate()}</span>
@@ -1653,18 +1653,18 @@ export default function KalenderPage() {
           </div>
 
           {/* Legend */}
-          <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-400">
+          <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-md bg-slate-800 inline-block cal-glow-training" />
+              <span className="w-3 h-3 rounded-md bg-gray-200 dark:bg-slate-800 inline-block cal-glow-training" />
               Träning
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-md bg-slate-800 inline-block cal-glow-match" />
+              <span className="w-3 h-3 rounded-md bg-gray-200 dark:bg-slate-800 inline-block cal-glow-match" />
               Match
             </div>
             {freePeriods.length > 0 && (
               <div className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-md bg-slate-800 border border-purple-700/50 inline-block" />
+                <span className="w-3 h-3 rounded-md bg-gray-200 dark:bg-slate-800 border border-purple-400 dark:border-purple-700/50 inline-block" />
                 Träningsfri period
               </div>
             )}
@@ -1675,9 +1675,9 @@ export default function KalenderPage() {
         <div className="w-full lg:w-80 shrink-0 space-y-4">
           {/* Selected date panel */}
           {selectedDate && (
-            <div ref={dateListRef} className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
+            <div ref={dateListRef} className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-slate-100">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100">
                   {new Date(selectedDate + "T12:00:00").toLocaleDateString(
                     "sv-SE",
                     {
@@ -1735,7 +1735,7 @@ export default function KalenderPage() {
                     className={`mb-2 p-3 rounded-xl border cursor-pointer transition-all ${
                       isExpanded
                         ? "border-orange-400 bg-orange-500/20"
-                        : "border-slate-600 hover:border-orange-400"
+                        : "border-gray-200 dark:border-slate-600 hover:border-orange-400"
                     }`}
                     onClick={() =>
                       setSelectedSession(isExpanded ? null : s)
@@ -1769,7 +1769,7 @@ export default function KalenderPage() {
                           </span>
                         )}
                         {showTeamName && (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                             👥 {sessionTeam.name}
                           </span>
                         )}
@@ -1778,7 +1778,7 @@ export default function KalenderPage() {
                         <Link
                           href={`/session/${s.id}`}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-slate-400 hover:text-orange-400 transition-colors text-sm px-1"
+                          className="text-slate-500 dark:text-slate-400 hover:text-orange-400 transition-colors text-sm px-1"
                           title="Öppna träningssida"
                         >
                           ↗
@@ -1790,7 +1790,7 @@ export default function KalenderPage() {
                                 e.stopPropagation();
                                 requestEditSession(s);
                               }}
-                              className="text-slate-400 hover:text-orange-500 transition-colors text-sm px-1"
+                              className="text-slate-500 dark:text-slate-400 hover:text-orange-500 transition-colors text-sm px-1"
                               title="Redigera"
                             >
                               ✏️
@@ -1800,7 +1800,7 @@ export default function KalenderPage() {
                                 e.stopPropagation();
                                 requestDeleteSession(s);
                               }}
-                              className="text-slate-400 hover:text-red-500 transition-colors text-sm"
+                              className="text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors text-sm"
                               title="Ställ in"
                             >
                               ✕
@@ -1809,27 +1809,27 @@ export default function KalenderPage() {
                         )}
                       </div>
                     </div>
-                    <p className="font-semibold text-sm text-slate-200 mt-1">
+                    <p className="font-semibold text-sm text-slate-700 dark:text-slate-200 mt-1">
                       {s.title}
                     </p>
                     {/* Match meta: opponent, location, result */}
                     {s.type === "match" && (s.opponent || s.location || s.result) && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {s.homeOrAway && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 font-medium">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-medium">
                             {s.homeOrAway === "home" ? "🏠 Hemma" : "✈️ Borta"}
                           </span>
                         )}
                         {s.opponent && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-900/40 text-red-300 font-medium">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-medium">
                             vs {s.opponent}
                           </span>
                         )}
                         {s.location && (
-                          <span className="text-xs text-slate-400">📍 {s.location}</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">📍 {s.location}</span>
                         )}
                         {s.result && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/40 text-emerald-300 font-bold">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-bold">
                             {s.result}
                           </span>
                         )}
@@ -1837,14 +1837,14 @@ export default function KalenderPage() {
                     )}
                     {/* Coach name */}
                     {s.coachName && (
-                      <p className="text-xs text-indigo-400 mt-0.5">🏃 {s.coachName}</p>
+                      <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">🏃 {s.coachName}</p>
                     )}
                     {/* RSVP count for coaches */}
                     {canEdit && rsvpCounts[s.id] && (rsvpCounts[s.id].coming + rsvpCounts[s.id].not_coming + rsvpCounts[s.id].maybe) > 0 && (
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        RSVP: <span className="text-emerald-400">{rsvpCounts[s.id].coming}✓</span>{" "}
-                        <span className="text-red-400">{rsvpCounts[s.id].not_coming}✗</span>{" "}
-                        <span className="text-amber-400">{rsvpCounts[s.id].maybe}?</span>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        RSVP: <span className="text-emerald-600 dark:text-emerald-400">{rsvpCounts[s.id].coming}✓</span>{" "}
+                        <span className="text-red-600 dark:text-red-400">{rsvpCounts[s.id].not_coming}✗</span>{" "}
+                        <span className="text-amber-600 dark:text-amber-400">{rsvpCounts[s.id].maybe}?</span>
                       </p>
                     )}
                     {s.planSessionNumber && (
@@ -1858,7 +1858,7 @@ export default function KalenderPage() {
                         {!isExpanded && s.planYear && s.planSessionNumber && (() => {
                           const ps = getPlanSession(s.planYear, s.planSessionNumber);
                           return ps ? (
-                            <span className="ml-2 text-slate-400">· {ps.activities.length} planövningar</span>
+                            <span className="ml-2 text-slate-500 dark:text-slate-400">· {ps.activities.length} planövningar</span>
                           ) : null;
                         })()}
                       </p>
@@ -1889,8 +1889,8 @@ export default function KalenderPage() {
 
                         {/* RSVP buttons for non-coach users on upcoming sessions */}
                         {!canEdit && s.date >= toYMD(today) && (
-                          <div className="bg-slate-700/50 rounded-lg px-2.5 py-2">
-                            <p className="text-xs font-semibold text-slate-400 mb-1.5">Kommer du?</p>
+                          <div className="bg-gray-100 dark:bg-slate-700/50 rounded-lg px-2.5 py-2">
+                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Kommer du?</p>
                             <div className="flex gap-1.5">
                               {([["coming", "✓ Ja", "emerald"], ["maybe", "? Kanske", "amber"], ["not_coming", "✗ Nej", "red"]] as const).map(([st, label, color]) => (
                                 <button
@@ -1900,7 +1900,7 @@ export default function KalenderPage() {
                                   className={`flex-1 py-1 text-xs font-semibold rounded-lg transition-all ${
                                     myRsvps[s.id] === st
                                       ? color === "emerald" ? "bg-emerald-600 text-white" : color === "amber" ? "bg-amber-500 text-white" : "bg-red-600 text-white"
-                                      : "bg-slate-600 text-slate-300 hover:bg-slate-500"
+                                      : "bg-gray-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-500"
                                   }`}
                                 >
                                   {label}
@@ -1912,9 +1912,9 @@ export default function KalenderPage() {
 
                         {/* Tränarkommentar */}
                         {note?.comment && (
-                          <div className="bg-blue-900/30 rounded-lg px-2.5 py-1.5">
-                            <p className="text-xs font-semibold text-blue-400 mb-0.5">💬 Tränarkommentar</p>
-                            <p className="text-xs text-slate-300 leading-relaxed">{note.comment}</p>
+                          <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg px-2.5 py-1.5">
+                            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-0.5">💬 Tränarkommentar</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{note.comment}</p>
                           </div>
                         )}
 
@@ -1931,9 +1931,9 @@ export default function KalenderPage() {
                                 {ps.activities.map((act, idx) => {
                                   const tags = autoTag(act);
                                   return (
-                                    <div key={idx} className="bg-slate-700 rounded-lg px-2.5 py-2 border border-orange-800/40">
+                                    <div key={idx} className="bg-white dark:bg-slate-700 rounded-lg px-2.5 py-2 border border-orange-200 dark:border-orange-800/40">
                                       <div className="flex items-start justify-between gap-1 mb-0.5">
-                                        <p className="text-xs font-semibold text-slate-200">{act.name}</p>
+                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{act.name}</p>
                                         <div className="flex gap-1 flex-wrap shrink-0">
                                           {tags.slice(0, 2).map((tag) => (
                                             <span key={tag} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TAG_COLORS[tag]}`}>
@@ -1941,10 +1941,10 @@ export default function KalenderPage() {
                                             </span>
                                           ))}
                                           {act.durationMinutes && (
-                                            <span className="text-xs text-slate-400">⏱{act.durationMinutes}m</span>
+                                            <span className="text-xs text-slate-500 dark:text-slate-400">⏱{act.durationMinutes}m</span>
                                           )}
                                           {act.intensityLevel && (
-                                            <span className="text-xs text-slate-400">{"🔥".repeat(act.intensityLevel)}</span>
+                                            <span className="text-xs text-slate-500 dark:text-slate-400">{"🔥".repeat(act.intensityLevel)}</span>
                                           )}
                                         </div>
                                       </div>
@@ -1963,10 +1963,10 @@ export default function KalenderPage() {
                             <p className="text-xs font-semibold text-slate-500 mb-1">🏋️ Tillagda övningar ({note.subActivities.length})</p>
                             <div className="space-y-1">
                               {note.subActivities.map((sub) => (
-                                <div key={sub.id} className="bg-slate-700 rounded-lg px-2.5 py-1.5 border border-blue-800/40">
+                                <div key={sub.id} className="bg-white dark:bg-slate-700 rounded-lg px-2.5 py-1.5 border border-blue-200 dark:border-blue-800/40">
                                   <div className="flex items-start justify-between gap-1">
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-semibold text-slate-200">{sub.name}</p>
+                                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{sub.name}</p>
                                       {sub.description && (
                                         <p className="text-xs text-slate-400 leading-relaxed">{sub.description}</p>
                                       )}
@@ -1980,7 +1980,7 @@ export default function KalenderPage() {
                                             deleteCalendarExercise(s.id, sub.id);
                                           }
                                         }}
-                                        className="text-slate-300 hover:text-red-500 transition-colors text-xs shrink-0 ml-1"
+                                        className="text-slate-500 dark:text-slate-300 hover:text-red-500 transition-colors text-xs shrink-0 ml-1"
                                         title="Ta bort övning"
                                       >
                                         ✕
@@ -1998,7 +1998,7 @@ export default function KalenderPage() {
                           <div className="border-t border-orange-100 pt-2">
                             {addingExerciseFor === s.id ? (
                               <div className="space-y-2">
-                                <p className="text-xs font-semibold text-slate-600">➕ Lägg till övning</p>
+                                <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">➕ Lägg till övning</p>
                                 <input
                                   type="text"
                                   value={calExerciseName[s.id] ?? ""}
@@ -2006,7 +2006,7 @@ export default function KalenderPage() {
                                     setCalExerciseName((prev) => ({ ...prev, [s.id]: e.target.value }))
                                   }
                                   placeholder="Övningens namn..."
-                                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                                 />
                                 <textarea
                                   value={calExerciseDesc[s.id] ?? ""}
@@ -2015,12 +2015,12 @@ export default function KalenderPage() {
                                   }
                                   placeholder="Beskrivning (valfritt)..."
                                   rows={2}
-                                  className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
                                 />
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => setAddingExerciseFor(null)}
-                                    className="flex-1 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                                    className="flex-1 py-1.5 rounded-xl border border-gray-200 dark:border-slate-600 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700"
                                   >
                                     Avbryt
                                   </button>
@@ -2084,16 +2084,16 @@ export default function KalenderPage() {
 
           {/* Attendance panel */}
           {selectedSession && players.length > 0 && (
-            <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
               <div className="flex items-center justify-between mb-1">
-                <h3 className="font-bold text-slate-100">Närvaro</h3>
+                <h3 className="font-bold text-slate-800 dark:text-slate-100">Närvaro</h3>
                 <button
                   onClick={async () => {
                     for (const p of players) {
                       await setPlayerAttendance(selectedSession.id, p.id, "present");
                     }
                   }}
-                  className="text-xs px-2.5 py-1 bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-400 rounded-lg font-semibold transition-colors"
+                  className="text-xs px-2.5 py-1 bg-emerald-100 dark:bg-emerald-900/40 hover:bg-emerald-200 dark:hover:bg-emerald-800/60 text-emerald-700 dark:text-emerald-400 rounded-lg font-semibold transition-colors"
                 >
                   ✓ Markera alla
                 </button>
@@ -2107,7 +2107,7 @@ export default function KalenderPage() {
                   return (
                     <div key={p.id} className="flex items-center gap-2">
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-slate-200">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                           #{p.number} {p.name}
                         </span>
                       </div>
@@ -2130,7 +2130,7 @@ export default function KalenderPage() {
                               className={`text-xs px-2 py-1 rounded-lg font-medium transition-all ${
                                 current === status
                                   ? `${cfg.bg} ${cfg.text} ring-1 ring-current`
-                                  : "bg-slate-700 text-slate-400 hover:bg-slate-600"
+                                  : "bg-gray-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-600"
                               }`}
                             >
                               {status === "present"
@@ -2151,7 +2151,7 @@ export default function KalenderPage() {
               {(() => {
                 const s = attendanceSummary(selectedSession.id);
                 return (
-                  <div className="mt-3 pt-3 border-t border-slate-700 flex gap-4 text-xs">
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-700 flex gap-4 text-xs">
                     <span className="text-emerald-600 font-semibold">
                       ✓ {s.present} Närvarande
                     </span>
@@ -2182,11 +2182,11 @@ export default function KalenderPage() {
               const suggestions = getDrillSuggestions(presentCount);
               if (suggestions.length === 0) return null;
               return (
-                <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-lg">💡</span>
                     <div>
-                      <h3 className="font-bold text-slate-100 text-sm">
+                      <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">
                         Övningsförslag
                       </h3>
                       <p className="text-xs text-slate-500">
@@ -2201,7 +2201,7 @@ export default function KalenderPage() {
                         className={`p-3 rounded-xl border ${drill.color}`}
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold px-2 py-0.5 bg-slate-900/50 rounded-full">
+                          <span className="text-xs font-bold px-2 py-0.5 bg-gray-200 dark:bg-slate-900/50 rounded-full">
                             {drill.badge}
                           </span>
                           <span className="text-sm font-semibold">
@@ -2239,11 +2239,11 @@ export default function KalenderPage() {
               .slice(0, 3);
             if (recommended.length === 0) return null;
             return (
-              <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-lg">🤖</span>
                   <div>
-                    <h3 className="font-bold text-slate-100 text-sm">AI-rekommendationer</h3>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">AI-rekommendationer</h3>
                     <p className="text-xs text-slate-500">
                       Liknande övningar från övningsbanken
                     </p>
@@ -2253,9 +2253,9 @@ export default function KalenderPage() {
                   {recommended.map((rec, i) => {
                     const tags = autoTag(rec);
                     return (
-                      <div key={i} className="p-2.5 rounded-xl border border-slate-700 bg-slate-700">
+                      <div key={i} className="p-2.5 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-700">
                         <div className="flex items-start justify-between gap-1 mb-0.5">
-                          <p className="text-xs font-semibold text-slate-200">{rec.name}</p>
+                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">{rec.name}</p>
                           <div className="flex gap-1 shrink-0">
                             {tags.slice(0, 1).map((tag) => (
                               <span key={tag} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${TAG_COLORS[tag]}`}>
@@ -2264,7 +2264,7 @@ export default function KalenderPage() {
                             ))}
                           </div>
                         </div>
-                        <p className="text-xs text-slate-400">År {rec.planYear} · {rec.sessionTitle}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">År {rec.planYear} · {rec.sessionTitle}</p>
                       </div>
                     );
                   })}
@@ -2281,8 +2281,8 @@ export default function KalenderPage() {
 
           {/* Player panel */}
           {showPlayerPanel && (
-            <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-sm p-4">
-              <h3 className="font-bold text-slate-100 mb-3">Spelarlistan</h3>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-sm p-4">
+              <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Spelarlistan</h3>
               {canEdit && (
                 <div className="flex gap-2 mb-2">
                   <input
@@ -2318,18 +2318,18 @@ export default function KalenderPage() {
                   {players.map((p) => (
                     <li
                       key={p.id}
-                      className="flex items-center gap-2 bg-slate-700 rounded-xl px-3 py-2"
+                      className="flex items-center gap-2 bg-gray-50 dark:bg-slate-700 rounded-xl px-3 py-2"
                     >
-                      <span className="text-xs font-bold text-slate-400 w-8">
+                      <span className="text-xs font-bold text-slate-500 dark:text-slate-400 w-8">
                         #{p.number}
                       </span>
-                      <span className="flex-1 text-sm font-medium text-slate-200">
+                      <span className="flex-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                         {p.name}
                       </span>
                       {canEdit && (
                         <button
                           onClick={() => deletePlayer(p.id)}
-                          className="text-slate-400 hover:text-red-500 transition-colors text-sm"
+                          className="text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors text-sm"
                         >
                           ✕
                         </button>

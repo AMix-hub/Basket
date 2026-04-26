@@ -221,11 +221,11 @@ export default function LagPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-3xl">🏀</span>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">
             Mina lag
           </h1>
         </div>
-        <p className="text-slate-500 text-sm">
+        <p className="text-slate-500 dark:text-slate-500 text-sm">
           Laginfo, inbjudningskoder och medlemmar. Du kan vara med i flera lag
           samtidigt.
         </p>
@@ -233,14 +233,14 @@ export default function LagPage() {
 
       {/* No team notice */}
       {teams.length === 0 && !joinSuccess && (
-        <div className="bg-amber-900/30 border border-amber-700/50 rounded-2xl p-4 mb-6 text-sm text-amber-300">
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-4 mb-6 text-sm text-amber-700 dark:text-amber-300">
           Du är inte med i något lag ännu. Ange en inbjudningskod nedan för att
           gå med.
         </div>
       )}
 
       {joinSuccess && (
-        <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-2xl p-4 mb-6 text-emerald-400 text-sm font-medium">
+        <div className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700/50 rounded-2xl p-4 mb-6 text-emerald-700 dark:text-emerald-400 text-sm font-medium">
           ✓ Du har gått med i laget! Laginformationen visas nedan.
         </div>
       )}
@@ -263,10 +263,10 @@ export default function LagPage() {
             {/* Team header card */}
             <button
               onClick={() => toggleTeam(team.id)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-5 flex items-center justify-between gap-4 hover:border-orange-300 transition-colors"
+              className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5 flex items-center justify-between gap-4 hover:border-orange-300 transition-colors"
             >
               <div className="text-left">
-                <h2 className="text-lg font-extrabold text-slate-100">
+                <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">
                   {team.name}
                 </h2>
                 {team.ageGroup && (
@@ -277,7 +277,7 @@ export default function LagPage() {
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-2xl">🏀</span>
-                <span className="text-slate-400 text-sm">
+                <span className="text-slate-500 dark:text-slate-400 text-sm">
                   {isExpanded ? "▲" : "▼"}
                 </span>
               </div>
@@ -295,33 +295,45 @@ export default function LagPage() {
                   return (
                     <Link href={`/session/${next.id}`}
                       className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-colors hover:opacity-90 ${
-                        isMatch ? "bg-red-900/20 border-red-800/40" : "bg-orange-500/10 border-orange-500/20"
+                        isMatch ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40" : "bg-orange-500/10 border-orange-500/20"
                       }`}>
                       <span className="text-xl">{isMatch ? "🏆" : "🏀"}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-orange-400 mb-0.5">Nästa pass</p>
-                        <p className="font-semibold text-slate-200 text-sm truncate">{next.title}</p>
-                        <p className="text-xs text-slate-400">{label}{next.time ? ` · ${next.time}` : ""}</p>
+                        <p className="font-semibold text-slate-700 dark:text-slate-200 text-sm truncate">{next.title}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{label}{next.time ? ` · ${next.time}` : ""}</p>
                       </div>
                       <span className="text-orange-400 text-sm">→</span>
                     </Link>
                   );
                 })()}
 
+                {/* Documents quick link */}
+                <Link
+                  href="/dokument"
+                  className="flex items-center gap-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl px-4 py-3 hover:border-orange-400 dark:hover:border-orange-500 transition-colors"
+                >
+                  <span className="text-xl">📄</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Lagdokument</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Policyer, schema, cuper & mer →</p>
+                  </div>
+                </Link>
+
                 {/* Invite codes (coach / admin only) */}
                 {canSeeInvites && (
-                  <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                    <h3 className="font-bold text-slate-100 mb-3">
+                  <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">
                       Inbjudningskoder
                     </h3>
-                    <p className="text-slate-500 text-sm mb-4">
+                    <p className="text-slate-400 dark:text-slate-500 text-sm mb-4">
                       Dela dessa koder med rätt person.
                     </p>
                     <div className="space-y-3">
                       {[
-                        { key: `${team.id}-staff`,  label: "👋 Assistenter / personal", code: team.inviteCode,        bg: "bg-slate-900/30",    text: "text-slate-400",   mono: "text-slate-200",   btn: "bg-slate-700 text-slate-300 hover:bg-slate-600" },
-                        { key: `${team.id}-parent`, label: "👪 Föräldrar",               code: team.parentInviteCode,  bg: "bg-orange-500/10",   text: "text-orange-400",  mono: "text-orange-300",  btn: "bg-orange-500/20 text-orange-400 hover:bg-orange-500/30" },
-                        { key: `${team.id}-player`, label: "🏃 Spelare",                 code: team.playerInviteCode,  bg: "bg-emerald-900/30",  text: "text-emerald-400", mono: "text-emerald-300", btn: "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30" },
+                        { key: `${team.id}-staff`,  label: "👋 Assistenter / personal", code: team.inviteCode,        bg: "bg-gray-100 dark:bg-slate-900/30",    text: "text-slate-500 dark:text-slate-400",   mono: "text-slate-700 dark:text-slate-200",   btn: "bg-gray-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600" },
+                        { key: `${team.id}-parent`, label: "👪 Föräldrar",               code: team.parentInviteCode,  bg: "bg-orange-500/10",   text: "text-orange-500 dark:text-orange-400",  mono: "text-orange-600 dark:text-orange-300",  btn: "bg-orange-500/20 text-orange-600 dark:text-orange-400 hover:bg-orange-500/30" },
+                        { key: `${team.id}-player`, label: "🏃 Spelare",                 code: team.playerInviteCode,  bg: "bg-emerald-500/10 dark:bg-emerald-900/30",  text: "text-emerald-600 dark:text-emerald-400", mono: "text-emerald-700 dark:text-emerald-300", btn: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30" },
                       ].map(({ key, label, code, bg, text, mono, btn }) => (
                         <div key={key} className={`flex items-center gap-3 ${bg} rounded-xl px-4 py-3`}>
                           <div className="flex-1">
@@ -339,7 +351,7 @@ export default function LagPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 p-3 bg-blue-900/30 border border-blue-700/50 rounded-xl text-xs text-blue-300">
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/50 rounded-xl text-xs text-blue-700 dark:text-blue-300">
                       💡 <strong>Tips:</strong> Dela rätt kod med rätt person. De
                       registrerar sig via{" "}
                       <Link href="/anslut" className="underline font-medium">
@@ -351,12 +363,12 @@ export default function LagPage() {
                 )}
 
                 {/* Members list */}
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                  <h3 className="font-bold text-slate-100 mb-3">
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">
                     Lagmedlemmar ({members.length})
                   </h3>
                   {members.length === 0 ? (
-                    <p className="text-slate-400 text-sm">
+                    <p className="text-slate-400 dark:text-slate-400 text-sm">
                       Inga medlemmar i laget ännu.
                     </p>
                   ) : (
@@ -364,19 +376,19 @@ export default function LagPage() {
                       {members.map((m) => (
                         <li
                           key={m.id}
-                          className="flex items-center gap-3 bg-slate-900/30 rounded-xl px-4 py-3"
+                          className="flex items-center gap-3 bg-gray-50 dark:bg-slate-900/30 rounded-xl px-4 py-3"
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-slate-200">
+                            <p className="font-medium text-sm text-slate-700 dark:text-slate-200">
                               {m.name}
                             </p>
                             {m.roles.includes("parent") && m.child_name && (
-                              <p className="text-xs text-slate-400 mt-0.5">
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 Förälder till {m.child_name}
                               </p>
                             )}
                           </div>
-                          <span className="text-xs font-semibold text-slate-500 shrink-0">
+                          <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 shrink-0">
                             {m.roles
                               .map((r) => roleLabel[r as keyof typeof roleLabel] ?? r)
                               .join(", ")}
@@ -388,11 +400,11 @@ export default function LagPage() {
                 </div>
 
                 {/* Player groups */}
-                <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5">
-                  <h3 className="font-bold text-slate-100 mb-3">
+                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">
                     Träningsgrupper ({groups.length})
                   </h3>
-                  <p className="text-slate-500 text-sm mb-4">
+                  <p className="text-slate-400 dark:text-slate-500 text-sm mb-4">
                     Spelare kan vara med i flera grupper samtidigt.
                   </p>
 
@@ -408,17 +420,17 @@ export default function LagPage() {
                           group.memberIds.includes(m.id)
                         );
                         return (
-                          <div key={group.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                          <div key={group.id} className="border border-gray-200 dark:border-slate-600 rounded-xl overflow-hidden">
                             <button
                               onClick={() => toggleGroup(group.id)}
-                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700/40 hover:bg-gray-100 dark:hover:bg-slate-700/60 transition-colors text-left"
                             >
                               <div className="flex items-center gap-2">
                                 <span className="text-base">👥</span>
-                                <span className="font-semibold text-sm text-slate-200">
+                                <span className="font-semibold text-sm text-slate-700 dark:text-slate-200">
                                   {group.name}
                                 </span>
-                                <span className="text-xs text-slate-500">
+                                <span className="text-xs text-slate-400 dark:text-slate-500">
                                   ({groupMembers.length} spelare)
                                 </span>
                               </div>
@@ -429,13 +441,13 @@ export default function LagPage() {
                                       e.stopPropagation();
                                       deleteGroup(group.id);
                                     }}
-                                    className="text-slate-300 hover:text-red-500 transition-colors text-xs px-1"
+                                    className="text-slate-400 dark:text-slate-300 hover:text-red-500 transition-colors text-xs px-1"
                                     aria-label="Ta bort grupp"
                                   >
                                     ✕
                                   </button>
                                 )}
-                                <span className="text-slate-400 text-xs">
+                                <span className="text-slate-400 dark:text-slate-400 text-xs">
                                   {isGroupExpanded ? "▲" : "▼"}
                                 </span>
                               </div>
@@ -443,7 +455,7 @@ export default function LagPage() {
                             {isGroupExpanded && (
                               <div className="px-4 py-3 space-y-2">
                                 {members.length === 0 ? (
-                                  <p className="text-slate-400 text-xs">Inga lagmedlemmar att lägga till.</p>
+                                  <p className="text-slate-400 dark:text-slate-400 text-xs">Inga lagmedlemmar att lägga till.</p>
                                 ) : (
                                   <ul className="space-y-1.5">
                                     {members.map((m) => {
@@ -458,8 +470,8 @@ export default function LagPage() {
                                                 onChange={() => toggleGroupMember(group, m.id)}
                                                 className="accent-orange-500 w-4 h-4 shrink-0"
                                               />
-                                              <span className="text-sm text-slate-200">{m.name}</span>
-                                              <span className="text-xs text-slate-400">
+                                              <span className="text-sm text-slate-700 dark:text-slate-200">{m.name}</span>
+                                              <span className="text-xs text-slate-500 dark:text-slate-400">
                                                 {m.roles
                                                   .map((r) => roleLabel[r as keyof typeof roleLabel] ?? r)
                                                   .join(", ")}
@@ -467,7 +479,7 @@ export default function LagPage() {
                                             </label>
                                           ) : (
                                             inGroup && (
-                                              <span className="text-sm text-slate-200">{m.name}</span>
+                                              <span className="text-sm text-slate-700 dark:text-slate-200">{m.name}</span>
                                             )
                                           )}
                                         </li>
@@ -494,7 +506,7 @@ export default function LagPage() {
                         }
                         onKeyDown={(e) => e.key === "Enter" && createGroup(team.id)}
                         placeholder="Namn på ny grupp…"
-                        className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
+                        className="flex-1 px-3 py-2 text-sm text-slate-800 dark:text-slate-100 border border-gray-200 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-400"
                       />
                       <button
                         onClick={() => createGroup(team.id)}
@@ -513,18 +525,18 @@ export default function LagPage() {
       })}
 
       {/* Join an additional team */}
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 mt-2">
-        <h2 className="font-bold text-slate-100 mb-1">
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mt-2">
+        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">
           {teams.length === 0 ? "Gå med i ett lag" : "Gå med i ytterligare ett lag"}
         </h2>
-        <p className="text-slate-500 text-sm mb-4">
+        <p className="text-slate-400 dark:text-slate-500 text-sm mb-4">
           {teams.length === 0
             ? "Ange en inbjudningskod från din coach för att gå med."
             : "Har du en kod till ett annat lag? Du kan vara med i flera lag samtidigt."}
         </p>
         <form onSubmit={handleJoin} className="space-y-3">
           <div>
-            <label className="block text-sm font-semibold text-slate-300 mb-1">
+            <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">
               Inbjudningskod
             </label>
             <input
@@ -534,12 +546,12 @@ export default function LagPage() {
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               placeholder="XXXXXX"
               maxLength={6}
-              className="w-full max-w-xs px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
+              className="w-full max-w-xs px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
             />
           </div>
           {user.roles.includes("parent") && (
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-1">
+              <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">
                 Barnets namn
               </label>
               <input
@@ -548,7 +560,7 @@ export default function LagPage() {
                 value={joinChildName}
                 onChange={(e) => setJoinChildName(e.target.value)}
                 placeholder="Barnets namn i spelarlistan"
-                className="w-full max-w-xs px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                className="w-full max-w-xs px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
               />
             </div>
           )}

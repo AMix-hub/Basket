@@ -228,7 +228,7 @@ export default function StatistikPage() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-3xl">🎯</span>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">Shot Tracker & Statistik</h1>
+          <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Shot Tracker & Statistik</h1>
         </div>
         <p className="text-slate-500 text-sm">Klicka på planen för att logga skott. Klicka på ett befintligt skott för att redigera.</p>
       </div>
@@ -237,7 +237,7 @@ export default function StatistikPage() {
       <div className="flex gap-2 mb-4">
         {(["log", "stats", "närvaro"] as const).map((tab) => (
           <button key={tab} onClick={() => setViewMode(tab)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${viewMode === tab ? "bg-orange-500 text-white" : "bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30"}`}>
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${viewMode === tab ? "bg-orange-500 text-white" : "bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700/30"}`}>
             {tab === "log" ? "🏀 Logga skott" : tab === "stats" ? "📊 Statistik" : "📋 Närvaro"}
           </button>
         ))}
@@ -247,7 +247,7 @@ export default function StatistikPage() {
 
         {/* Court */}
         <div className="flex-1 min-w-0">
-          <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden relative">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 overflow-hidden relative">
             <svg
               ref={svgRef}
               viewBox={`0 0 ${CW} ${CH}`}
@@ -289,10 +289,10 @@ export default function StatistikPage() {
               const player = players.find((p) => p.id === selectedShot.playerId);
               return (
                 <div
-                  className="absolute z-10 bg-slate-900 border border-slate-600 rounded-xl shadow-xl p-3 flex flex-col gap-2 min-w-[160px]"
+                  className="absolute z-10 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl shadow-xl p-3 flex flex-col gap-2 min-w-[160px]"
                   style={{ left: Math.min(leftPx + 16, containerRect.width - 180), top: Math.max(topPx - 80, 4) }}
                 >
-                  <p className="text-xs text-slate-400 font-medium">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                     {player ? `#${player.number} ${player.name}` : "Alla spelare"} · {getZone(selectedShot.x, selectedShot.y)}
                   </p>
                   <div className="flex gap-2">
@@ -304,12 +304,12 @@ export default function StatistikPage() {
                   </div>
                   <button
                     onClick={() => deleteShot(selectedShot.id)}
-                    className="w-full py-1.5 rounded-lg text-xs font-semibold bg-slate-700 hover:bg-red-900/50 text-red-400 transition-colors">
+                    className="w-full py-1.5 rounded-lg text-xs font-semibold bg-red-50 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors">
                     Ta bort skott
                   </button>
                   <button
                     onClick={() => setSelectedShotId(null)}
-                    className="w-full py-1 rounded-lg text-xs text-slate-500 hover:text-slate-300 transition-colors">
+                    className="w-full py-1 rounded-lg text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
                     Stäng
                   </button>
                 </div>
@@ -326,9 +326,9 @@ export default function StatistikPage() {
 
           {/* Recent shots list */}
           {viewMode === "log" && shots.length > 0 && (
-            <div className="mt-4 bg-slate-800 border border-slate-700 rounded-2xl p-4">
+            <div className="mt-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-slate-100 text-sm">Senaste skott</h3>
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Senaste skott</h3>
                 <button onClick={() => { if (confirm("Rensa alla skott?")) saveShots([]); }}
                   className="text-xs text-red-400 hover:text-red-300 transition-colors">
                   Rensa alla
@@ -339,7 +339,7 @@ export default function StatistikPage() {
                   const player = players.find((p) => p.id === s.playerId);
                   return (
                     <div key={s.id}
-                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer ${s.id === selectedShotId ? "bg-slate-600" : "bg-slate-900/40 hover:bg-slate-700"}`}
+                      className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors cursor-pointer ${s.id === selectedShotId ? "bg-gray-200 dark:bg-slate-600" : "bg-gray-50 dark:bg-slate-900/40 hover:bg-gray-100 dark:hover:bg-slate-700"}`}
                       onClick={() => setSelectedShotId(s.id === selectedShotId ? null : s.id)}>
                       <span className={`text-xs font-bold w-12 shrink-0 ${s.made ? "text-emerald-400" : "text-red-400"}`}>
                         {s.made ? "✓ Satt" : "✗ Miss"}
@@ -349,11 +349,11 @@ export default function StatistikPage() {
                       </span>
                       <div className="flex gap-1 shrink-0">
                         <button onClick={(e) => { e.stopPropagation(); toggleShotResult(s.id); }}
-                          className="text-xs px-1.5 py-0.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">
+                          className="text-xs px-1.5 py-0.5 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors">
                           ↔
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); deleteShot(s.id); }}
-                          className="text-xs px-1.5 py-0.5 rounded-lg bg-slate-700 hover:bg-red-900/50 text-red-400 transition-colors">
+                          className="text-xs px-1.5 py-0.5 rounded-lg bg-red-50 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 transition-colors">
                           ✕
                         </button>
                       </div>
@@ -371,8 +371,8 @@ export default function StatistikPage() {
           {viewMode === "log" && (
             <>
               {/* Shot result toggle */}
-              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
-                <h3 className="font-bold text-slate-100 mb-3">Nästa skott</h3>
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Nästa skott</h3>
                 <div className="flex gap-2">
                   <button onClick={() => setShotResult("made")}
                     className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${shotResult === "made" ? "bg-emerald-500 text-white shadow-md scale-105" : "bg-emerald-900/30 text-emerald-400 hover:bg-emerald-800/30"}`}>
@@ -386,9 +386,9 @@ export default function StatistikPage() {
               </div>
 
               {/* Player selection */}
-              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-slate-100">Spelare</h3>
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100">Spelare</h3>
                   <button onClick={() => setShowPlayerForm((s) => !s)} className="text-xs text-orange-500 font-semibold hover:text-orange-600">
                     + Lägg till
                   </button>
@@ -396,22 +396,22 @@ export default function StatistikPage() {
                 {showPlayerForm && (
                   <div className="flex gap-2 mb-3">
                     <input type="number" value={newPlayerNumber} onChange={(e) => setNewPlayerNumber(e.target.value)} placeholder="#"
-                      className="w-14 px-2 py-1.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      className="w-14 px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100" />
                     <input type="text" value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && addPlayer()} placeholder="Namn..."
-                      className="flex-1 px-2 py-1.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                      className="flex-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100" />
                     <button onClick={addPlayer} disabled={!newPlayerName.trim()}
                       className="px-2 py-1.5 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 disabled:opacity-40 transition-colors">+</button>
                   </div>
                 )}
                 <button onClick={() => setSelectedPlayerId(null)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-sm mb-1 font-medium transition-colors ${selectedPlayerId === null ? "bg-orange-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>
+                  className={`w-full text-left px-3 py-2 rounded-xl text-sm mb-1 font-medium transition-colors ${selectedPlayerId === null ? "bg-orange-500 text-white" : "bg-gray-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600"}`}>
                   🏀 Alla spelare
                 </button>
                 {players.map((p) => (
                   <div key={p.id} className="flex items-center gap-1 mb-1">
                     <button onClick={() => setSelectedPlayerId(selectedPlayerId === p.id ? null : p.id)}
-                      className={`flex-1 text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors ${selectedPlayerId === p.id ? "bg-orange-500 text-white" : "bg-slate-700 text-slate-300 hover:bg-slate-600"}`}>
+                      className={`flex-1 text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors ${selectedPlayerId === p.id ? "bg-orange-500 text-white" : "bg-gray-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600"}`}>
                       #{p.number} {p.name}
                     </button>
                     <button onClick={() => deletePlayer(p.id)} className="text-slate-400 hover:text-red-500 transition-colors px-1">✕</button>
@@ -420,9 +420,9 @@ export default function StatistikPage() {
                 {(() => {
                   const stats = getPlayerStats(selectedPlayerId);
                   return stats.attempted > 0 ? (
-                    <div className="mt-3 pt-3 border-t border-slate-700 flex gap-4 text-xs">
+                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-700 flex gap-4 text-xs">
                       <span className="text-emerald-400 font-semibold">{stats.made}/{stats.attempted} satt</span>
-                      <span className="text-slate-100 font-bold text-sm">{stats.percentage}%</span>
+                      <span className="text-slate-800 dark:text-slate-100 font-bold text-sm">{stats.percentage}%</span>
                     </div>
                   ) : null;
                 })()}
@@ -432,17 +432,17 @@ export default function StatistikPage() {
 
           {viewMode === "stats" && (
             <>
-              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
-                <h3 className="font-bold text-slate-100 mb-3">Visa statistik för</h3>
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Visa statistik för</h3>
                 <select value={filterPlayerId} onChange={(e) => setFilterPlayerId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-slate-900 text-slate-200">
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-200">
                   <option value="all">Alla spelare</option>
                   {players.map((p) => <option key={p.id} value={p.id}>#{p.number} {p.name}</option>)}
                 </select>
                 {overallStats.attempted > 0 && (
                   <div className="mt-4 flex items-center justify-between">
                     <div className="text-center flex-1">
-                      <div className="text-3xl font-extrabold text-slate-100">{overallStats.percentage}%</div>
+                      <div className="text-3xl font-extrabold text-slate-800 dark:text-slate-100">{overallStats.percentage}%</div>
                       <div className="text-xs text-slate-500">Träffprocent</div>
                     </div>
                     <div className="text-center flex-1">
@@ -454,7 +454,7 @@ export default function StatistikPage() {
                       <div className="text-xs text-slate-500">Miss</div>
                     </div>
                     <div className="text-center flex-1">
-                      <div className="text-2xl font-bold text-slate-300">{overallStats.attempted}</div>
+                      <div className="text-2xl font-bold text-slate-600 dark:text-slate-300">{overallStats.attempted}</div>
                       <div className="text-xs text-slate-500">Totalt</div>
                     </div>
                   </div>
@@ -462,8 +462,8 @@ export default function StatistikPage() {
               </div>
 
               {filterPlayerId === "all" && players.length > 0 && (
-                <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
-                  <h3 className="font-bold text-slate-100 mb-3">Per spelare</h3>
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Per spelare</h3>
                   <div className="space-y-2">
                     {players.map((p) => ({ player: p, stats: getPlayerStats(p.id) }))
                       .filter(({ stats }) => stats.attempted > 0)
@@ -471,15 +471,15 @@ export default function StatistikPage() {
                       .map(({ player, stats }) => (
                         <div key={player.id} className="flex items-center gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-200 truncate">#{player.number} {player.name}</p>
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">#{player.number} {player.name}</p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                              <div className="flex-1 h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                 <div className="h-full bg-orange-400 rounded-full transition-all" style={{ width: `${stats.percentage}%` }} />
                               </div>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <span className="text-sm font-bold text-slate-100">{stats.percentage}%</span>
+                            <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{stats.percentage}%</span>
                             <p className="text-xs text-slate-400">{stats.made}/{stats.attempted}</p>
                           </div>
                         </div>
@@ -489,21 +489,21 @@ export default function StatistikPage() {
               )}
 
               {zoneStats.length > 0 && (
-                <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
-                  <h3 className="font-bold text-slate-100 mb-3">Per zon</h3>
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Per zon</h3>
                   <div className="space-y-2">
                     {zoneStats.map(({ zone, made, attempted, percentage }) => (
                       <div key={zone} className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-0.5">
-                            <span className="text-xs font-medium text-slate-300 truncate">{zone}</span>
+                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">{zone}</span>
                             <span className="text-xs text-slate-400 shrink-0 ml-2">{made}/{attempted}</span>
                           </div>
-                          <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                          <div className="h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
                             <div className={`h-full rounded-full transition-all ${percentage >= 50 ? "bg-emerald-400" : "bg-orange-400"}`} style={{ width: `${percentage}%` }} />
                           </div>
                         </div>
-                        <span className="text-sm font-bold text-slate-100 w-10 text-right shrink-0">{percentage}%</span>
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-100 w-10 text-right shrink-0">{percentage}%</span>
                       </div>
                     ))}
                   </div>
@@ -511,7 +511,7 @@ export default function StatistikPage() {
               )}
 
               {zoneStats.length === 0 && (
-                <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4 text-sm text-slate-500 text-center">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 text-sm text-slate-500 text-center">
                   Logga skott på planen för att se statistik här.
                 </div>
               )}
@@ -521,15 +521,15 @@ export default function StatistikPage() {
           {viewMode === "närvaro" && (
             <>
               {players.length === 0 || calSessions.length === 0 ? (
-                <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 text-center text-slate-500 text-sm">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 text-center text-slate-500 text-sm">
                   <p className="text-2xl mb-2">📋</p>
                   {players.length === 0 ? "Lägg till spelare i Kalender-sidan för att se närvaro här." : "Inga träningspass registrerade ännu."}
                 </div>
               ) : (
                 <>
-                  <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
                     <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-slate-100">Närvaro per spelare</h3>
+                      <h3 className="font-bold text-slate-800 dark:text-slate-100">Närvaro per spelare</h3>
                       <button
                         onClick={() => {
                           const trainingSessions = calSessions.filter((s) => s.type === "träning").sort((a, b) => a.date.localeCompare(b.date));
@@ -552,7 +552,7 @@ export default function StatistikPage() {
                           a.href = url; a.download = "narvaro.csv"; a.click();
                           URL.revokeObjectURL(url);
                         }}
-                        className="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-semibold transition-colors"
+                        className="text-xs px-3 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-semibold transition-colors"
                       >
                         ⬇ Exportera CSV
                       </button>
@@ -572,12 +572,12 @@ export default function StatistikPage() {
                         return (
                           <div key={p.id} className="flex items-center gap-3">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-200">#{p.number} {p.name}</p>
+                              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">#{p.number} {p.name}</p>
                               <p className="text-xs text-slate-400">{present} av {total} pass</p>
                             </div>
                             {pct !== null ? (
                               <div className="flex items-center gap-2 shrink-0">
-                                <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                <div className="w-20 h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
                                   <div className={`h-full rounded-full ${pct >= 70 ? "bg-emerald-400" : pct >= 40 ? "bg-amber-400" : "bg-red-400"}`} style={{ width: `${pct}%` }} />
                                 </div>
                                 <span className={`text-sm font-bold w-10 text-right ${pct >= 70 ? "text-emerald-400" : pct >= 40 ? "text-amber-400" : "text-red-400"}`}>{pct}%</span>
@@ -591,8 +591,8 @@ export default function StatistikPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
-                    <h3 className="font-bold text-slate-100 mb-3">Sessionshistorik</h3>
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-4">
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Sessionshistorik</h3>
                     <div className="space-y-2">
                       {calSessions.filter((s) => s.type === "träning").sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15).map((s) => {
                         const sessAtt = calAttendance.filter((a) => a.sessionId === s.id);
@@ -600,9 +600,9 @@ export default function StatistikPage() {
                         const d = new Date(s.date + "T12:00:00");
                         return (
                           <Link key={s.id} href={`/session/${s.id}`}
-                            className="flex items-center gap-3 bg-slate-900/40 hover:bg-slate-700/40 rounded-xl px-3 py-2 transition-colors">
+                            className="flex items-center gap-3 bg-gray-50 dark:bg-slate-900/40 hover:bg-gray-100 dark:hover:bg-slate-700/40 rounded-xl px-3 py-2 transition-colors">
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-slate-200 truncate">{s.title}</p>
+                              <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{s.title}</p>
                               <p className="text-xs text-slate-400">{d.toLocaleDateString("sv-SE", { weekday: "short", month: "short", day: "numeric" })}</p>
                             </div>
                             {sessAtt.length > 0 ? (

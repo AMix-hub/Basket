@@ -137,11 +137,11 @@ export default function DashboardHome() {
       {/* Greeting */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
             {greeting}, {displayName}! 👋
           </h1>
           {team && (
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {team.name} · {team.ageGroup}
             </p>
           )}
@@ -153,7 +153,7 @@ export default function DashboardHome() {
               setSelectedTeamId(e.target.value);
               setSessions([]);
             }}
-            className="text-sm text-slate-200 bg-slate-700 border border-slate-600 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+            className="text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
           >
             {myTeams.map((t) => (
               <option key={t.id} value={t.id}>
@@ -168,14 +168,14 @@ export default function DashboardHome() {
       {!isCoachOrAdmin && unansweredCount > 0 && (
         <Link
           href="/familj"
-          className="flex items-center gap-3 bg-amber-900/30 border border-amber-700/50 rounded-2xl px-4 py-3 hover:border-amber-600/70 transition-colors"
+          className="flex items-center gap-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-2xl px-4 py-3 hover:border-amber-400 dark:hover:border-amber-600/70 transition-colors"
         >
           <span className="text-xl">📬</span>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-amber-300">
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
               Du har {unansweredCount} obesvarad{unansweredCount !== 1 ? "e" : ""} kallelse{unansweredCount !== 1 ? "r" : ""}
             </p>
-            <p className="text-xs text-amber-500">Svara nu →</p>
+            <p className="text-xs text-amber-600 dark:text-amber-500">Svara nu →</p>
           </div>
         </Link>
       )}
@@ -189,19 +189,19 @@ export default function DashboardHome() {
               href={`/session/${s.id}`}
               className={`flex items-center gap-4 rounded-2xl p-4 border transition-all hover:opacity-90 ${
                 s.type === "match"
-                  ? "bg-red-900/30 border-red-700/50"
+                  ? "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700/50"
                   : "bg-orange-500/15 border-orange-500/30"
               }`}
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xl ${
-                s.type === "match" ? "bg-red-800/60" : "bg-orange-500/30"
+                s.type === "match" ? "bg-red-100 dark:bg-red-800/60" : "bg-orange-500/30"
               }`}>
                 {s.type === "match" ? "🏆" : "🏀"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-orange-400 mb-0.5">IDAG</p>
-                <p className="font-bold text-white truncate">{s.title}</p>
-                {s.time && <p className="text-xs text-slate-400">{s.time}</p>}
+                <p className="text-xs font-semibold text-orange-500 dark:text-orange-400 mb-0.5">IDAG</p>
+                <p className="font-bold text-slate-900 dark:text-white truncate">{s.title}</p>
+                {s.time && <p className="text-xs text-slate-500 dark:text-slate-400">{s.time}</p>}
               </div>
               <span className="text-orange-400 font-bold text-sm shrink-0">→</span>
             </Link>
@@ -215,7 +215,7 @@ export default function DashboardHome() {
           {
             label: "Träningspass",
             value: totalSessions > 0 ? String(totalSessions) : "—",
-            accent: "text-sky-400",
+            accent: "text-sky-500 dark:text-sky-400",
             bg: "bg-sky-500/10 border-sky-500/15",
             icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -227,7 +227,7 @@ export default function DashboardHome() {
           {
             label: "Spelare",
             value: memberCount > 0 ? String(memberCount) : "—",
-            accent: "text-violet-400",
+            accent: "text-violet-500 dark:text-violet-400",
             bg: "bg-violet-500/10 border-violet-500/15",
             icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,7 +239,7 @@ export default function DashboardHome() {
           {
             label: "Säsongen",
             value: totalSessions > 0 ? `${seasonPct}%` : "—",
-            accent: "text-emerald-400",
+            accent: "text-emerald-500 dark:text-emerald-400",
             bg: "bg-emerald-500/10 border-emerald-500/15",
             icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,8 +251,8 @@ export default function DashboardHome() {
         ].map((stat) => (
           <div key={stat.label} className={`${stat.bg} border rounded-2xl p-4`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400">{stat.label}</span>
-              <span className="text-slate-500">{stat.icon}</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{stat.label}</span>
+              <span className="text-slate-400 dark:text-slate-500">{stat.icon}</span>
             </div>
             <div className={`text-2xl font-bold ${stat.accent}`}>{stat.value}</div>
           </div>
@@ -264,12 +264,12 @@ export default function DashboardHome() {
             className="bg-amber-500/10 border border-amber-500/15 hover:border-amber-500/40 rounded-2xl p-4 transition-colors"
           >
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400">Nästa match</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Nästa match</span>
               <span className="text-lg">🏆</span>
             </div>
-            <div className="text-2xl font-bold text-amber-400">{matchDayLabel()}</div>
+            <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">{matchDayLabel()}</div>
             {nextMatch.opponent && (
-              <p className="text-xs text-amber-500 mt-1 truncate">
+              <p className="text-xs text-amber-600 dark:text-amber-500 mt-1 truncate">
                 {nextMatch.homeOrAway === "home" ? "🏠" : "✈️"} vs {nextMatch.opponent}
               </p>
             )}
@@ -277,10 +277,10 @@ export default function DashboardHome() {
         ) : (
           <div className="bg-amber-500/10 border border-amber-500/15 rounded-2xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400">Nästa match</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">Nästa match</span>
               <span className="text-lg">🏆</span>
             </div>
-            <div className="text-2xl font-bold text-amber-400">—</div>
+            <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">—</div>
           </div>
         )}
       </div>
@@ -288,12 +288,12 @@ export default function DashboardHome() {
       {/* Middle row: upcoming sessions + calendar */}
       <div className="grid sm:grid-cols-3 gap-4">
         {/* Upcoming sessions */}
-        <div className="sm:col-span-2 bg-[#1e293b] border border-white/5 rounded-2xl p-5">
+        <div className="sm:col-span-2 bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-white/5 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <span className="font-semibold text-slate-200">Kommande träningar</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-200">Kommande träningar</span>
             <Link
               href="/kalender"
-              className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
+              className="text-xs text-sky-500 dark:text-sky-400 hover:text-sky-400 dark:hover:text-sky-300 transition-colors"
             >
               Se kalender →
             </Link>
@@ -301,12 +301,12 @@ export default function DashboardHome() {
 
           {upcoming.length === 0 ? (
             <div className="text-center py-6">
-              <p className="text-sm text-slate-500 mb-3">
+              <p className="text-sm text-slate-400 dark:text-slate-500 mb-3">
                 Inga träningar inlagda i kalendern ännu.
               </p>
               <Link
                 href="/kalender"
-                className="text-xs text-sky-400 hover:text-sky-300 underline underline-offset-2 transition-colors"
+                className="text-xs text-sky-500 dark:text-sky-400 hover:text-sky-400 dark:hover:text-sky-300 underline underline-offset-2 transition-colors"
               >
                 Lägg till träningar →
               </Link>
@@ -320,24 +320,24 @@ export default function DashboardHome() {
                 const isToday = s.date === todayYMD;
                 return (
                   <button key={s.id} onClick={() => router.push(`/session/${s.id}`)}
-                    className="flex items-center gap-3 w-full text-left hover:bg-slate-700/30 rounded-xl px-2 py-1 -mx-2 transition-colors">
+                    className="flex items-center gap-3 w-full text-left hover:bg-slate-100 dark:hover:bg-slate-700/30 rounded-xl px-2 py-1 -mx-2 transition-colors">
                     <div
                       className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0 ${
                         isToday ? "bg-sky-500" : "bg-sky-500/10"
                       }`}
                     >
-                      <span className={`text-[10px] font-semibold ${isToday ? "text-white" : "text-sky-400"}`}>
+                      <span className={`text-[10px] font-semibold ${isToday ? "text-white" : "text-sky-500 dark:text-sky-400"}`}>
                         {dayName}
                       </span>
-                      <span className={`text-xs font-bold ${isToday ? "text-white" : "text-sky-400"}`}>
+                      <span className={`text-xs font-bold ${isToday ? "text-white" : "text-sky-500 dark:text-sky-400"}`}>
                         {d.getDate()}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm text-slate-200 font-medium truncate">{s.title}</div>
-                      <div className="text-xs text-slate-500">{dateLabel} · {s.time}</div>
+                      <div className="text-sm text-slate-700 dark:text-slate-200 font-medium truncate">{s.title}</div>
+                      <div className="text-xs text-slate-400 dark:text-slate-500">{dateLabel} · {s.time}</div>
                     </div>
-                    <span className="text-slate-600 text-xs shrink-0">→</span>
+                    <span className="text-slate-400 dark:text-slate-600 text-xs shrink-0">→</span>
                   </button>
                 );
               })}
@@ -346,15 +346,15 @@ export default function DashboardHome() {
         </div>
 
         {/* Mini calendar */}
-        <div className="bg-[#1e293b] border border-white/5 rounded-2xl p-5">
+        <div className="bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-white/5 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="font-semibold text-slate-200">Kalender</span>
-            <span className="text-xs text-slate-400">{MONTHS_SV[month]}</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-200">Kalender</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{MONTHS_SV[month]}</span>
           </div>
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
             {DAYS_SV_SHORT.map((d, i) => (
-              <div key={i} className="text-[10px] text-slate-500 font-medium py-0.5">
+              <div key={i} className="text-[10px] text-slate-400 dark:text-slate-500 font-medium py-0.5">
                 {d}
               </div>
             ))}
@@ -376,10 +376,10 @@ export default function DashboardHome() {
                     isToday
                       ? "bg-sky-500 text-white"
                       : hasMatch
-                      ? "bg-amber-500/25 text-amber-400"
+                      ? "bg-amber-500/25 text-amber-600 dark:text-amber-400"
                       : hasTraining
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "text-slate-500"
+                      ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                      : "text-slate-400 dark:text-slate-500"
                   }`}
                 >
                   {day}
@@ -388,7 +388,7 @@ export default function DashboardHome() {
             })}
           </div>
           {/* Legend */}
-          <div className="mt-3 flex items-center gap-3 text-[10px] text-slate-500">
+          <div className="mt-3 flex items-center gap-3 text-[10px] text-slate-400 dark:text-slate-500">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-sm bg-emerald-500/40 inline-block" />
               Träning
@@ -408,7 +408,7 @@ export default function DashboardHome() {
             href: "/taktik",
             label: "Taktiktavla",
             desc: "Rita upp spelsystem live",
-            color: "text-violet-400",
+            color: "text-violet-500 dark:text-violet-400",
             iconBg: "bg-violet-500/10",
             icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,7 +421,7 @@ export default function DashboardHome() {
             href: "/statistik",
             label: "Statistik",
             desc: "Följ spelarutveckling",
-            color: "text-sky-400",
+            color: "text-sky-500 dark:text-sky-400",
             iconBg: "bg-sky-500/10",
             icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -434,7 +434,7 @@ export default function DashboardHome() {
             href: "/videor",
             label: "Videor",
             desc: "Dela klipp med laget",
-            color: "text-emerald-400",
+            color: "text-emerald-500 dark:text-emerald-400",
             iconBg: "bg-emerald-500/10",
             icon: (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -447,16 +447,16 @@ export default function DashboardHome() {
           <Link
             key={link.href}
             href={link.href}
-            className="bg-[#1e293b] border border-white/5 hover:border-white/10 rounded-2xl p-4 flex items-center gap-4 transition-all duration-150 group"
+            className="bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-white/5 hover:border-gray-300 dark:hover:border-white/10 rounded-2xl p-4 flex items-center gap-4 transition-all duration-150 group"
           >
             <div className={`w-10 h-10 rounded-xl ${link.iconBg} flex items-center justify-center flex-shrink-0 ${link.color}`}>
               {link.icon}
             </div>
             <div className="flex-1 min-w-0">
               <div className={`font-semibold ${link.color}`}>{link.label}</div>
-              <div className="text-xs text-slate-500">{link.desc}</div>
+              <div className="text-xs text-slate-400 dark:text-slate-500">{link.desc}</div>
             </div>
-            <span className="text-slate-600 group-hover:text-slate-400 transition-colors text-sm flex-shrink-0">
+            <span className="text-slate-400 dark:text-slate-600 group-hover:text-slate-600 dark:group-hover:text-slate-400 transition-colors text-sm flex-shrink-0">
               →
             </span>
           </Link>
@@ -465,16 +465,16 @@ export default function DashboardHome() {
 
       {/* ── Quick actions for coaches/admins ── */}
       {user?.roles.some((r) => ["coach", "admin", "assistant"].includes(r)) && (
-        <div className="bg-[#1e293b] border border-white/5 rounded-2xl p-5">
-          <p className="font-semibold text-slate-200 mb-3">Snabbåtgärder</p>
+        <div className="bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-white/5 rounded-2xl p-5">
+          <p className="font-semibold text-slate-700 dark:text-slate-200 mb-3">Snabbåtgärder</p>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[
-              { href: "/kalender", label: "Skapa träning", icon: "📅", color: "bg-sky-500/10 hover:bg-sky-500/20 text-sky-300" },
-              { href: "/kalender", label: "Skapa match",   icon: "🏆", color: "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300" },
-              { href: "/spelare",  label: "Spelartruppen", icon: "🏀", color: "bg-orange-500/10 hover:bg-orange-500/20 text-orange-300" },
-              { href: "/taktik",   label: "Taktiktavla",   icon: "🎯", color: "bg-violet-500/10 hover:bg-violet-500/20 text-violet-300" },
-              { href: "/meddelanden", label: "Meddelanden", icon: "💬", color: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300" },
-              { href: "/betalningar", label: "Betalningar", icon: "💰", color: "bg-pink-500/10 hover:bg-pink-500/20 text-pink-300" },
+              { href: "/kalender", label: "Skapa träning", icon: "📅", color: "bg-sky-500/10 hover:bg-sky-500/20 text-sky-600 dark:text-sky-300" },
+              { href: "/kalender", label: "Skapa match",   icon: "🏆", color: "bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300" },
+              { href: "/spelare",  label: "Spelartruppen", icon: "🏀", color: "bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 dark:text-orange-300" },
+              { href: "/taktik",   label: "Taktiktavla",   icon: "🎯", color: "bg-violet-500/10 hover:bg-violet-500/20 text-violet-600 dark:text-violet-300" },
+              { href: "/meddelanden", label: "Meddelanden", icon: "💬", color: "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-300" },
+              { href: "/betalningar", label: "Betalningar", icon: "💰", color: "bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-300" },
             ].map((a) => (
               <Link key={a.label} href={a.href}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors ${a.color}`}>

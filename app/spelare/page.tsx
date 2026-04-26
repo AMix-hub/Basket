@@ -70,7 +70,7 @@ function AttendanceBar({ present, total }: { present: number; total: number }) {
   const color = pct >= 80 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-500" : "bg-red-500";
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+      <div className="flex-1 h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
         <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
       </div>
       <span className={`text-xs font-bold w-8 text-right ${pct >= 80 ? "text-emerald-400" : pct >= 60 ? "text-amber-400" : "text-red-400"}`}>
@@ -265,7 +265,7 @@ export default function SpelarePage() {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <span className="text-3xl">🏀</span>
-            <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">Spelartruppen</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 tracking-tight">Spelartruppen</h1>
           </div>
           <p className="text-slate-500 text-sm">
             {players.length} spelare{team ? ` · ${team.name}` : ""}
@@ -283,26 +283,26 @@ export default function SpelarePage() {
 
       {/* ── Add player form ── */}
       {showAddPlayer && canEdit && (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 mb-5">
-          <h2 className="font-bold text-slate-100 mb-3">Ny spelare</h2>
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-4 mb-5">
+          <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Ny spelare</h2>
           <div className="grid grid-cols-2 gap-2 mb-2">
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Namn <span className="text-red-400">*</span></label>
               <input autoFocus value={addName} onChange={(e) => setAddName(e.target.value)}
                 placeholder="För- och efternamn"
-                className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-400 block mb-1">Tröjnummer</label>
               <input type="number" value={addNumber} onChange={(e) => setAddNumber(e.target.value)}
                 placeholder="T.ex. 12" min="0" max="99"
-                className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400" />
             </div>
           </div>
           <div className="mb-3">
             <label className="text-xs font-semibold text-slate-400 block mb-1">Position</label>
             <select value={addPosition} onChange={(e) => setAddPosition(e.target.value)}
-              className="w-full px-3 py-2 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400">
+              className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400">
               <option value="">Välj position</option>
               {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -313,7 +313,7 @@ export default function SpelarePage() {
               {addingPlayer ? "Lägger till…" : "Lägg till"}
             </button>
             <button onClick={() => { setShowAddPlayer(false); setAddName(""); setAddNumber(""); setAddPosition(""); }}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+              className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
               Avbryt
             </button>
           </div>
@@ -322,7 +322,7 @@ export default function SpelarePage() {
 
       {/* ── Player list ── */}
       {players.length === 0 ? (
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-12 text-center">
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-12 text-center">
           <p className="text-4xl mb-3">🏀</p>
           <p className="text-slate-500 text-sm">
             {canEdit ? "Inga spelare ännu. Klicka \"+ Lägg till spelare\" för att komma igång." : "Inga spelare registrerade ännu."}
@@ -339,7 +339,7 @@ export default function SpelarePage() {
             const isEditingThis = editingPlayer === player.id;
 
             return (
-              <div key={player.id} className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
+              <div key={player.id} className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl overflow-hidden">
                 {/* ── Player row ── */}
                 {isEditingThis ? (
                   <div className="p-4">
@@ -348,18 +348,18 @@ export default function SpelarePage() {
                       <div>
                         <label className="text-xs text-slate-500 block mb-1">Namn</label>
                         <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
-                          className="w-full px-3 py-1.5 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                          className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400" />
                       </div>
                       <div>
                         <label className="text-xs text-slate-500 block mb-1">Tröjnummer</label>
                         <input type="number" value={editNumber} onChange={(e) => setEditNumber(e.target.value)} min="0" max="99"
-                          className="w-full px-3 py-1.5 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400" />
+                          className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400" />
                       </div>
                     </div>
                     <div className="mb-3">
                       <label className="text-xs text-slate-500 block mb-1">Position</label>
                       <select value={editPosition} onChange={(e) => setEditPosition(e.target.value)}
-                        className="w-full px-3 py-1.5 text-sm bg-slate-700 border border-slate-600 rounded-xl text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400">
+                        className="w-full px-3 py-1.5 text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-orange-400">
                         <option value="">Ingen position</option>
                         {POSITIONS.map((p) => <option key={p} value={p}>{p}</option>)}
                       </select>
@@ -370,7 +370,7 @@ export default function SpelarePage() {
                         {savingPlayer ? "Sparar…" : "Spara"}
                       </button>
                       <button onClick={() => setEditingPlayer(null)}
-                        className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                        className="px-4 py-1.5 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors">
                         Avbryt
                       </button>
                     </div>
@@ -378,7 +378,7 @@ export default function SpelarePage() {
                 ) : (
                   <button
                     onClick={() => toggleExpand(player.id)}
-                    className="w-full flex items-center gap-4 px-4 py-3.5 text-left hover:bg-slate-700/40 transition-colors"
+                    className="w-full flex items-center gap-4 px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-slate-700/40 transition-colors"
                   >
                     {/* Jersey number */}
                     <div className="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0">
@@ -387,7 +387,7 @@ export default function SpelarePage() {
                     {/* Name + position + streak */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-slate-100 text-sm">{player.name}</p>
+                        <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{player.name}</p>
                         {streak >= 3 && (
                           <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${streak >= 10 ? "bg-amber-400/20 text-amber-300" : "bg-orange-500/20 text-orange-400"}`}>
                             🔥 {streak}
@@ -410,7 +410,7 @@ export default function SpelarePage() {
 
                 {/* ── Expanded detail ── */}
                 {isExpanded && !isEditingThis && (
-                  <div className="border-t border-slate-700 p-4 space-y-5">
+                  <div className="border-t border-gray-200 dark:border-slate-700 p-4 space-y-5">
 
                     {/* Attendance history */}
                     <div>
@@ -427,7 +427,7 @@ export default function SpelarePage() {
                                   row?.status === "present" ? "bg-emerald-900/60 text-emerald-400" :
                                   row?.status === "absent"  ? "bg-red-900/60 text-red-400" :
                                   row?.status === "sick"    ? "bg-amber-900/60 text-amber-400" :
-                                  "bg-slate-700 text-slate-600"
+                                  "bg-gray-200 dark:bg-slate-700 text-slate-400"
                                 }`}>
                                   {row?.status === "present" ? "✓" : row?.status === "absent" ? "✗" : row?.status === "sick" ? "🤒" : "—"}
                                 </span>
@@ -455,7 +455,7 @@ export default function SpelarePage() {
                                 onChange={(e) => setNoteDraft((p) => ({ ...p, [player.id]: e.target.value }))}
                                 placeholder="Lägg till en anteckning om spelarens utveckling…"
                                 rows={2}
-                                className="w-full text-sm bg-slate-700 border border-slate-600 rounded-xl px-3 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none"
+                                className="w-full text-sm bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400 resize-none"
                               />
                               <div className="flex items-center justify-between">
                                 <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -482,7 +482,7 @@ export default function SpelarePage() {
                             ) : (
                               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                                 {(playerDetail?.notes ?? []).map((n) => (
-                                  <div key={n.id} className="bg-slate-900/60 rounded-xl px-3 py-2.5 relative group">
+                                  <div key={n.id} className="bg-gray-50 dark:bg-slate-900/60 rounded-xl px-3 py-2.5 relative group">
                                     <div className="flex items-center justify-between mb-1">
                                       <div className="flex items-center gap-2">
                                         <span className="text-xs font-semibold text-orange-400">{n.authorName}</span>
@@ -502,7 +502,7 @@ export default function SpelarePage() {
                                         </button>
                                       </div>
                                     </div>
-                                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{n.note}</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{n.note}</p>
                                   </div>
                                 ))}
                               </div>
@@ -517,7 +517,7 @@ export default function SpelarePage() {
                       <div className="flex gap-2 pt-1">
                         <button
                           onClick={() => { setEditingPlayer(player.id); setEditName(player.name); setEditNumber(String(player.number)); setEditPosition(player.position); }}
-                          className="flex-1 py-1.5 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl transition-colors"
+                          className="flex-1 py-1.5 text-xs font-semibold bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-xl transition-colors"
                         >
                           ✏️ Redigera
                         </button>
