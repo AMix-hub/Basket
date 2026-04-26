@@ -17,6 +17,7 @@ const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }
   { href: "/spelare", label: "Spelare", restrictedRoles: [] },
   { href: "/nyheter", label: "Nyheter", restrictedRoles: [] },
   { href: "/traningsdatabas", label: "Träning", restrictedRoles: [] },
+  { href: "/matcher", label: "Matcher", restrictedRoles: [] },
   { href: "/cup", label: "Cuper", restrictedRoles: [] },
   { href: "/betalningar", label: "Betalningar", restrictedRoles: ["player", "parent"] },
 ];
