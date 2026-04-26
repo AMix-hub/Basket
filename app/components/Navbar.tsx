@@ -11,30 +11,68 @@ import { useTheme } from "../context/ThemeContext";
 import { roleEmoji } from "../../lib/roleLabels";
 import { getSport } from "../../lib/sports";
 
-const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }[] = [
-  { href: "/taktik", label: "Taktik", restrictedRoles: [] },
-  { href: "/kalender", label: "Kalender", restrictedRoles: [] },
-  { href: "/spelare", label: "Spelare", restrictedRoles: [] },
-  { href: "/nyheter", label: "Nyheter", restrictedRoles: [] },
-  { href: "/traningsdatabas", label: "Träning", restrictedRoles: [] },
-  { href: "/matcher", label: "Matcher", restrictedRoles: [] },
-  { href: "/cup", label: "Cuper", restrictedRoles: [] },
-  { href: "/betalningar", label: "Betalningar", restrictedRoles: ["player", "parent"] },
+interface NavItem {
+  href: string;
+  label: string;
+  restrictedRoles?: UserRole[];
+  parentOnly?: boolean;
+}
+
+interface NavGroup {
+  id: string;
+  label: string;
+  items: NavItem[];
+}
+
+const navGroups: NavGroup[] = [
+  {
+    id: "schema",
+    label: "📅 Schema",
+    items: [
+      { href: "/kalender",  label: "📅 Kalender" },
+      { href: "/matcher",   label: "⚽ Matcher" },
+      { href: "/cup",       label: "🏆 Cuper" },
+    ],
+  },
+  {
+    id: "traning",
+    label: "🏋 Träning",
+    items: [
+      { href: "/taktik",         label: "🎯 Taktik" },
+      { href: "/traningsdatabas", label: "💪 Träningsdatabas" },
+      { href: "/mallar",         label: "📋 Mallar",    restrictedRoles: ["player", "parent"] },
+      { href: "/utrustning",     label: "🎒 Utrustning", restrictedRoles: ["player", "parent"] },
+    ],
+  },
+  {
+    id: "trupp",
+    label: "👥 Trupp",
+    items: [
+      { href: "/spelare",    label: "🏀 Spelare" },
+      { href: "/lag",        label: "🏟 Laget" },
+      { href: "/utveckling", label: "📈 Spelarutveckling" },
+      { href: "/statistik",  label: "📊 Statistik",  restrictedRoles: ["player", "parent"] },
+      { href: "/registret",  label: "👥 Registret",  restrictedRoles: ["player", "parent"] },
+      { href: "/familj",     label: "👪 Min sida",   parentOnly: true },
+    ],
+  },
+  {
+    id: "klubb",
+    label: "📣 Klubb",
+    items: [
+      { href: "/nyheter",     label: "📰 Nyheter" },
+      { href: "/mal",         label: "🎯 Säsongsmål" },
+      { href: "/videor",      label: "🎬 Videor" },
+      { href: "/dokument",    label: "📁 Dokument" },
+      { href: "/betalningar", label: "💰 Betalningar", restrictedRoles: ["player", "parent"] },
+    ],
+  },
 ];
 
-const merDropdownLinks: { href: string; label: string; restrictedRoles: UserRole[] }[] = [
-  { href: "/mal", label: "🎯 Säsongsmål", restrictedRoles: [] },
-  { href: "/utveckling", label: "📈 Spelarutveckling", restrictedRoles: [] },
-  { href: "/statistik", label: "📊 Statistik", restrictedRoles: ["player", "parent"] },
-  { href: "/mallar", label: "📋 Mallar", restrictedRoles: ["player", "parent"] },
-  { href: "/utrustning", label: "🎒 Utrustning", restrictedRoles: ["player", "parent"] },
-  { href: "/videor", label: "🎬 Videor", restrictedRoles: [] },
-  { href: "/dokument", label: "📁 Dokument", restrictedRoles: [] },
-];
-
-const adminDropdownLinks = [
-  { href: "/admin", label: "🏛 Adminpanel" },
+const adminLinks = [
+  { href: "/admin",    label: "🏛 Adminpanel" },
   { href: "/registret", label: "👥 Registret" },
+  { href: "/dev",      label: "🛠 Utveckling" },
 ];
 
 export default function Navbar() {
@@ -45,18 +83,17 @@ export default function Navbar() {
 
   const { theme, toggle: toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [adminDropdownOpen, setAdminDropdownOpen] = useState(false);
-  const [merDropdownOpen, setMerDropdownOpen] = useState(false);
-  const adminDropdownRef = useRef<HTMLDivElement>(null);
-  const merDropdownRef = useRef<HTMLDivElement>(null);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const navRef = useRef<HTMLElement>(null);
 
-  const sportId = user?.sport ?? "basket";
-  const sport = getSport(sportId);
-  /* Club logo: from admin's own profile or from the team they belong to */
+  const sport = getSport(user?.sport ?? "basket");
   const team = getMyTeam();
   const clubLogoUrl = user?.clubLogoUrl ?? team?.clubLogoUrl ?? null;
-  /* Club name: admin has it on their profile; coaches/players get it from the team */
-  const clubName = user?.clubName ?? team?.clubName ?? null;
+  const clubName    = user?.clubName    ?? team?.clubName    ?? null;
+
+  const isAdmin  = user?.roles.includes("admin")  ?? false;
+  const isParent = user?.roles.includes("parent") ?? false;
 
   const handleLogout = async () => {
     await logout();
@@ -64,60 +101,60 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   };
 
-  /* Close dropdowns when clicking outside */
+  /* Close all dropdowns on outside click */
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (adminDropdownRef.current && !adminDropdownRef.current.contains(event.target as Node))
-        setAdminDropdownOpen(false);
-      if (merDropdownRef.current && !merDropdownRef.current.contains(event.target as Node))
-        setMerDropdownOpen(false);
+    function onClickOutside(e: MouseEvent) {
+      if (navRef.current && !navRef.current.contains(e.target as Node)) {
+        setOpenGroup(null);
+        setAdminOpen(false);
+      }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  /* Close mobile menu on route change */
+  /* Close everything on route change */
   useEffect(() => {
     setMobileMenuOpen(false);
-    setAdminDropdownOpen(false);
-    setMerDropdownOpen(false);
+    setOpenGroup(null);
+    setAdminOpen(false);
   }, [pathname]);
 
-  const isAdmin = user?.roles.includes("admin") ?? false;
-  const isCoach = user?.roles.some((r) => r === "coach") ?? false;
-  const isAssistantOrPlayer =
-    user?.roles.some((r) => ["assistant", "player"].includes(r)) ?? false;
-  const isParent = user?.roles.includes("parent") ?? false;
+  function filterItems(items: NavItem[]) {
+    if (!user) return [] as NavItem[];
+    return items.filter((item) => {
+      if (item.parentOnly) return isParent;
+      if (item.restrictedRoles) return !item.restrictedRoles.some((r) => user.roles.includes(r));
+      return true;
+    });
+  }
 
-  /* Filter main links based on user role */
-  const mainLinks = allMainLinks.filter(
-    ({ restrictedRoles }) =>
-      !user || !restrictedRoles.some((r) => user.roles.includes(r))
-  );
-  const merLinks = merDropdownLinks.filter(
-    ({ restrictedRoles }) =>
-      !user || !restrictedRoles.some((r) => user.roles.includes(r))
-  );
+  function isGroupActive(group: NavGroup) {
+    return group.items.some(({ href }) => {
+      if (pathname === href) return true;
+      if (href === "/traningsdatabas" && /\/ar[123]$/.test(pathname)) return true;
+      return false;
+    });
+  }
 
-  /* Right-side role links (excluding admin which has its own dropdown) */
-  const rightLinks = isAdmin
-    ? [{ href: "/dev", label: "🛠 Utveckling" }]
-    : isCoach
-    ? [
-        { href: "/lag", label: `${sport.emoji} Laget` },
-        { href: "/registret", label: "👥 Registret" },
-      ]
-    : isAssistantOrPlayer
-    ? [{ href: "/lag", label: `${sport.emoji} Laget` }]
-    : isParent
-    ? [
-        { href: "/lag", label: `${sport.emoji} Laget` },
-        { href: "/familj", label: "👪 Min sida" },
-      ]
-    : [];
+  function isItemActive(href: string) {
+    if (pathname === href) return true;
+    if (href === "/traningsdatabas" && /\/ar[123]$/.test(pathname)) return true;
+    return false;
+  }
+
+  const chevron = (open: boolean) => (
+    <svg
+      className={`w-3 h-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
 
   return (
     <nav
+      ref={navRef}
       style={{ backgroundColor: "#111827" }}
       className="text-white sticky top-0 z-50 w-full shadow-[0_2px_8px_rgba(0,0,0,0.5)] border-b border-gray-800"
       aria-label="Main navigation"
@@ -125,98 +162,93 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center h-14">
 
-          {/* ── LEFT: Logo / Brand ── */}
+          {/* ── Logo ── */}
           <div className="flex-shrink-0">
-            <Link
-              href="/"
-              className="flex items-center gap-2 text-white hover:text-orange-400 transition-colors"
-            >
+            <Link href="/" className="flex items-center gap-2 text-white hover:text-orange-400 transition-colors">
               {user ? (
                 <>
                   {clubLogoUrl ? (
-                    <Image
-                      src={clubLogoUrl}
-                      alt="Klubblogga"
-                      width={36}
-                      height={36}
-                      unoptimized
-                      className="rounded-full object-cover"
-                    />
+                    <Image src={clubLogoUrl} alt="Klubblogga" width={36} height={36} unoptimized className="rounded-full object-cover" />
                   ) : (
                     <span className="text-2xl leading-none">{sport.emoji}</span>
                   )}
-                  <span className="text-lg font-extrabold tracking-tight">
-                    {clubName ?? sport.name}
-                  </span>
+                  <span className="text-lg font-extrabold tracking-tight">{clubName ?? sport.name}</span>
                 </>
               ) : (
                 <>
-                  <Image
-                    src="/sportiq-logo.png"
-                    alt="SportIQ"
-                    width={36}
-                    height={36}
-                    unoptimized
-                    className="rounded-xl object-cover"
-                  />
+                  <Image src="/sportiq-logo.png" alt="SportIQ" width={36} height={36} unoptimized className="rounded-xl object-cover" />
                   <span className="text-lg font-extrabold tracking-tight">SportIQ</span>
                 </>
               )}
             </Link>
           </div>
 
-          {/* ── CENTER: Main nav links (hidden on mobile) ── */}
+          {/* ── Desktop nav groups ── */}
           {user && (
-            <div className="hidden md:flex flex-1 items-center justify-center gap-1">
-              {mainLinks.map(({ href, label }) => {
-                const isActive =
-                  pathname === href ||
-                  (href === "/traningsdatabas" && /\/ar[123]$/.test(pathname));
+            <div className="hidden md:flex flex-1 items-center justify-center gap-0.5">
+              {navGroups.map((group) => {
+                const items = filterItems(group.items);
+                if (items.length === 0) return null;
+                const active = isGroupActive(group);
+                const open   = openGroup === group.id;
                 return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`relative px-3 py-2 text-sm font-medium transition-colors group whitespace-nowrap ${
-                      isActive
-                        ? "text-orange-400"
-                        : "text-gray-300 hover:text-white"
-                    }`}
-                  >
-                    {label}
-                    <span
-                      className={`absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t transition-transform duration-300 origin-left ${
-                        isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                  <div key={group.id} className="relative">
+                    <button
+                      onClick={() => setOpenGroup(open ? null : group.id)}
+                      className={`flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                        active ? "text-orange-400" : "text-gray-300 hover:text-white"
                       }`}
-                    />
-                  </Link>
+                      aria-expanded={open}
+                      aria-haspopup="true"
+                    >
+                      {group.label}
+                      {chevron(open)}
+                    </button>
+                    {open && (
+                      <div className="absolute left-0 mt-1 w-52 rounded-xl shadow-xl bg-gray-800 border border-gray-700 py-1 z-50">
+                        {items.map(({ href, label }) => (
+                          <Link
+                            key={href}
+                            href={href}
+                            onClick={() => setOpenGroup(null)}
+                            className={`block px-4 py-2 text-sm transition-colors ${
+                              isItemActive(href)
+                                ? "text-orange-400 bg-gray-700"
+                                : "text-gray-300 hover:text-white hover:bg-gray-700"
+                            }`}
+                          >
+                            {label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-              {/* Mer dropdown */}
-              {merLinks.length > 0 && (
-                <div className="relative" ref={merDropdownRef}>
+
+              {/* Admin dropdown */}
+              {isAdmin && (
+                <div className="relative">
                   <button
-                    onClick={() => setMerDropdownOpen((o) => !o)}
+                    onClick={() => setAdminOpen((o) => !o)}
                     className={`flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-                      merLinks.some((l) => pathname === l.href)
+                      pathname.startsWith("/admin") || pathname === "/registret" || pathname === "/dev"
                         ? "text-orange-400"
                         : "text-gray-300 hover:text-white"
                     }`}
-                    aria-expanded={merDropdownOpen}
+                    aria-expanded={adminOpen}
                     aria-haspopup="true"
                   >
-                    Mer
-                    <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${merDropdownOpen ? "rotate-180" : ""}`}
-                      fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    🏛 Admin
+                    {chevron(adminOpen)}
                   </button>
-                  {merDropdownOpen && (
-                    <div className="absolute left-0 mt-1 w-40 rounded-lg shadow-xl bg-gray-800 border border-gray-700 py-1 z-50">
-                      {merLinks.map(({ href, label }) => (
+                  {adminOpen && (
+                    <div className="absolute left-0 mt-1 w-44 rounded-xl shadow-xl bg-gray-800 border border-gray-700 py-1 z-50">
+                      {adminLinks.map(({ href, label }) => (
                         <Link
                           key={href}
                           href={href}
-                          onClick={() => setMerDropdownOpen(false)}
+                          onClick={() => setAdminOpen(false)}
                           className={`block px-4 py-2 text-sm transition-colors ${
                             pathname === href
                               ? "text-orange-400 bg-gray-700"
@@ -233,104 +265,22 @@ export default function Navbar() {
             </div>
           )}
 
-          {/* ── RIGHT: Tools + Auth ── */}
+          {/* ── Right side ── */}
           <div className="ml-auto flex items-center gap-1">
             {user && (
               <>
-                {/* Admin dropdown (desktop only) */}
-                {isAdmin && (
-                  <div className="hidden md:block relative" ref={adminDropdownRef}>
-                    <button
-                      onClick={() => setAdminDropdownOpen((o) => !o)}
-                      className={`flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-                        pathname.startsWith("/admin") ||
-                        pathname === "/registret" ||
-                        pathname === "/anslut"
-                          ? "text-orange-400"
-                          : "text-gray-300 hover:text-white"
-                      }`}
-                      aria-expanded={adminDropdownOpen}
-                      aria-haspopup="true"
-                    >
-                      🏛 Admin
-                      <svg
-                        className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                          adminDropdownOpen ? "rotate-180" : ""
-                        }`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 9l-7 7-7-7"
-                        />
-                      </svg>
-                    </button>
-                    {adminDropdownOpen && (
-                      <div className="absolute right-0 mt-1 w-44 rounded-lg shadow-xl bg-gray-800 border border-gray-700 py-1 z-50">
-                        {adminDropdownLinks.map(({ href, label }) => (
-                          <Link
-                            key={href}
-                            href={href}
-                            onClick={() => setAdminDropdownOpen(false)}
-                            className={`block px-4 py-2 text-sm transition-colors ${
-                              pathname === href
-                                ? "text-orange-400 bg-gray-700"
-                                : "text-gray-300 hover:text-white hover:bg-gray-700"
-                            }`}
-                          >
-                            {label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Other role-based links (desktop only) */}
-                <div className="hidden md:flex items-center">
-                  {rightLinks.map(({ href, label }) => {
-                    const isActive = pathname === href;
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        className={`relative px-3 py-1.5 text-sm font-medium transition-colors group whitespace-nowrap ${
-                          isActive ? "text-orange-400" : "text-gray-300 hover:text-white"
-                        }`}
-                      >
-                        {label}
-                        <span
-                          className={`absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t transition-transform duration-300 origin-left ${
-                            isActive ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-                          }`}
-                        />
-                      </Link>
-                    );
-                  })}
-                </div>
-
-                {/* Theme toggle */}
                 <button
                   onClick={toggleTheme}
                   className="flex items-center justify-center w-8 h-8 rounded-full text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
                   aria-label={theme === "dark" ? "Byt till ljust läge" : "Byt till mörkt läge"}
-                  title={theme === "dark" ? "Ljust läge" : "Mörkt läge"}
                 >
                   {theme === "dark" ? "☀️" : "🌙"}
                 </button>
 
-                {/* Messages icon */}
                 <Link
                   href="/meddelanden"
                   className={`flex relative items-center justify-center w-8 h-8 rounded-full transition-colors ${
-                    pathname === "/meddelanden"
-                      ? "text-orange-400"
-                      : "text-gray-300 hover:text-white"
+                    pathname === "/meddelanden" ? "text-orange-400" : "text-gray-300 hover:text-white"
                   }`}
                   aria-label="Chatt"
                 >
@@ -342,7 +292,6 @@ export default function Navbar() {
                   )}
                 </Link>
 
-                {/* Profile icon */}
                 <Link
                   href="/profil"
                   className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors text-sm leading-none"
@@ -352,7 +301,6 @@ export default function Navbar() {
                   {roleEmoji(user.roles)}
                 </Link>
 
-                {/* Logout (desktop only) */}
                 <button
                   onClick={handleLogout}
                   className="hidden md:block ml-1 px-3 py-1.5 text-xs font-semibold bg-gray-700 hover:bg-gray-600 rounded-full text-gray-300 hover:text-white transition-colors whitespace-nowrap"
@@ -360,7 +308,6 @@ export default function Navbar() {
                   Logga ut
                 </button>
 
-                {/* Hamburger button (mobile only) */}
                 <button
                   onClick={() => setMobileMenuOpen((o) => !o)}
                   className="md:hidden ml-1 p-2 rounded-md text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
@@ -368,54 +315,25 @@ export default function Navbar() {
                   aria-expanded={mobileMenuOpen}
                 >
                   {mobileMenuOpen ? (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   ) : (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 6h16M4 12h16M4 18h16"
-                      />
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                   )}
                 </button>
               </>
             )}
 
-            {/* Logged-out state */}
             {!user && (
               <>
-                <Link
-                  href="/login"
-                  className="px-3 py-1.5 text-xs font-semibold text-gray-300 hover:text-white transition-colors whitespace-nowrap"
-                >
+                <Link href="/login" className="px-3 py-1.5 text-xs font-semibold text-gray-300 hover:text-white transition-colors whitespace-nowrap">
                   Logga in
                 </Link>
                 {!loading && (
-                  <Link
-                    href="/registrera"
-                    className="px-3 py-1.5 text-xs font-semibold bg-orange-500 hover:bg-orange-600 rounded-full text-white transition-colors whitespace-nowrap"
-                  >
+                  <Link href="/registrera" className="px-3 py-1.5 text-xs font-semibold bg-orange-500 hover:bg-orange-600 rounded-full text-white transition-colors whitespace-nowrap">
                     Registrera
                   </Link>
                 )}
@@ -428,53 +346,36 @@ export default function Navbar() {
       {/* ── Mobile menu ── */}
       {user && mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-800" style={{ backgroundColor: "#111827" }}>
-          <div className="px-4 py-3 space-y-1">
-
-            {/* Main nav links */}
-            {mainLinks.map(({ href, label }) => {
-              const isActive =
-                pathname === href ||
-                (href === "/traningsdatabas" && /\/ar[123]$/.test(pathname));
+          <div className="px-4 py-3 space-y-0.5">
+            {navGroups.map((group) => {
+              const items = filterItems(group.items);
+              if (items.length === 0) return null;
               return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? "text-orange-400 bg-gray-800"
-                      : "text-gray-300 hover:text-white hover:bg-gray-800"
-                  }`}
-                >
-                  {label}
-                </Link>
+                <div key={group.id}>
+                  <p className="px-3 pt-3 pb-1 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    {group.label}
+                  </p>
+                  {items.map(({ href, label }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                        isItemActive(href)
+                          ? "text-orange-400 bg-gray-800"
+                          : "text-gray-300 hover:text-white hover:bg-gray-800"
+                      }`}
+                    >
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               );
             })}
 
-            {/* Mer links (mobile) */}
-            {merLinks.length > 0 && (
-              <>
-                <div className="h-px bg-gray-700 my-2" />
-                {merLinks.map(({ href, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      pathname === href
-                        ? "text-orange-400 bg-gray-800"
-                        : "text-gray-300 hover:text-white hover:bg-gray-800"
-                    }`}
-                  >
-                    {label}
-                  </Link>
-                ))}
-              </>
-            )}
-
-            {/* Admin links (mobile) */}
             {isAdmin && (
-              <>
-                <div className="h-px bg-gray-700 my-2" />
-                {adminDropdownLinks.map(({ href, label }) => (
+              <div>
+                <p className="px-3 pt-3 pb-1 text-xs font-bold text-gray-500 uppercase tracking-wider">🏛 Admin</p>
+                {adminLinks.map(({ href, label }) => (
                   <Link
                     key={href}
                     href={href}
@@ -487,37 +388,12 @@ export default function Navbar() {
                     {label}
                   </Link>
                 ))}
-              </>
-            )}
-
-            {/* Other role links (mobile) */}
-            {rightLinks.length > 0 && (
-              <>
-                <div className="h-px bg-gray-700 my-2" />
-                {rightLinks.map(({ href, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      pathname === href
-                        ? "text-orange-400 bg-gray-800"
-                        : "text-gray-300 hover:text-white hover:bg-gray-800"
-                    }`}
-                  >
-                    {label}
-                  </Link>
-                ))}
-              </>
+              </div>
             )}
 
             <div className="h-px bg-gray-700 my-2" />
-
-            {/* Profile + logout + theme toggle (mobile) */}
             <div className="flex items-center justify-between px-3 py-2">
-              <Link
-                href="/profil"
-                className="text-sm text-gray-300 hover:text-white transition-colors"
-              >
+              <Link href="/profil" className="text-sm text-gray-300 hover:text-white transition-colors">
                 {roleEmoji(user.roles)} {user.name}
               </Link>
               <div className="flex items-center gap-2">
