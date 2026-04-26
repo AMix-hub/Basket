@@ -23,6 +23,7 @@ const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }
 ];
 
 const merDropdownLinks: { href: string; label: string; restrictedRoles: UserRole[] }[] = [
+  { href: "/mal", label: "🎯 Säsongsmål", restrictedRoles: [] },
   { href: "/statistik", label: "📊 Statistik", restrictedRoles: ["player", "parent"] },
   { href: "/mallar", label: "📋 Mallar", restrictedRoles: ["player", "parent"] },
   { href: "/utrustning", label: "🎒 Utrustning", restrictedRoles: ["player", "parent"] },
