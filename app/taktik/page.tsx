@@ -73,23 +73,43 @@ const R_TP3_X = 630;
 /* ─── App constants ──────────────────────────────────────────────────────── */
 
 const ANIM_MS = 1200;
-const HOME_NAMES = ["PG", "SG", "SF", "PF", "C"];
+const HOME_NAMES_BY_SPORT: Record<string, string[]> = {
+  basket:   ["PG", "SG", "SF", "PF", "C"],
+  fotboll:  ["MV", "V", "H", "CM", "A"],
+  ishockey: ["MV", "VB", "HB", "F", "C"],
+  innebandy:["MV", "VB", "HB", "F", "C"],
+  handboll: ["MV", "VN", "HN", "CM", "CA"],
+};
 const MIN_SHAPE_DIST = 5;
 const MIN_LINE_DIST  = 10;
 const FULLSCREEN_TOOLBAR_HEIGHT = 56; // px reserved for toolbar row in fullscreen
 
-const TACTICAL_ROLES = [
-  "Ball Handler",
-  "P&R-skärmare",
-  "Cutter",
-  "Skjutare",
-  "Post-spelare",
-  "Off-Ball Screen",
-  "Flare Screen",
-  "Helpersida",
-  "Spjutstans",
-  "Hjälpförsvarare",
-];
+const TACTICAL_ROLES_BY_SPORT: Record<string, string[]> = {
+  basket: [
+    "Ball Handler", "P&R-skärmare", "Cutter", "Skjutare", "Post-spelare",
+    "Off-Ball Screen", "Flare Screen", "Helpersida", "Spjutstans", "Hjälpförsvarare",
+  ],
+  fotboll: [
+    "Målvakt", "Mittback", "Ytterback", "Defensiv MF", "Central MF",
+    "Offensiv MF", "Vänsterkant", "Högerkant", "Anfallare", "Pressing",
+    "Friläge", "Kontringsläge",
+  ],
+  ishockey: [
+    "Målvakt", "Vänsterback", "Högerback", "Vänsterforward", "Center",
+    "Högerforward", "Power Play", "Boxplay", "Forecheck", "Neutral Zone",
+    "Break", "Närkamp",
+  ],
+  innebandy: [
+    "Målvakt", "Vänsterback", "Högerback", "Vänsterforward", "Center",
+    "Högerforward", "Övertalsläge", "Undertalsläge", "Kontringsläge",
+    "Närkamp", "Friläge",
+  ],
+  handboll: [
+    "Målvakt", "Vänsternia", "Högernia", "Vänsterkant", "Högerkant",
+    "Mittnia", "Mittsexa", "Vänstersexa", "Högersexa", "Cirkelspelare",
+    "Kontra", "7m-kastare",
+  ],
+};
 
 const ZONE_COLORS = [
   { label: "Röd",  color: "rgba(239,68,68,0.35)" },
@@ -105,7 +125,8 @@ const SHAPE_COLOR  = "#f472b6";
 
 /* ─── Initial players ────────────────────────────────────────────────────── */
 
-function makeInitialPlayers(): Player[] {
+function makeInitialPlayers(sport = "basket"): Player[] {
+  const names = HOME_NAMES_BY_SPORT[sport] ?? HOME_NAMES_BY_SPORT.basket;
   const homePos = [
     { x: 380, y: 195 },
     { x: 255, y: 260 }, { x: 505, y: 260 },
@@ -119,7 +140,7 @@ function makeInitialPlayers(): Player[] {
   return [
     ...homePos.map((p, i) => ({
       id: `home-${i + 1}`, team: "home" as const,
-      number: i + 1, name: HOME_NAMES[i], x: p.x, y: p.y,
+      number: i + 1, name: names[i], x: p.x, y: p.y,
     })),
     ...awayPos.map((p, i) => ({
       id: `away-${i + 1}`, team: "away" as const,
@@ -129,11 +150,11 @@ function makeInitialPlayers(): Player[] {
   ];
 }
 
-function makeStep(label: string, prev?: Step): Step {
+function makeStep(label: string, prev?: Step, sport = "basket"): Step {
   return {
     id: crypto.randomUUID(),
     label,
-    players: prev ? prev.players.map(p => ({ ...p })) : makeInitialPlayers(),
+    players: prev ? prev.players.map(p => ({ ...p })) : makeInitialPlayers(sport),
     drawings: [],
   };
 }
@@ -198,6 +219,268 @@ function BasketballCourt() {
       <path d={`M ${R_TP3_X} ${TP3_Y1} A ${TP3_R} ${TP3_R} 0 0 0 ${R_TP3_X} ${TP3_Y2}`} {...lp} />
     </g>
   );
+}
+
+/* ─── Football pitch ─────────────────────────────────────────────────────── */
+function FootballPitch() {
+  const lp = { stroke: "rgba(255,255,255,0.9)", strokeWidth: 2, fill: "none" };
+  // Pitch: full canvas, green with subtle grass stripes
+  const PX = 20, PY = 15, PW = 720, PH = 430;
+  const cx = PX + PW / 2, cy = PY + PH / 2;
+  // Goal areas (5.5m proportional), penalty areas, penalty spots, centre circle
+  const GA_W = 55, GA_H = 130;   // goal area
+  const PA_W = 150, PA_H = 260;  // penalty area
+  const SPOT = 100;               // penalty spot distance from goal line
+  const CR = 90;                  // centre circle radius
+  const GOAL_W = 8, GOAL_H = 70; // goal mouth
+  return (
+    <g>
+      {/* Grass */}
+      <rect x={0} y={0} width={CW} height={CH} fill="#2d7a2d" />
+      {Array.from({ length: 8 }, (_, i) => (
+        <rect key={i} x={PX} y={PY + i * (PH / 8)} width={PW} height={PH / 8}
+          fill={i % 2 === 0 ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.03)"} />
+      ))}
+      {/* Pitch outline + halfway line */}
+      <rect x={PX} y={PY} width={PW} height={PH} {...lp} />
+      <line x1={cx} y1={PY} x2={cx} y2={PY + PH} {...lp} />
+      {/* Centre circle + spot */}
+      <circle cx={cx} cy={cy} r={CR} {...lp} />
+      <circle cx={cx} cy={cy} r={4} fill="rgba(255,255,255,0.9)" />
+      {/* Left goal area */}
+      <rect x={PX} y={cy - GA_H / 2} width={GA_W} height={GA_H} {...lp} fill="rgba(255,255,255,0.05)" />
+      {/* Left penalty area */}
+      <rect x={PX} y={cy - PA_H / 2} width={PA_W} height={PA_H} {...lp} fill="rgba(255,255,255,0.03)" />
+      {/* Left penalty spot */}
+      <circle cx={PX + SPOT} cy={cy} r={4} fill="rgba(255,255,255,0.9)" />
+      {/* Left penalty arc */}
+      <path d={`M ${PX + PA_W} ${cy - 70} A 90 90 0 0 1 ${PX + PA_W} ${cy + 70}`} {...lp} />
+      {/* Left goal */}
+      <rect x={PX - GOAL_W} y={cy - GOAL_H / 2} width={GOAL_W} height={GOAL_H}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="rgba(255,255,255,0.12)" />
+      {/* Right goal area */}
+      <rect x={PX + PW - GA_W} y={cy - GA_H / 2} width={GA_W} height={GA_H} {...lp} fill="rgba(255,255,255,0.05)" />
+      {/* Right penalty area */}
+      <rect x={PX + PW - PA_W} y={cy - PA_H / 2} width={PA_W} height={PA_H} {...lp} fill="rgba(255,255,255,0.03)" />
+      {/* Right penalty spot */}
+      <circle cx={PX + PW - SPOT} cy={cy} r={4} fill="rgba(255,255,255,0.9)" />
+      {/* Right penalty arc */}
+      <path d={`M ${PX + PW - PA_W} ${cy - 70} A 90 90 0 0 0 ${PX + PW - PA_W} ${cy + 70}`} {...lp} />
+      {/* Right goal */}
+      <rect x={PX + PW} y={cy - GOAL_H / 2} width={GOAL_W} height={GOAL_H}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="rgba(255,255,255,0.12)" />
+      {/* Corner arcs */}
+      {([[PX, PY], [PX + PW, PY], [PX, PY + PH], [PX + PW, PY + PH]] as [number,number][]).map(([rx, ry], i) => {
+        const sx = rx === PX ? 1 : -1, sy = ry === PY ? 1 : -1;
+        return <path key={i} d={`M ${rx + sx * 12} ${ry} A 12 12 0 0 ${sx === sy ? 1 : 0} ${rx} ${ry + sy * 12}`} {...lp} />;
+      })}
+    </g>
+  );
+}
+
+/* ─── Ice hockey rink ────────────────────────────────────────────────────── */
+function IceHockeyRink() {
+  const lp = { stroke: "rgba(0,0,180,0.85)", strokeWidth: 2, fill: "none" };
+  const RP = 20, RW = 720, RH = 420, RY = 20;
+  const cx = RP + RW / 2, cy = RY + RH / 2;
+  const CORNER_R = 60;
+  // Rink outline with rounded corners
+  const rink = `M ${RP + CORNER_R} ${RY}
+    L ${RP + RW - CORNER_R} ${RY}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${RP + RW} ${RY + CORNER_R}
+    L ${RP + RW} ${RY + RH - CORNER_R}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${RP + RW - CORNER_R} ${RY + RH}
+    L ${RP + CORNER_R} ${RY + RH}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${RP} ${RY + RH - CORNER_R}
+    L ${RP} ${RY + CORNER_R}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${RP + CORNER_R} ${RY} Z`;
+  const BLUE_OFFSET = 175; // blue line distance from centre
+  const GOAL_LINE_OFF = 55; // goal line from end boards
+  const CREASE_R = 45;
+  const CREASE_H = 35;
+  const FACE_R = 30;
+  // Faceoff dot positions
+  const LGX = RP + GOAL_LINE_OFF;
+  const RGX = RP + RW - GOAL_LINE_OFF;
+  const FOY1 = cy - 105, FOY2 = cy + 105;
+  const redLine = { stroke: "rgba(220,30,30,0.9)", strokeWidth: 3, fill: "none" };
+  const blueLine = { stroke: "rgba(30,80,220,0.9)", strokeWidth: 3, fill: "none" };
+  return (
+    <g>
+      {/* Ice surface */}
+      <rect x={0} y={0} width={CW} height={CH} fill="#dbeeff" />
+      <clipPath id="rink-clip"><path d={rink} /></clipPath>
+      <rect x={0} y={0} width={CW} height={CH} fill="#e8f4ff" clipPath="url(#rink-clip)" />
+      {/* Rink border */}
+      <path d={rink} stroke="rgba(0,0,180,0.85)" strokeWidth={3} fill="none" />
+      {/* Red centre line */}
+      <line x1={cx} y1={RY} x2={cx} y2={RY + RH} {...redLine} strokeDasharray="12 6" />
+      {/* Blue lines */}
+      <line x1={cx - BLUE_OFFSET} y1={RY} x2={cx - BLUE_OFFSET} y2={RY + RH} {...blueLine} />
+      <line x1={cx + BLUE_OFFSET} y1={RY} x2={cx + BLUE_OFFSET} y2={RY + RH} {...blueLine} />
+      {/* Centre faceoff circle + dot */}
+      <circle cx={cx} cy={cy} r={55} {...redLine} />
+      <circle cx={cx} cy={cy} r={4} fill="rgba(220,30,30,0.9)" />
+      {/* Left goal line */}
+      <line x1={LGX} y1={RY + 30} x2={LGX} y2={RY + RH - 30} {...redLine} />
+      {/* Left crease */}
+      <path d={`M ${LGX} ${cy - CREASE_H} A ${CREASE_R} ${CREASE_R} 0 0 1 ${LGX} ${cy + CREASE_H}`}
+        stroke="rgba(220,30,30,0.85)" strokeWidth={2} fill="rgba(220,30,30,0.12)" />
+      {/* Left goal */}
+      <rect x={RP} y={cy - 22} width={22} height={44}
+        stroke="rgba(180,0,0,0.8)" strokeWidth={2} fill="rgba(255,0,0,0.15)" />
+      {/* Left zone faceoff circles */}
+      {[FOY1, FOY2].map((fy, i) => (
+        <g key={i}>
+          <circle cx={LGX + 80} cy={fy} r={FACE_R} {...redLine} />
+          <circle cx={LGX + 80} cy={fy} r={4} fill="rgba(220,30,30,0.9)" />
+        </g>
+      ))}
+      {/* Right goal line */}
+      <line x1={RGX} y1={RY + 30} x2={RGX} y2={RY + RH - 30} {...redLine} />
+      {/* Right crease */}
+      <path d={`M ${RGX} ${cy - CREASE_H} A ${CREASE_R} ${CREASE_R} 0 0 0 ${RGX} ${cy + CREASE_H}`}
+        stroke="rgba(220,30,30,0.85)" strokeWidth={2} fill="rgba(220,30,30,0.12)" />
+      {/* Right goal */}
+      <rect x={RP + RW - 22} y={cy - 22} width={22} height={44}
+        stroke="rgba(180,0,0,0.8)" strokeWidth={2} fill="rgba(255,0,0,0.15)" />
+      {/* Right zone faceoff circles */}
+      {[FOY1, FOY2].map((fy, i) => (
+        <g key={i}>
+          <circle cx={RGX - 80} cy={fy} r={FACE_R} {...redLine} />
+          <circle cx={RGX - 80} cy={fy} r={4} fill="rgba(220,30,30,0.9)" />
+        </g>
+      ))}
+      {/* Neutral zone faceoff dots */}
+      {[cy - 95, cy + 95].map((fy, i) => (
+        <circle key={i} cx={cx} cy={fy} r={4} fill="rgba(220,30,30,0.9)" />
+      ))}
+    </g>
+  );
+}
+
+/* ─── Floorball court (innebandy) ────────────────────────────────────────── */
+function FloorballCourt() {
+  const lp = { stroke: "rgba(255,255,255,0.9)", strokeWidth: 2, fill: "none" };
+  const FX = 20, FY = 15, FW = 720, FH = 430;
+  const cx = FX + FW / 2, cy = FY + FH / 2;
+  const CORNER_R = 40;
+  // Rounded rectangle outline
+  const court = `M ${FX + CORNER_R} ${FY}
+    L ${FX + FW - CORNER_R} ${FY}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${FX + FW} ${FY + CORNER_R}
+    L ${FX + FW} ${FY + FH - CORNER_R}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${FX + FW - CORNER_R} ${FY + FH}
+    L ${FX + CORNER_R} ${FY + FH}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${FX} ${FY + FH - CORNER_R}
+    L ${FX} ${FY + CORNER_R}
+    A ${CORNER_R} ${CORNER_R} 0 0 1 ${FX + CORNER_R} ${FY} Z`;
+  const GOAL_AREA_R = 130; // semicircle around goal
+  const GOAL_W = 10, GOAL_H = 70;
+  const FREE_KICK_R = 170;
+  return (
+    <g>
+      {/* Floor */}
+      <rect x={0} y={0} width={CW} height={CH} fill="#3a3a5c" />
+      <clipPath id="fb-clip"><path d={court} /></clipPath>
+      <rect x={0} y={0} width={CW} height={CH} fill="#44446a" clipPath="url(#fb-clip)" />
+      {/* Court outline */}
+      <path d={court} stroke="rgba(255,255,255,0.9)" strokeWidth={3} fill="none" />
+      {/* Halfway line */}
+      <line x1={cx} y1={FY} x2={cx} y2={FY + FH} {...lp} />
+      {/* Centre circle */}
+      <circle cx={cx} cy={cy} r={55} {...lp} />
+      <circle cx={cx} cy={cy} r={4} fill="rgba(255,255,255,0.9)" />
+      {/* Left goal area (D) */}
+      <path d={`M ${FX} ${cy - GOAL_AREA_R / 2 - 20}
+        A ${GOAL_AREA_R} ${GOAL_AREA_R / 1.5} 0 0 1 ${FX} ${cy + GOAL_AREA_R / 2 + 20}`}
+        {...lp} fill="rgba(255,255,255,0.05)" />
+      {/* Left goal */}
+      <rect x={FX - GOAL_W} y={cy - GOAL_H / 2} width={GOAL_W} height={GOAL_H}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="rgba(255,255,255,0.15)" />
+      {/* Left free-kick dot */}
+      <circle cx={FX + 80} cy={cy} r={5} fill="rgba(255,255,255,0.9)" />
+      {/* Right goal area (D) */}
+      <path d={`M ${FX + FW} ${cy - GOAL_AREA_R / 2 - 20}
+        A ${GOAL_AREA_R} ${GOAL_AREA_R / 1.5} 0 0 0 ${FX + FW} ${cy + GOAL_AREA_R / 2 + 20}`}
+        {...lp} fill="rgba(255,255,255,0.05)" />
+      {/* Right goal */}
+      <rect x={FX + FW} y={cy - GOAL_H / 2} width={GOAL_W} height={GOAL_H}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="rgba(255,255,255,0.15)" />
+      {/* Right free-kick dot */}
+      <circle cx={FX + FW - 80} cy={cy} r={5} fill="rgba(255,255,255,0.9)" />
+    </g>
+  );
+}
+
+/* ─── Handball court ─────────────────────────────────────────────────────── */
+function HandballCourt() {
+  const lp = { stroke: "rgba(255,255,255,0.9)", strokeWidth: 2, fill: "none" };
+  const HX = 20, HY = 15, HW = 720, HH = 430;
+  const cx = HX + HW / 2, cy = HY + HH / 2;
+  // Goal area D (6m line) and free-throw line (9m dashed)
+  const D_RX = 150, D_RY = 150; // 6m D semi-ellipse
+  const FT_RX = 225, FT_RY = 225; // 9m dashed line
+  const GOAL_W = 10, GOAL_H = 80;
+  const SEVEN_OFFSET = 195; // 7m penalty spot
+  return (
+    <g>
+      {/* Floor */}
+      <rect x={0} y={0} width={CW} height={CH} fill="#8b5e3c" />
+      {Array.from({ length: 10 }, (_, i) => (
+        <rect key={i} x={HX} y={HY + i * (HH / 10)} width={HW} height={HH / 10}
+          fill={i % 2 === 0 ? "rgba(0,0,0,0.06)" : "rgba(255,255,255,0.02)"} />
+      ))}
+      {/* Court outline */}
+      <rect x={HX} y={HY} width={HW} height={HH} {...lp} />
+      {/* Halfway line */}
+      <line x1={cx} y1={HY} x2={cx} y2={HY + HH} {...lp} />
+      {/* Centre circle */}
+      <circle cx={cx} cy={cy} r={20} {...lp} />
+      <circle cx={cx} cy={cy} r={4} fill="rgba(255,255,255,0.9)" />
+      {/* Left 6m D */}
+      <path d={`M ${HX} ${cy - D_RY}
+        A ${D_RX} ${D_RY} 0 0 1 ${HX} ${cy + D_RY}`}
+        {...lp} fill="rgba(255,255,255,0.07)" />
+      <line x1={HX} y1={cy - D_RY} x2={HX + 10} y2={cy - D_RY} {...lp} />
+      <line x1={HX} y1={cy + D_RY} x2={HX + 10} y2={cy + D_RY} {...lp} />
+      {/* Left 9m dashed */}
+      <path d={`M ${HX} ${cy - FT_RY}
+        A ${FT_RX} ${FT_RY} 0 0 1 ${HX} ${cy + FT_RY}`}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="none" strokeDasharray="10 7" />
+      {/* Left 7m spot */}
+      <circle cx={HX + SEVEN_OFFSET} cy={cy} r={4} fill="rgba(255,255,255,0.9)" />
+      {/* Left goal */}
+      <rect x={HX - GOAL_W} y={cy - GOAL_H / 2} width={GOAL_W} height={GOAL_H}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="rgba(255,255,255,0.15)" />
+      {/* Right 6m D */}
+      <path d={`M ${HX + HW} ${cy - D_RY}
+        A ${D_RX} ${D_RY} 0 0 0 ${HX + HW} ${cy + D_RY}`}
+        {...lp} fill="rgba(255,255,255,0.07)" />
+      <line x1={HX + HW - 10} y1={cy - D_RY} x2={HX + HW} y2={cy - D_RY} {...lp} />
+      <line x1={HX + HW - 10} y1={cy + D_RY} x2={HX + HW} y2={cy + D_RY} {...lp} />
+      {/* Right 9m dashed */}
+      <path d={`M ${HX + HW} ${cy - FT_RY}
+        A ${FT_RX} ${FT_RY} 0 0 0 ${HX + HW} ${cy + FT_RY}`}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="none" strokeDasharray="10 7" />
+      {/* Right 7m spot */}
+      <circle cx={HX + HW - SEVEN_OFFSET} cy={cy} r={4} fill="rgba(255,255,255,0.9)" />
+      {/* Right goal */}
+      <rect x={HX + HW} y={cy - GOAL_H / 2} width={GOAL_W} height={GOAL_H}
+        stroke="rgba(255,255,255,0.9)" strokeWidth={2} fill="rgba(255,255,255,0.15)" />
+    </g>
+  );
+}
+
+/* ─── Sport court dispatcher ─────────────────────────────────────────────── */
+function SportCourt({ sport }: { sport: string }) {
+  switch (sport) {
+    case "fotboll":   return <FootballPitch />;
+    case "ishockey":  return <IceHockeyRink />;
+    case "innebandy": return <FloorballCourt />;
+    case "handboll":  return <HandballCourt />;
+    default:          return <BasketballCourt />;
+  }
 }
 
 /* ─── Player marker ──────────────────────────────────────────────────────── */
@@ -533,7 +816,7 @@ export default function TaktikPage() {
   const clearBoard = () => {
     undoStackRef.current = [];
     setCanUndo(false);
-    setSteps([makeStep("Steg 1")]);
+    setSteps([makeStep("Steg 1", undefined, activeTeam?.sport ?? "basket")]);
     setCurrentStepIdx(0);
     setCoachNotes("");
     setSelectedPlayerId(null);
@@ -850,7 +1133,7 @@ export default function TaktikPage() {
   const loadTactic = (t: TacticDoc) => {
     undoStackRef.current = [];
     setCanUndo(false);
-    const loadedSteps = t.steps?.length ? t.steps : [makeStep("Steg 1")];
+    const loadedSteps = t.steps?.length ? t.steps : [makeStep("Steg 1", undefined, activeTeam?.sport ?? "basket")];
     setSteps(loadedSteps);
     setCurrentStepIdx(0);
     setCoachNotes(t.coachNotes ?? "");
@@ -958,11 +1241,13 @@ export default function TaktikPage() {
             <select
               value={activeTeam.id}
               onChange={(e) => {
-                setSelectedTeamId(e.target.value);
+                const newTeamId = e.target.value;
+                setSelectedTeamId(newTeamId);
                 // Full board reset for the new team
+                const newTeam = myTeams.find((t) => t.id === newTeamId);
                 undoStackRef.current = [];
                 setCanUndo(false);
-                setSteps([makeStep("Steg 1")]);
+                setSteps([makeStep("Steg 1", undefined, newTeam?.sport ?? "basket")]);
                 setCurrentStepIdx(0);
                 setCoachNotes("");
                 setTacticName("");
@@ -1056,7 +1341,7 @@ export default function TaktikPage() {
               onPointerUp={handleSVGPointerUp}
             >
               <AllMarkerDefs />
-              <BasketballCourt />
+              <SportCourt sport={activeTeam?.sport ?? "basket"} />
               {displayDrawings.filter(d => d.type === "zone" && d.color).map(d => (
                 <DrawingEl key={d.id} d={d} erasable={tool === "erase" && !isPlaying} onErase={() => handleDrawingClick(d.id)} />
               ))}
@@ -1162,7 +1447,7 @@ export default function TaktikPage() {
                         </h3>
                         <p className="text-xs text-slate-500 mb-2">Taktisk roll:</p>
                         <div className="flex flex-wrap gap-1">
-                          {TACTICAL_ROLES.map(role => (
+                          {(TACTICAL_ROLES_BY_SPORT[activeTeam?.sport ?? "basket"] ?? TACTICAL_ROLES_BY_SPORT.basket).map(role => (
                             <button key={role} onClick={() => updatePlayerInfo(selectedPlayer.id, { role })}
                               className={`text-xs px-2 py-0.5 rounded-lg font-medium transition-colors ${selectedPlayer.role === role ? "bg-orange-500 text-white" : "bg-slate-700 border border-slate-600 text-slate-300 hover:bg-orange-500/20 hover:border-orange-500/50"}`}>
                               {role}
