@@ -38,10 +38,9 @@ const navGroups: NavGroup[] = [
     id: "traning",
     label: "🏋 Träning",
     items: [
-      { href: "/taktik",         label: "🎯 Taktik" },
       { href: "/traningsdatabas", label: "💪 Träningsdatabas" },
-      { href: "/mallar",         label: "📋 Mallar",    restrictedRoles: ["player", "parent"] },
-      { href: "/utrustning",     label: "🎒 Utrustning", restrictedRoles: ["player", "parent"] },
+      { href: "/mallar",          label: "📋 Mallar",    restrictedRoles: ["player", "parent"] },
+      { href: "/utrustning",      label: "🎒 Utrustning", restrictedRoles: ["player", "parent"] },
     ],
   },
   {
@@ -186,6 +185,19 @@ export default function Navbar() {
           {/* ── Desktop nav groups ── */}
           {user && (
             <div className="hidden md:flex flex-1 items-center justify-center gap-0.5">
+              {/* Taktik — always direct, it's the core feature */}
+              <Link
+                href="/taktik"
+                className={`relative px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap group ${
+                  pathname === "/taktik" ? "text-orange-400" : "text-gray-300 hover:text-white"
+                }`}
+              >
+                🎯 Taktik
+                <span className={`absolute bottom-0 left-2 right-2 h-0.5 bg-orange-400 rounded-t transition-transform duration-300 origin-left ${
+                  pathname === "/taktik" ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+                }`} />
+              </Link>
+
               {navGroups.map((group) => {
                 const items = filterItems(group.items);
                 if (items.length === 0) return null;
@@ -347,6 +359,15 @@ export default function Navbar() {
       {user && mobileMenuOpen && (
         <div className="md:hidden border-t border-gray-800" style={{ backgroundColor: "#111827" }}>
           <div className="px-4 py-3 space-y-0.5">
+            <Link
+              href="/taktik"
+              className={`block px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                pathname === "/taktik" ? "text-orange-400 bg-gray-800" : "text-gray-300 hover:text-white hover:bg-gray-800"
+              }`}
+            >
+              🎯 Taktik
+            </Link>
+            <div className="h-px bg-gray-700 my-1" />
             {navGroups.map((group) => {
               const items = filterItems(group.items);
               if (items.length === 0) return null;
