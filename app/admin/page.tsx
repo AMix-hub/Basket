@@ -1215,7 +1215,7 @@ export default function AdminPage() {
                                     } else {
                                       try {
                                         await supabase.from("team_members").upsert(
-                                          { team_id: t.id, user_id: member.id, role: member.roles[0] },
+                                          { team_id: t.id, user_id: member.id },
                                           { onConflict: "team_id,user_id" }
                                         );
                                       } catch {
