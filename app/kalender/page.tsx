@@ -1309,20 +1309,20 @@ export default function KalenderPage() {
 
       {/* Create activity modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-slate-900 mb-3">Skapa ny aktivitet</h3>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">Skapa ny aktivitet</h3>
             <div className="space-y-3">
-              {/* Group selector – required; only teams where user has permission */}
+              {/* Group selector */}
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1">
                   Grupp <span className="text-red-500">*</span>
                 </label>
                 <select
                   required
                   value={createModalTeamId}
                   onChange={(e) => setCreateModalTeamId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                 >
                   {createableTeams.length === 0 && (
                     <option value="">Inga lag tillgängliga</option>
@@ -1334,9 +1334,9 @@ export default function KalenderPage() {
                   ))}
                 </select>
               </div>
-              {/* Date – changing the date also syncs Startdatum for recurring */}
+              {/* Date */}
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Datum</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1">Datum</label>
                 <input
                   type="date"
                   value={createModalDate}
@@ -1344,28 +1344,28 @@ export default function KalenderPage() {
                     setCreateModalDate(e.target.value);
                     setRecurStartDate(e.target.value);
                   }}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>
               {/* Title */}
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Titel</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1">Titel</label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !isRecurring && addSession()}
                   placeholder="Titel på passet..."
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                 />
               </div>
               {/* Type */}
               <div>
-                <label className="text-xs font-semibold text-slate-600 block mb-1">Typ</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-1">Typ</label>
                 <select
                   value={newType}
                   onChange={(e) => setNewType(e.target.value as "träning" | "match")}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                 >
                   <option value="träning">Träning</option>
                   <option value="match">Match</option>
@@ -1374,32 +1374,32 @@ export default function KalenderPage() {
               {/* Times */}
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-xs text-slate-500 block mb-0.5">Starttid</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Starttid</label>
                   <input
                     type="time"
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs text-slate-500 block mb-0.5">Sluttid</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Sluttid</label>
                   <input
                     type="time"
                     value={newEndTime}
                     onChange={(e) => setNewEndTime(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                   />
                 </div>
               </div>
               {/* Hall */}
               {halls.length > 0 && (
                 <div>
-                  <label className="text-xs text-slate-500 block mb-0.5">Hall</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Hall</label>
                   <select
                     value={newHallId}
                     onChange={(e) => setNewHallId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                   >
                     <option value="">🏟 Välj hall (valfritt)</option>
                     {halls.map((h) => (
@@ -1410,34 +1410,34 @@ export default function KalenderPage() {
               )}
               {/* Match-specific fields */}
               {newType === "match" && (
-                <div className="space-y-2 bg-red-50 rounded-xl p-3 border border-red-100">
-                  <p className="text-xs font-semibold text-red-700">Matchinfo</p>
+                <div className="space-y-2 bg-red-50 dark:bg-red-900/20 rounded-xl p-3 border border-red-100 dark:border-red-800/40">
+                  <p className="text-xs font-semibold text-red-700 dark:text-red-400">Matchinfo</p>
                   <div>
-                    <label className="text-xs text-slate-500 block mb-0.5">Motståndare</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Motståndare</label>
                     <input
                       type="text"
                       value={newOpponent}
                       onChange={(e) => setNewOpponent(e.target.value)}
                       placeholder="Motståndarlaget..."
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 block mb-0.5">Plats / Arena</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Plats / Arena</label>
                     <input
                       type="text"
                       value={newLocation}
                       onChange={(e) => setNewLocation(e.target.value)}
                       placeholder="Arena eller adress..."
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 block mb-0.5">Hemma / Borta</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Hemma / Borta</label>
                     <select
                       value={newHomeOrAway}
                       onChange={(e) => setNewHomeOrAway(e.target.value as "home" | "away")}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 bg-white"
+                      className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400"
                     >
                       <option value="home">🏠 Hemma</option>
                       <option value="away">✈️ Borta</option>
@@ -1448,11 +1448,11 @@ export default function KalenderPage() {
               {/* Coach assignment */}
               {teamCoaches.length > 0 && (
                 <div>
-                  <label className="text-xs text-slate-500 block mb-0.5">Ansvarig tränare</label>
+                  <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Ansvarig tränare</label>
                   <select
                     value={newCoachId}
                     onChange={(e) => setNewCoachId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                    className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
                   >
                     <option value="">Ingen specifik tränare</option>
                     {teamCoaches.map((c) => (
@@ -1469,39 +1469,39 @@ export default function KalenderPage() {
                   onChange={(e) => setIsRecurring(e.target.checked)}
                   className="accent-orange-500 w-4 h-4"
                 />
-                <span className="text-sm text-slate-700">🔁 Återkommande</span>
+                <span className="text-sm text-slate-700 dark:text-slate-200">🔁 Återkommande</span>
               </label>
               {/* Recurring fields */}
               {isRecurring && (
-                <div className="space-y-2 bg-blue-50 rounded-xl p-3 border border-blue-100">
-                  <p className="text-xs font-semibold text-blue-700">Generera återkommande pass</p>
+                <div className="space-y-2 bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 border border-blue-100 dark:border-blue-800/40">
+                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Generera återkommande pass</p>
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <label className="text-xs text-slate-500 block mb-0.5">Startdatum</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Startdatum</label>
                       <input
                         type="date"
                         value={recurStartDate}
                         onChange={(e) => setRecurStartDate(e.target.value)}
-                        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                       />
                     </div>
                     <div className="flex-1">
-                      <label className="text-xs text-slate-500 block mb-0.5">Slutdatum</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Slutdatum</label>
                       <input
                         type="date"
                         value={recurEndDate}
                         min={recurStartDate}
                         onChange={(e) => setRecurEndDate(e.target.value)}
-                        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-500 block mb-0.5">Veckodag</label>
+                    <label className="text-xs text-slate-500 dark:text-slate-400 block mb-0.5">Veckodag</label>
                     <select
                       value={recurWeekday}
                       onChange={(e) => setRecurWeekday(Number(e.target.value))}
-                      className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                      className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400"
                     >
                       {WEEKDAY_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1513,10 +1513,10 @@ export default function KalenderPage() {
                     const filtered = allDates.filter((d) => !isInFreePeriod(d, freePeriods));
                     const skipped = allDates.length - filtered.length;
                     return (
-                      <div className="text-xs text-blue-600 space-y-0.5">
+                      <div className="text-xs text-blue-600 dark:text-blue-300 space-y-0.5">
                         <p>{filtered.length} pass kommer att skapas</p>
                         {skipped > 0 && (
-                          <p className="text-purple-600">🚫 {skipped} datum hoppas över (träningsfria perioder)</p>
+                          <p className="text-purple-600 dark:text-purple-400">🚫 {skipped} datum hoppas över (träningsfria perioder)</p>
                         )}
                       </div>
                     );
