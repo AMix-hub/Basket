@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useCast } from "@/app/hooks/useCast";
+import { getSport } from "@/lib/sports";
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 
@@ -662,7 +663,7 @@ export default function TaktikPage() {
   const [playProgress, setPlayProgress] = useState(0);
 
   const [rightTab, setRightTab] = useState<"players" | "tactics" | "notes">("players");
-  const [showRight, setShowRight] = useState(true);
+  const [showRight, setShowRight] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1280);
 
   const [savedTactics, setSavedTactics] = useState<TacticDoc[]>([]);
   const [tacticName, setTacticName] = useState("");
@@ -1216,26 +1217,28 @@ export default function TaktikPage() {
     ? currentStep?.players.find(p => p.id === selectedPlayerId) ?? null
     : null;
 
-  const TOOLS: { id: Tool; label: string; bg: string; title: string }[] = [
-    { id: "select", label: "⇖ Välj/Flytta",  bg: "bg-slate-700",  title: "Välj och flytta spelare" },
-    { id: "arrow",  label: "→ Pil",                bg: "bg-yellow-500", title: "Rita rörelsepil (fast linje)" },
-    { id: "dashed", label: "- - Pass",                  bg: "bg-lime-500",   title: "Rita passningslinje (streckad)" },
-    { id: "circle", label: "○ Cirkel",              bg: "bg-pink-500",   title: "Markera ett område med cirkel" },
-    { id: "rect",   label: "□ Ruta",                bg: "bg-pink-500",   title: "Markera ett område med ruta" },
-    { id: "zone",   label: "■ Zon",                 bg: "bg-purple-600", title: "Färgmarkera en zon" },
-    { id: "erase",  label: "✕ Radera",              bg: "bg-slate-500",  title: "Radera spelare eller rita" },
+  const TOOLS: { id: Tool; icon: string; label: string; bg: string; title: string }[] = [
+    { id: "select", icon: "⇖", label: "Flytta",  bg: "bg-slate-700",  title: "Välj och flytta spelare" },
+    { id: "arrow",  icon: "→", label: "Pil",     bg: "bg-yellow-500", title: "Rita rörelsepil (fast linje)" },
+    { id: "dashed", icon: "╌", label: "Pass",    bg: "bg-lime-500",   title: "Rita passningslinje (streckad)" },
+    { id: "circle", icon: "○", label: "Cirkel",  bg: "bg-pink-500",   title: "Markera ett område med cirkel" },
+    { id: "rect",   icon: "□", label: "Ruta",    bg: "bg-pink-500",   title: "Markera ett område med ruta" },
+    { id: "zone",   icon: "■", label: "Zon",     bg: "bg-purple-600", title: "Färgmarkera en zon" },
+    { id: "erase",  icon: "✕", label: "Radera",  bg: "bg-slate-500",  title: "Radera spelare eller rita" },
   ];
+
+  const sportEmoji = getSport(activeTeam?.sport).emoji;
 
   return (
     <div className="flex flex-col gap-3">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">🏀</span>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight">Interaktiv Taktiktavla</h1>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-2xl sm:text-3xl">{sportEmoji}</span>
+          <h1 className="text-lg sm:text-2xl font-extrabold text-slate-100 tracking-tight">Taktiktavla</h1>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           {/* Team selector: show dropdown when user belongs to multiple teams */}
           {myTeams.length > 1 ? (
             <select
@@ -1293,34 +1296,37 @@ export default function TaktikPage() {
       <div ref={boardRef} className={isFullscreen ? "bg-black flex flex-col w-full h-full" : "flex flex-col gap-3"}>
 
       {/* Toolbar */}
-      <div className={`flex flex-wrap gap-2 items-center${isFullscreen ? " px-2 py-2" : ""}`}>
-        {TOOLS.map(({ id, label, bg, title }) => (
+      <div className={`flex flex-wrap gap-1.5 sm:gap-2 items-center${isFullscreen ? " px-2 py-2" : ""}`}>
+        {TOOLS.map(({ id, icon, label, bg, title }) => (
           <button key={id} title={title}
             onClick={() => !isPlaying && setTool(id)}
             disabled={isPlaying}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-all ${bg} ${tool === id && !isPlaying ? "ring-2 ring-offset-1 ring-orange-400 scale-105" : "opacity-75 hover:opacity-100"} disabled:opacity-40`}>
-            {label}
+            className={`min-h-[40px] sm:min-h-0 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-white transition-all ${bg} ${tool === id && !isPlaying ? "ring-2 ring-offset-1 ring-orange-400 scale-105" : "opacity-75 hover:opacity-100"} disabled:opacity-40`}>
+            <span className="sm:hidden">{icon}</span>
+            <span className="hidden sm:inline">{icon} {label}</span>
           </button>
         ))}
         {tool === "zone" && (
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
-            <span className="text-xs text-slate-500 shrink-0">Zon:</span>
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 sm:py-1">
+            <span className="text-xs text-slate-500 shrink-0 hidden sm:inline">Zon:</span>
             {ZONE_COLORS.map(zc => (
               <button key={zc.color} title={zc.label}
                 onClick={() => setZoneColor(zc.color)}
-                className={`w-5 h-5 rounded-full border-2 transition-all ${zoneColor === zc.color ? "border-slate-900 scale-125" : "border-transparent"}`}
+                className={`w-6 h-6 sm:w-5 sm:h-5 rounded-full border-2 transition-all ${zoneColor === zc.color ? "border-slate-900 scale-125" : "border-transparent"}`}
                 style={{ backgroundColor: zc.color.replace("0.35", "0.8") }} />
             ))}
           </div>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <button onClick={undo} disabled={!canUndo || isPlaying} title="Ångra (Ctrl+Z)"
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30 transition-colors disabled:opacity-40">
-            ↩ Ångra
+            className="min-h-[40px] sm:min-h-0 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30 transition-colors disabled:opacity-40">
+            <span className="sm:hidden">↩</span>
+            <span className="hidden sm:inline">↩ Ångra</span>
           </button>
           <button onClick={clearBoard} disabled={isPlaying}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30 transition-colors disabled:opacity-40">
-            🗑 Ny tavla
+            className="min-h-[40px] sm:min-h-0 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700/30 transition-colors disabled:opacity-40">
+            <span className="sm:hidden">🗑</span>
+            <span className="hidden sm:inline">🗑 Ny tavla</span>
           </button>
         </div>
       </div>
@@ -1335,7 +1341,7 @@ export default function TaktikPage() {
               ref={svgRef}
               viewBox={`0 0 ${CW} ${CH}`}
               className={`w-full select-none touch-none ${svgCursor}`}
-              style={{ maxHeight: isFullscreen ? `calc(100dvh - ${FULLSCREEN_TOOLBAR_HEIGHT}px)` : "65vh" }}
+              style={{ maxHeight: isFullscreen ? `calc(100dvh - ${FULLSCREEN_TOOLBAR_HEIGHT}px)` : "clamp(200px, 52vw, 65vh)" }}
               onPointerDown={handleSVGPointerDown}
               onPointerMove={handleSVGPointerMove}
               onPointerUp={handleSVGPointerUp}
@@ -1396,6 +1402,15 @@ export default function TaktikPage() {
               <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed border-lime-500" />Pass</span>
             </div>
           )}
+          {/* Mobile panel toggle — shown below court on small screens */}
+          {!isFullscreen && (
+            <button
+              onClick={() => setShowRight(v => !v)}
+              className="xl:hidden mt-2 w-full py-2.5 text-xs font-semibold rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+              {showRight ? "▲ Dölj panel" : "▼ Spelare · Taktiker · Noter"}
+            </button>
+          )}
         </div>
 
         {/* Right panel — hidden in fullscreen */}
@@ -1405,7 +1420,7 @@ export default function TaktikPage() {
               <div className="flex border-b border-slate-700">
                 {(["players", "tactics", "notes"] as const).map(tab => (
                   <button key={tab} onClick={() => setRightTab(tab)}
-                    className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${rightTab === tab ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50" : "text-slate-500 hover:text-slate-300"}`}>
+                    className={`flex-1 py-3 text-xs font-semibold transition-colors ${rightTab === tab ? "text-orange-600 border-b-2 border-orange-500 bg-orange-50" : "text-slate-500 hover:text-slate-300"}`}>
                     {tab === "players" ? "Spelare" : tab === "tactics" ? "💾 Taktiker" : "📝 Noter"}
                   </button>
                 ))}
@@ -1423,7 +1438,7 @@ export default function TaktikPage() {
                             <div key={p.id} className="flex items-center gap-1.5">
                               <span className="w-5 h-5 rounded-full bg-red-600 flex items-center justify-center text-white text-xs font-bold shrink-0">{p.number}</span>
                               <input value={live?.name ?? ""} onChange={e => updatePlayerInfo(p.id, { name: e.target.value })} placeholder={`Spelare ${p.number}`}
-                                className="flex-1 text-xs px-1.5 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400 min-w-0" />
+                                className="flex-1 text-xs px-1.5 py-1.5 sm:py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-orange-400 min-w-0" />
                             </div>
                           );
                         })}
@@ -1523,15 +1538,15 @@ export default function TaktikPage() {
 
       {/* Timeline */}
       <div className="bg-slate-800 rounded-2xl border border-slate-700 p-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap scrollbar-none">
             <span className="text-xs font-bold text-slate-500 shrink-0">Steg:</span>
             {steps.map((step, idx) => (
-              <div key={step.id} className="relative group">
+              <div key={step.id} className="relative group shrink-0">
                 <button
                   onClick={() => { if (!isPlaying) { setCurrentStepIdx(idx); setSelectedPlayerId(null); } }}
                   disabled={isPlaying}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${idx === currentStepIdx && !isPlaying ? "bg-orange-500 text-white ring-2 ring-offset-1 ring-orange-300" : isPlaying && idx === playStepIdx ? "bg-orange-300 text-white animate-pulse" : "bg-slate-700 text-slate-300 hover:bg-slate-200"} disabled:opacity-70`}>
+                  className={`min-h-[40px] sm:min-h-0 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold transition-all ${idx === currentStepIdx && !isPlaying ? "bg-orange-500 text-white ring-2 ring-offset-1 ring-orange-300" : isPlaying && idx === playStepIdx ? "bg-orange-300 text-white animate-pulse" : "bg-slate-700 text-slate-300 hover:bg-slate-200"} disabled:opacity-70`}>
                   {step.label}
                 </button>
                 {steps.length > 1 && !isPlaying && (
@@ -1543,19 +1558,20 @@ export default function TaktikPage() {
               </div>
             ))}
             <button onClick={addStep} disabled={isPlaying}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-200 transition-colors border border-dashed border-slate-300 disabled:opacity-40">
-              + Nytt steg
+              className="shrink-0 min-h-[40px] sm:min-h-0 px-2.5 py-2 sm:py-1.5 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-200 transition-colors border border-dashed border-slate-300 disabled:opacity-40">
+              + Nytt
             </button>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {steps.length < 2 && !isPlaying && <span className="text-xs text-slate-400 hidden sm:block">Lägg till 2+ steg</span>}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button onClick={isPlaying ? stopAnimation : playAnimation} disabled={!isPlaying && steps.length < 2}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all ${isPlaying ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700 disabled:opacity-40"}`}>
-              {isPlaying ? "⏹ Stopp" : "▶ Spela upp"}
+              className={`min-h-[40px] sm:min-h-0 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-bold text-white transition-all ${isPlaying ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700 disabled:opacity-40"}`}>
+              {isPlaying ? "⏹" : "▶"}
+              <span className="hidden sm:inline"> {isPlaying ? "Stopp" : "Spela upp"}</span>
             </button>
             <button onClick={exportPng} disabled={isPlaying} title="Exportera aktuellt steg som PNG"
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-40">
-              🖼 Exportera
+              className="min-h-[40px] sm:min-h-0 px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-200 transition-colors disabled:opacity-40">
+              🖼
+              <span className="hidden sm:inline"> Exportera</span>
             </button>
           </div>
         </div>
