@@ -1639,7 +1639,7 @@ export default function KalenderPage() {
                       : isFreePeriod
                       ? "bg-purple-50 dark:bg-slate-800 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/40 hover:bg-purple-100 dark:hover:bg-slate-700/80"
                       : isToday
-                      ? "bg-orange-500/20 text-orange-500 dark:text-orange-300 font-bold border border-orange-500/40"
+                      ? "bg-sky-500/20 text-sky-600 dark:text-sky-300 font-bold border border-sky-500/40"
                       : "bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/80 text-slate-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700/50"
                   }`}
                 >
@@ -1654,6 +1654,10 @@ export default function KalenderPage() {
 
           {/* Legend */}
           <div className="flex flex-wrap gap-4 mt-3 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-md bg-sky-500/20 border border-sky-500/40 inline-block cal-glow-today" />
+              Idag
+            </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded-md bg-gray-200 dark:bg-slate-800 inline-block cal-glow-training" />
               Träning

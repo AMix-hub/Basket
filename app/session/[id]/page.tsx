@@ -561,38 +561,9 @@ export default function SessionDetailPage() {
                 {session.homeOrAway === "home" ? "🏠 Hemma" : "✈️ Borta"} mot {session.opponent}
               </p>
             )}
-            {isMatch && isPast && (
+            {isMatch && session.result && (
               <div className="mt-2">
-                {editingResult ? (
-                  <div className="flex gap-2 items-center">
-                    <input
-                      autoFocus
-                      value={resultDraft}
-                      onChange={(e) => setResultDraft(e.target.value)}
-                      placeholder="T.ex. 78-65"
-                      className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg px-3 py-1 text-sm text-slate-800 dark:text-slate-100 w-28 focus:outline-none focus:ring-1 focus:ring-orange-400"
-                      onKeyDown={(e) => { if (e.key === "Enter") saveResult(); if (e.key === "Escape") setEditingResult(false); }}
-                    />
-                    <button onClick={saveResult} disabled={savingResult} className="text-xs px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition-colors">
-                      {savingResult ? "…" : "Spara"}
-                    </button>
-                    <button onClick={() => setEditingResult(false)} className="text-xs text-slate-500 hover:text-slate-300">Avbryt</button>
-                  </div>
-                ) : session.result ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-extrabold text-emerald-300">{session.result}</span>
-                    {canEdit && (
-                      <button onClick={() => { setResultDraft(session.result); setEditingResult(true); }} className="text-xs text-slate-500 hover:text-slate-300">✏️</button>
-                    )}
-                  </div>
-                ) : canEdit ? (
-                  <button
-                    onClick={() => { setResultDraft(""); setEditingResult(true); }}
-                    className="text-xs px-3 py-1 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 rounded-lg transition-colors"
-                  >
-                    + Lägg till resultat
-                  </button>
-                ) : null}
+                <span className="text-2xl font-extrabold text-emerald-400">{session.result}</span>
               </div>
             )}
             <div className="flex flex-wrap gap-3 mt-2 text-sm text-slate-500 dark:text-slate-400">
@@ -619,7 +590,87 @@ export default function SessionDetailPage() {
         </div>
       </div>
 
-      {/* ── Theme / Focus / Material / Notes ── */}
+      {/* ── Match report card ── */}
+      {isMatch && (
+        <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-slate-800 dark:text-slate-100">🏆 Matchrapport</h2>
+            {canEdit && !editingMeta && (
+              <button
+                onClick={() => { setMetaDraft({ theme: session.theme, focusArea: session.focusArea, material: session.material, reflection: session.reflection }); setResultDraft(session.result); setEditingMeta(true); }}
+                className="text-xs px-3 py-1 bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-800/50 text-red-600 dark:text-red-300 rounded-lg transition-colors"
+              >
+                ✏️ Redigera
+              </button>
+            )}
+          </div>
+
+          {editingMeta ? (
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Resultat (slutresultat)</label>
+                <input
+                  value={resultDraft}
+                  onChange={(e) => setResultDraft(e.target.value)}
+                  placeholder="T.ex. 78-65"
+                  className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-red-400 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 block mb-1">Matchrapport / anteckningar</label>
+                <textarea
+                  value={metaDraft.reflection}
+                  onChange={(e) => setMetaDraft((p) => ({ ...p, reflection: e.target.value }))}
+                  rows={4}
+                  placeholder="Hur gick matchen? Vad var bra? Vad kan bli bättre?"
+                  className="w-full bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-red-400 resize-none"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => { await saveResult(); await saveMeta(); }}
+                  disabled={savingResult || savingMeta}
+                  className="flex-1 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  {savingResult || savingMeta ? "Sparar…" : "Spara"}
+                </button>
+                <button
+                  onClick={() => setEditingMeta(false)}
+                  className="px-4 py-2 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Avbryt
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Score */}
+              <div className="text-center py-3">
+                {session.result ? (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1 uppercase tracking-wide">Slutresultat</p>
+                    <span className="text-4xl font-extrabold text-emerald-500 dark:text-emerald-400 tabular-nums">{session.result}</span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 dark:text-slate-500 italic">
+                    {canEdit ? "Klicka Redigera för att fylla i resultat och matchrapport." : "Resultat ej inlagt ännu."}
+                  </p>
+                )}
+              </div>
+              {/* Match notes */}
+              {session.reflection && (
+                <div className="border-t border-red-200 dark:border-red-800/40 pt-4">
+                  <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 mb-1 uppercase tracking-wide">Matchrapport</p>
+                  <p className="text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">{session.reflection}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Training info (hidden for matches) ── */}
+      {!isMatch && (
       <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-bold text-slate-800 dark:text-slate-100">Träningsinformation</h2>
@@ -702,6 +753,7 @@ export default function SessionDetailPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── Training plan ── */}
       {!isMatch && (

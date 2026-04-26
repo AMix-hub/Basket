@@ -128,7 +128,7 @@ details[open] .chevron {
 }
 
 .cal-glow-today {
-  box-shadow: 0 0 12px rgba(249, 115, 22, 0.6), 0 0 28px rgba(249, 115, 22, 0.3), inset 0 0 10px rgba(249, 115, 22, 0.08);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.6), 0 0 28px rgba(56, 189, 248, 0.3), inset 0 0 10px rgba(56, 189, 248, 0.08);
 }
 
 /* Gradient button with hover lift */
