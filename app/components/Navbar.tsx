@@ -16,7 +16,7 @@ const allMainLinks: { href: string; label: string; restrictedRoles: UserRole[] }
   { href: "/kalender", label: "Kalender", restrictedRoles: [] },
   { href: "/spelare", label: "Spelare", restrictedRoles: [] },
   { href: "/nyheter", label: "Nyheter", restrictedRoles: [] },
-  { href: "/traningsdatabas", label: "Träning", restrictedRoles: ["player", "parent"] },
+  { href: "/traningsdatabas", label: "Träning", restrictedRoles: [] },
   { href: "/cup", label: "Cuper", restrictedRoles: [] },
   { href: "/betalningar", label: "Betalningar", restrictedRoles: ["player", "parent"] },
 ];
@@ -32,7 +32,6 @@ const merDropdownLinks: { href: string; label: string; restrictedRoles: UserRole
 const adminDropdownLinks = [
   { href: "/admin", label: "🏛 Adminpanel" },
   { href: "/registret", label: "👥 Registret" },
-  { href: "/anslut", label: "🔗 Anslut" },
 ];
 
 export default function Navbar() {

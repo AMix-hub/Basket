@@ -3,34 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth, UserRole } from "../context/AuthContext";
-
-const roles: { value: UserRole; label: string; desc: string }[] = [
-  { value: "coach",     label: "🎽 Coach",      desc: "Leder ett lag"             },
-  { value: "assistant", label: "👋 Assistent",   desc: "Hjälper coachen"           },
-  { value: "parent",    label: "👪 Förälder",    desc: "Följer sitt barns lag"     },
-  { value: "player",    label: "🏃 Spelare",     desc: "Spelar i laget"            },
-];
-
-const inviteCodeLabel: Partial<Record<UserRole, string>> = {
-  coach:     "Admin-inbjudningskod",
-  assistant: "Inbjudningskod från coach",
-  parent:    "Inbjudningskod från coach",
-  player:    "Inbjudningskod från coach",
-};
-
-const inviteCodeHint: Partial<Record<UserRole, string>> = {
-  coach:     "Fråga din föreningsadmin om koden.",
-  assistant: "Fråga din coach om assistentkoden.",
-  parent:    "Fråga din coach om föräldrainbjudningskoden.",
-  player:    "Fråga din coach om spelarkoden.",
-};
+import { useAuth } from "../context/AuthContext";
 
 export default function AnslutPage() {
   const { register } = useAuth();
   const router = useRouter();
 
-  const [role, setRole]         = useState<UserRole>("coach");
   const [name, setName]         = useState("");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
@@ -38,7 +16,6 @@ export default function AnslutPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("≤7 år");
-  const [childName, setChildName] = useState("");
   const [error, setError]       = useState("");
   const [busy, setBusy]         = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -57,21 +34,17 @@ export default function AnslutPage() {
       setError("Lösenorden matchar inte.");
       return;
     }
-    if (role === "parent" && !childName.trim()) {
-      setError("Ange barnets namn för att kopplas till rätt spelare.");
-      return;
-    }
 
     setBusy(true);
     const result = await register(
       name.trim(),
       email.trim().toLowerCase(),
       password,
-      role,
-      role === "coach" ? teamName.trim() : undefined,
-      role === "coach" ? ageGroup        : undefined,
+      "coach",
+      teamName.trim(),
+      ageGroup,
       inviteCode.trim(),
-      role === "parent" ? childName.trim() : undefined,
+      undefined,
       undefined
     );
     setBusy(false);
@@ -112,54 +85,19 @@ export default function AnslutPage() {
         <div className="text-center mb-8">
           <span className="text-4xl">🏀</span>
           <h1 className="text-2xl font-extrabold text-slate-100 mt-3">
-            Gå med i ett lag
+            Skapa nytt lag
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Registrera dig med din inbjudningskod
+            Registrera dig som coach och skapa ditt lag
           </p>
         </div>
 
         <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Role selector */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-1">
-                Roll
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {roles.map(({ value, label, desc }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => {
-                      setRole(value);
-                      setError("");
-                      if (value !== "parent") setChildName("");
-                      setInviteCode("");
-                    }}
-                    className={`py-2.5 px-3 text-left rounded-xl transition-all border ${
-                      role === value
-                        ? "bg-orange-500 text-white border-orange-500"
-                        : "bg-slate-50 text-slate-300 border-slate-200 hover:border-orange-300"
-                    }`}
-                  >
-                    <span className="text-xs font-bold block">{label}</span>
-                    <span
-                      className={`text-xs block mt-0.5 ${
-                        role === value ? "text-orange-100" : "text-slate-400"
-                      }`}
-                    >
-                      {desc}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Name */}
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-1">
-                Namn
+                Ditt namn
               </label>
               <input
                 type="text"
@@ -227,63 +165,41 @@ export default function AnslutPage() {
               )}
             </div>
 
-            {/* Coach: team name + age group */}
-            {role === "coach" && (
-              <>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-1">
-                    Lagets namn
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
-                    placeholder="T.ex. Röda Laget U9"
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-1">
-                    Åldersgrupp
-                  </label>
-                  <select
-                    value={ageGroup}
-                    onChange={(e) => setAgeGroup(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-                  >
-                    <option value="≤7 år">≤7 år (År 1)</option>
-                    <option value="8 år">8 år (År 2)</option>
-                    <option value="9 år">9 år (År 3)</option>
-                  </select>
-                </div>
-              </>
-            )}
-
-            {/* Parent: child name */}
-            {role === "parent" && (
-              <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-1">
-                  Barnets namn
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={childName}
-                  onChange={(e) => setChildName(e.target.value)}
-                  placeholder="Vad heter ditt barn?"
-                  className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  Används för att koppla dig till ditt barns närvaro.
-                </p>
-              </div>
-            )}
-
-            {/* Invite code */}
+            {/* Team name */}
             <div>
               <label className="block text-sm font-semibold text-slate-300 mb-1">
-                {inviteCodeLabel[role]}
+                Lagets namn
+              </label>
+              <input
+                type="text"
+                required
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                placeholder="T.ex. Röda Laget U9"
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
+
+            {/* Age group */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                Åldersgrupp
+              </label>
+              <select
+                value={ageGroup}
+                onChange={(e) => setAgeGroup(e.target.value)}
+                className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+              >
+                <option value="≤7 år">≤7 år (År 1)</option>
+                <option value="8 år">8 år (År 2)</option>
+                <option value="9 år">9 år (År 3)</option>
+              </select>
+            </div>
+
+            {/* Admin invite code */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-300 mb-1">
+                Admin-inbjudningskod
               </label>
               <input
                 type="text"
@@ -295,7 +211,7 @@ export default function AnslutPage() {
                 className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
               />
               <p className="text-xs text-slate-400 mt-1">
-                {inviteCodeHint[role]}
+                Fråga din föreningsadmin om koden.
               </p>
             </div>
 
@@ -310,7 +226,7 @@ export default function AnslutPage() {
               disabled={busy}
               className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-bold text-sm rounded-xl transition-colors"
             >
-              {busy ? "Registrerar…" : "Skapa konto"}
+              {busy ? "Registrerar…" : "Skapa lag"}
             </button>
           </form>
 
@@ -324,13 +240,6 @@ export default function AnslutPage() {
             </Link>
           </p>
         </div>
-
-        <p className="text-center text-xs text-slate-400 mt-4">
-          Vill du starta en ny förening?{" "}
-          <Link href="/registrera" className="text-orange-500 hover:underline font-medium">
-            Registrera som föreningsadmin →
-          </Link>
-        </p>
       </div>
     </div>
   );

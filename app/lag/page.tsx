@@ -23,16 +23,11 @@ interface PlayerGroup {
 }
 
 export default function LagPage() {
-  const { user, getMyTeams, joinTeam } = useAuth();
+  const { user, getMyTeams } = useAuth();
   const teams = getMyTeams();
 
   // Members keyed by teamId
   const [membersByTeam, setMembersByTeam] = useState<Record<string, ProfileRow[]>>({});
-  const [copied, setCopied]         = useState<string | null>(null);
-  const [joinCode, setJoinCode]     = useState("");
-  const [joinChildName, setJoinChildName] = useState("");
-  const [joinError, setJoinError]   = useState("");
-  const [joinSuccess, setJoinSuccess] = useState(false);
   // Which team panels are expanded
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
@@ -118,31 +113,6 @@ export default function LagPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teams.map((t: Team) => t.id).join(",")]);
 
-  const copyToClipboard = async (text: string, key: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(key);
-      setTimeout(() => setCopied(null), 2000);
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleJoin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setJoinError("");
-    const ok = await joinTeam(
-      joinCode.trim().toUpperCase(),
-      user?.roles.includes("parent") ? joinChildName.trim() : undefined
-    );
-    if (ok) {
-      setJoinSuccess(true);
-      setJoinCode("");
-    } else {
-      setJoinError("Ogiltig kod. Kontrollera att du skrivit rätt.");
-    }
-  };
-
   const createGroup = async (teamId: string) => {
     const name = (newGroupName[teamId] ?? "").trim();
     if (!name) return;
@@ -226,22 +196,14 @@ export default function LagPage() {
           </h1>
         </div>
         <p className="text-slate-500 dark:text-slate-500 text-sm">
-          Laginfo, inbjudningskoder och medlemmar. Du kan vara med i flera lag
-          samtidigt.
+          Laginfo och medlemmar. Du kan vara med i flera lag samtidigt.
         </p>
       </div>
 
       {/* No team notice */}
-      {teams.length === 0 && !joinSuccess && (
+      {teams.length === 0 && (
         <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-4 mb-6 text-sm text-amber-700 dark:text-amber-300">
-          Du är inte med i något lag ännu. Ange en inbjudningskod nedan för att
-          gå med.
-        </div>
-      )}
-
-      {joinSuccess && (
-        <div className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700/50 rounded-2xl p-4 mb-6 text-emerald-700 dark:text-emerald-400 text-sm font-medium">
-          ✓ Du har gått med i laget! Laginformationen visas nedan.
+          Du är inte med i något lag ännu. Be din coach bjuda in dig via e-post.
         </div>
       )}
 
@@ -251,11 +213,8 @@ export default function LagPage() {
         const groups = groupsByTeam[team.id] ?? [];
         const isExpanded = expandedTeams.has(team.id);
         const isCoach = user.roles.includes("coach") && team.coachId === user.id;
-        // Co-admins have adminId pointing to the original club admin; treat them
-        // as admin for any team that belongs to the same club.
         const effectiveAdminId = (user.roles.includes("admin") && user.adminId) ? user.adminId : user.id;
         const isAdmin = user.roles.includes("admin") && team.adminId === effectiveAdminId;
-        const canSeeInvites = isCoach || isAdmin;
         const canManageGroups = isCoach || isAdmin;
 
         return (
@@ -320,47 +279,6 @@ export default function LagPage() {
                   </div>
                 </Link>
 
-                {/* Invite codes (coach / admin only) */}
-                {canSeeInvites && (
-                  <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
-                    <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3">
-                      Inbjudningskoder
-                    </h3>
-                    <p className="text-slate-400 dark:text-slate-500 text-sm mb-4">
-                      Dela dessa koder med rätt person.
-                    </p>
-                    <div className="space-y-3">
-                      {[
-                        { key: `${team.id}-staff`,  label: "👋 Assistenter / personal", code: team.inviteCode,        bg: "bg-gray-100 dark:bg-slate-900/30",    text: "text-slate-500 dark:text-slate-400",   mono: "text-slate-700 dark:text-slate-200",   btn: "bg-gray-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-gray-300 dark:hover:bg-slate-600" },
-                        { key: `${team.id}-parent`, label: "👪 Föräldrar",               code: team.parentInviteCode,  bg: "bg-orange-500/10",   text: "text-orange-500 dark:text-orange-400",  mono: "text-orange-600 dark:text-orange-300",  btn: "bg-orange-500/20 text-orange-600 dark:text-orange-400 hover:bg-orange-500/30" },
-                        { key: `${team.id}-player`, label: "🏃 Spelare",                 code: team.playerInviteCode,  bg: "bg-emerald-500/10 dark:bg-emerald-900/30",  text: "text-emerald-600 dark:text-emerald-400", mono: "text-emerald-700 dark:text-emerald-300", btn: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30" },
-                      ].map(({ key, label, code, bg, text, mono, btn }) => (
-                        <div key={key} className={`flex items-center gap-3 ${bg} rounded-xl px-4 py-3`}>
-                          <div className="flex-1">
-                            <p className={`text-xs font-semibold ${text} mb-0.5`}>{label}</p>
-                            <p className={`font-mono text-xl font-bold ${mono} tracking-widest`}>{code}</p>
-                          </div>
-                          <button
-                            onClick={() => copyToClipboard(code, key)}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
-                              copied === key ? "bg-emerald-500 text-white" : btn
-                            }`}
-                          >
-                            {copied === key ? "✓ Kopierad!" : "📋 Kopiera"}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700/50 rounded-xl text-xs text-blue-700 dark:text-blue-300">
-                      💡 <strong>Tips:</strong> Dela rätt kod med rätt person. De
-                      registrerar sig via{" "}
-                      <Link href="/anslut" className="underline font-medium">
-                        Gå med i ett lag
-                      </Link>
-                      .
-                    </div>
-                  </div>
-                )}
 
                 {/* Members list */}
                 <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
@@ -524,57 +442,6 @@ export default function LagPage() {
         );
       })}
 
-      {/* Join an additional team */}
-      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 mt-2">
-        <h2 className="font-bold text-slate-800 dark:text-slate-100 mb-1">
-          {teams.length === 0 ? "Gå med i ett lag" : "Gå med i ytterligare ett lag"}
-        </h2>
-        <p className="text-slate-400 dark:text-slate-500 text-sm mb-4">
-          {teams.length === 0
-            ? "Ange en inbjudningskod från din coach för att gå med."
-            : "Har du en kod till ett annat lag? Du kan vara med i flera lag samtidigt."}
-        </p>
-        <form onSubmit={handleJoin} className="space-y-3">
-          <div>
-            <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">
-              Inbjudningskod
-            </label>
-            <input
-              type="text"
-              required
-              value={joinCode}
-              onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-              placeholder="XXXXXX"
-              maxLength={6}
-              className="w-full max-w-xs px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400 uppercase tracking-widest font-mono"
-            />
-          </div>
-          {user.roles.includes("parent") && (
-            <div>
-              <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                Barnets namn
-              </label>
-              <input
-                type="text"
-                required
-                value={joinChildName}
-                onChange={(e) => setJoinChildName(e.target.value)}
-                placeholder="Barnets namn i spelarlistan"
-                className="w-full max-w-xs px-3 py-2.5 text-sm text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-400"
-              />
-            </div>
-          )}
-          {joinError && (
-            <p className="text-red-600 text-sm">{joinError}</p>
-          )}
-          <button
-            type="submit"
-            className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors"
-          >
-            Gå med i laget
-          </button>
-        </form>
-      </div>
     </div>
   );
 }
